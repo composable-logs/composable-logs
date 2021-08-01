@@ -1,0 +1,61 @@
+// Dynamically created tasks.json -- do not edit.
+// See make_tasks_json.py
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "pynb_dag_runner library - watch and run all tasks",
+            "dependsOn": [
+                "(pynb_dag_runner library: run unit tests)",
+                "(pynb_dag_runner library: mypy static code analysis)",
+                "(pynb_dag_runner library: black format code check)"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "(pynb_dag_runner library: run unit tests)",
+            "type": "shell",
+            "command": "(cd pynb_dag_runner; find . | grep \".py\" | entr make test-pytest)",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "pynb_dag_runner library (terminal-group-id)"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "(pynb_dag_runner library: mypy static code analysis)",
+            "type": "shell",
+            "command": "(cd pynb_dag_runner; find . | grep \".py\" | entr make test-mypy)",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "pynb_dag_runner library (terminal-group-id)"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "(pynb_dag_runner library: black format code check)",
+            "type": "shell",
+            "command": "(cd pynb_dag_runner; find . | grep \".py\" | entr make test-black)",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+                "group": "pynb_dag_runner library (terminal-group-id)"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

@@ -1,5 +1,9 @@
 FROM pynb-dag-runner
 
+USER root
+RUN apt-get install -y -q entr
+USER host_user
+
 # Jupyter server is only run in dev-mode
 ARG JUPYTER_TOKEN
 ENV JUPYTER_TOKEN=$JUPYTER_TOKEN
