@@ -1,0 +1,17 @@
+// See, https://code.visualstudio.com/docs/remote/containers
+{
+  "name": "pynb-dag-runner dev",
+  "dockerComposeFile": [
+    "docker-compose.yml"
+  ],
+  "service": "dev-environment",
+  "runServices": [],
+  "forwardPorts": [
+    8888
+  ],
+  "remoteEnv": {},
+  "extensions": [
+    "ms-python.python"
+  ],
+  "workspaceFolder": "/home/host_user/workspace",
+}

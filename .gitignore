@@ -1,0 +1,6 @@
+JUPYTER_TOKEN
+
+# build files
+**/build/
+**/dist/
+**/*.egg-info/

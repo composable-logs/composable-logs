@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+  dev-environment:
+    image: pynb-dag-runner-dev
+    volumes:
+    - ./workspace:/home/host_user/workspace
+    ports:
+    - "8888:8888"
+    command:
+    - |
+      cd /home/host_user/workspace/
+      jupyter notebook --no-browser --port 8888 --ip 0.0.0.0
+    hostname: pynb-dag-runner-dev

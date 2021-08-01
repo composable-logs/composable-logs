@@ -1,0 +1,33 @@
+{
+    // Editor settings
+    "window.zoomLevel": 0,
+    "editor.fontSize": 18,
+    "editor.rulers": [
+        88
+    ],
+    "editor.renderWhitespace": "all",
+    "editor.renderLineHighlight": "all",
+    "editor.formatOnSave": true,
+    "workbench.colorCustomizations": {
+        "editor.lineHighlightBackground": "#484860",
+        "editorWhitespace.foreground": "#525260"
+    },
+    // Python settings
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [],
+    "python.testing.unittestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.formatting.provider": "black",
+    "python.formatting.blackPath": "/home/host_user/.local/bin/black",
+    "python.formatting.blackArgs": [],
+    "jupyter.jupyterServerType": "local",
+    // Extensions settings
+    //
+    // VS Code have had issues installing extensions when VS Code is run inside a
+    // container. This should have been fixed, but the below seems to work better (?)
+    // See https://github.com/microsoft/vscode/issues/119073
+    "remote.downloadExtensionsLocally": true,
+    // Terminal settings
+    "terminal.integrated.fontSize": 11,
+    "terminal.integrated.cwd": "/home/host_user/workspace/pynb_dag_runner/"
+}

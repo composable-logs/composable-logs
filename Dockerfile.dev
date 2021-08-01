@@ -1,0 +1,10 @@
+FROM pynb-dag-runner
+
+# Jupyter server is only run in dev-mode
+ARG JUPYTER_TOKEN
+ENV JUPYTER_TOKEN=$JUPYTER_TOKEN
+
+# See
+# https://docs.python.org/3/using/cmdline.html#environment-variables
+ENV PYTHONDEVMODE="1"
+ENV PYTHONDONTWRITEBYTECODE="1"
