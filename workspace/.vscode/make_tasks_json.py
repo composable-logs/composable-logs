@@ -85,3 +85,4 @@ with open("tasks.json", "w") as f:
             indent=4,
         )
     )
+    f.write("\n")
