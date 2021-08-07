@@ -18,6 +18,7 @@ USER host_user
 ENV PATH "/home/host_user/.local/bin:$PATH"
 
 RUN pip3 install --user \
+        ray[default]==1.5.1 \
         notebook==6.3.0 \
         jupytext==1.11.4 \
         pytest==6.2.4 \
