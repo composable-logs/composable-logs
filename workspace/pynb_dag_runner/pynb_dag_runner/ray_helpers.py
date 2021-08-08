@@ -79,3 +79,28 @@ def try_eval_f_async_wrapper(
             )
 
     return result
+
+
+RetryCount = int
+
+
+def retry_wrapper(
+    f_task_remote: Callable[[RetryCount], Future[A]],
+    max_retries: RetryCount,
+    is_success: Callable[[A], bool],
+) -> Future[List[A]]:
+    # Note: this is currently the only place where cpu-resources are allocated for Ray
+    @ray.remote(num_cpus=1)
+    class RetryActor:
+        async def make_retry_calls(self):
+            results: List[A] = []
+            for attempt_nr in range(max_retries):
+                results.append(await f_task_remote(attempt_nr))
+
+                if is_success(results[-1]):
+                    break
+
+            return results
+
+    retry_actor = RetryActor.remote()  # type: ignore
+    return retry_actor.make_retry_calls.remote()

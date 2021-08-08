@@ -1,4 +1,4 @@
-import time
+import time, random
 from pathlib import Path
 from uuid import uuid4
 from typing import Callable
@@ -7,7 +7,8 @@ from typing import Callable
 import pytest, ray
 
 #
-from pynb_dag_runner.ray_helpers import try_eval_f_async_wrapper, Future
+from pynb_dag_runner.helpers import flatten, ranges_intersect
+from pynb_dag_runner.ray_helpers import try_eval_f_async_wrapper, retry_wrapper, Future
 
 
 @ray.remote(num_cpus=0)
@@ -131,3 +132,134 @@ def test_timeout_w_timeout(
     else:
         assert state.did_flip()  # type: ignore
         assert result == "RUN OK"
+
+
+### tests for retry_wrapper
+
+
+def test_retry_all_fail():
+    results = ray.get(
+        retry_wrapper(
+            f_task_remote=ray.remote(num_cpus=0)(lambda _: "foo").remote,
+            max_retries=10,
+            is_success=lambda _: False,
+        )
+    )
+    assert results == ["foo"] * 10
+
+
+def test_retry_all_success():
+    results = ray.get(
+        retry_wrapper(
+            f_task_remote=ray.remote(num_cpus=0)(lambda _: "foo").remote,
+            max_retries=10,
+            is_success=lambda _: True,
+        )
+    )
+    assert results == ["foo"]
+
+
+def test_retry_deterministic_success():
+    results = ray.get(
+        retry_wrapper(
+            f_task_remote=ray.remote(num_cpus=0)(lambda retry_nr: retry_nr).remote,
+            max_retries=10,
+            is_success=lambda x: x >= 4,
+        )
+    )
+    assert results == [0, 1, 2, 3, 4]
+
+
+def test_retry_random():
+    for _ in range(10):
+        results = ray.get(
+            retry_wrapper(
+                f_task_remote=ray.remote(num_cpus=0)(
+                    lambda _: random.randint(1, 10)
+                ).remote,
+                max_retries=5,
+                is_success=lambda x: x >= 5,
+            )
+        )
+
+        assert all(isinstance(r, int) for r in results)
+        assert 0 < len(results) <= 5
+
+        if len(results) < 5:
+            assert results[-1] >= 5  # last is success
+            assert all(r < 5 for r in results[:-1])  # other is failures
+
+
+def test_multiple_retrys_should_run_in_parallel():
+    def make_f(task_label: str):
+        def f(retry_count):
+            start_ts = time.time_ns()
+            time.sleep(0.1)
+            return {
+                "task_label": task_label,
+                "retry_count": retry_count,
+                "start_ts": start_ts,
+                "stop_ts": time.time_ns(),
+            }
+
+        return f
+
+    f_a = retry_wrapper(
+        ray.remote(num_cpus=0)(make_f("task-a")).remote,
+        10,
+        is_success=lambda result: result["retry_count"] >= 2,
+    )
+    f_b = retry_wrapper(
+        ray.remote(num_cpus=0)(make_f("task-b")).remote,
+        10,
+        is_success=lambda result: result["retry_count"] >= 2,
+    )
+
+    results = flatten(ray.get([f_a, f_b]))
+    assert len(results) == 2 * 3
+
+    # On fast multi-core computers we can check that ray.get takes less than 2x the
+    # sleep delay in f. However, on slower VMs with only two cores (and possibly other
+    # processes?, like github's defaults runners) there may be so much overhead this
+    # is not true. Instead we check that that there is some overlap between run times
+    # for the two tasks. This seems like a more stable condition.
+
+    def get_range(task_label: str):
+        task_results = [r for r in results if r["task_label"] == task_label]
+
+        return range(
+            min(r["start_ts"] for r in task_results),
+            max(r["stop_ts"] for r in task_results),
+        )
+
+    assert ranges_intersect(get_range("task-a"), get_range("task-b"))
+
+
+### Test composition of both retry and timeout wrappers
+
+
+@pytest.mark.parametrize("dummy_loop_parameter", range(1))
+def test_retry_and_timeout_composition(dummy_loop_parameter):
+    def f(retry_count):
+        if retry_count < 5:
+            time.sleep(1e6)  # hang computation
+
+    f_timeout = try_eval_f_async_wrapper(
+        f,
+        timeout_s=1,
+        success_handler=lambda _: "SUCCESS",
+        error_handler=lambda e: f"FAIL:{e}",
+    )
+
+    f_retry_timeout = retry_wrapper(
+        lambda retry_count: f_timeout(ray.put(retry_count)),
+        10,
+        is_success=lambda result: result == "SUCCESS",
+    )
+
+    results = flatten(ray.get([f_retry_timeout]))
+
+    assert len(results) == 6
+    for result in results[:-1]:
+        assert result.startswith("FAIL:Timeout error:")
+    assert results[-1] == "SUCCESS"
