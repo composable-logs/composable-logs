@@ -48,8 +48,7 @@ def compose(*fs):
     assert len(fs) >= 1
     *fs_outers, f_innermost = fs
 
-    return (
-        (lambda *xs: compose(*fs_outers)(f_innermost(*xs)))
-        if len(fs_outers) > 0
-        else f_innermost
-    )
+    if len(fs_outers) > 0:
+        return lambda *xs: compose(*fs_outers)(f_innermost(*xs))
+    else:
+        return f_innermost
