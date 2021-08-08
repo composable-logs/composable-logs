@@ -2,7 +2,7 @@ import time, random
 from typing import List, Set, Dict, Tuple, Optional, Any, Callable
 
 #
-import ray, pytest
+import pytest, ray
 
 #
 from pynb_dag_runner.ray_helpers import Future
@@ -13,17 +13,6 @@ from pynb_dag_runner.core.dag_runner import (
     run_tasks,
 )
 from tests.test_ray_helpers import StateActor
-
-ray.init(num_cpus=2, ignore_reinit_error=True)
-
-
-def make_task(sleep_secs: float, return_value: int) -> Task[int]:
-    @ray.remote(num_cpus=0)
-    def f():
-        time.sleep(sleep_secs)
-        return return_value
-
-    return Task(f.remote)
 
 
 @pytest.mark.parametrize(
@@ -38,6 +27,14 @@ def make_task(sleep_secs: float, return_value: int) -> Task[int]:
     ],
 )
 def test_all_tasks_are_run(task_dependencies):
+    def make_task(sleep_secs: float, return_value: int) -> Task[int]:
+        @ray.remote(num_cpus=0)
+        def f():
+            time.sleep(sleep_secs)
+            return return_value
+
+        return Task(f.remote)
+
     task0 = make_task(sleep_secs=0.05, return_value=0)
     task1 = make_task(sleep_secs=0.01, return_value=1)
     task2 = make_task(sleep_secs=0.025, return_value=2)

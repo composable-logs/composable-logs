@@ -8,8 +8,6 @@ from pynb_dag_runner.core.dag_runner import (
     TaskDependencies,
 )
 
-ray.init(num_cpus=2, ignore_reinit_error=True)
-
 
 def test_task_execute_states():
     @ray.remote(num_cpus=0)
