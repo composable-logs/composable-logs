@@ -1,0 +1,65 @@
+name: "Automated tests"
+
+on:
+  push:
+    branches:
+      - development
+
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - development
+
+  workflow_dispatch:
+
+
+jobs:
+  run-all-tests:
+    runs-on: [ubuntu-20.04]
+
+    steps:
+      - name: "Determine run-environment"
+        shell: bash
+        run: |
+          echo "RUN_ENVIRONMENT=ci" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v2
+
+      - name: "Build docker image"
+        shell: bash
+        run: |
+          cd ${{ github.workspace }}
+          make docker-build
+
+      - name: "Run unit tests"
+        shell: bash
+        run: |
+          cd ${{ github.workspace }}
+          make \
+              RUN_ENVIRONMENT="${{ env.RUN_ENVIRONMENT }}" \
+              COMMAND="(cd pynb_dag_runner; make test-pytest )" \
+              docker-run
+
+      - name: "Run mypy type checks"
+        shell: bash
+        run: |
+          cd ${{ github.workspace }}
+          make \
+              COMMAND="(cd pynb_dag_runner; make test-mypy )" \
+              docker-run
+
+      - name: "Check black formatting"
+        shell: bash
+        run: |
+          cd ${{ github.workspace }}
+          make \
+              COMMAND="(cd pynb_dag_runner; make test-black )" \
+              docker-run
+
+      - name: "Build Python wheel file"
+        shell: bash
+        run: |
+          cd ${{ github.workspace }}
+          make \
+              COMMAND="(cd pynb_dag_runner; make clean build )" \
+              docker-run
