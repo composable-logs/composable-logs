@@ -48,7 +48,8 @@ def test_all_tasks_are_run(task_dependencies):
     assert len(result) == 3 and set(result) == set([0, 1, 2])
 
 
-def test_task_run_order():
+@pytest.mark.parametrize("dummy_loop_parameter", range(1))
+def test_task_run_order(dummy_loop_parameter):
     state_actor = StateActor.remote()
 
     def make_task(i: int) -> Task[int]:
