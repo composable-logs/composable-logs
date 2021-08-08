@@ -12,6 +12,7 @@ from pynb_dag_runner.core.dag_runner import (
     TaskDependencies,
     run_tasks,
 )
+from tests.test_ray_helpers import StateActor
 
 ray.init(num_cpus=2, ignore_reinit_error=True)
 
@@ -48,18 +49,7 @@ def test_all_tasks_are_run(task_dependencies):
 
 
 def test_task_run_order():
-    @ray.remote(num_cpus=1)
-    class GlobalState:
-        def __init__(self):
-            self.state = []
-
-        def add(self, value):
-            self.state += [value]
-
-        def get(self):
-            return self.state
-
-    state_actor = GlobalState.remote()
+    state_actor = StateActor.remote()
 
     def make_task(i: int) -> Task[int]:
         @ray.remote(num_cpus=0)
