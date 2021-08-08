@@ -31,3 +31,25 @@ def flatten(xss):
             result += [xs]
 
     return result
+
+
+def compose(*fs):
+    """
+    Functional compositions of one or more functions. Eg. compose(f1, f2, f3, f4).
+
+    The innermost function:
+     - may take arbitrary (including zero) positional arguments.
+     - should produce one output value
+
+    The remaining functions (if there are more than one argument to compose):
+     - should take one input positional argument and produce one output value.
+
+    """
+    assert len(fs) >= 1
+    *fs_outers, f_innermost = fs
+
+    return (
+        (lambda *xs: compose(*fs_outers)(f_innermost(*xs)))
+        if len(fs_outers) > 0
+        else f_innermost
+    )
