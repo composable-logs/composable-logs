@@ -1,6 +1,11 @@
 import random
 
-from pynb_dag_runner.helpers import ranges_intersection, ranges_intersect, flatten
+from pynb_dag_runner.helpers import (
+    ranges_intersection,
+    ranges_intersect,
+    flatten,
+    compose,
+)
 
 
 def test_ranges_intersection_random():
@@ -42,3 +47,20 @@ def test_flatten():
     assert flatten2([1, [2], [[[3]]]]) == [1, 2, 3]
     assert flatten2([[1, 2, 3, [4]]]) == [1, 2, 3, 4]
     assert flatten2(list(range(10))) == list(range(10))
+
+
+def test_compose():
+    f0 = lambda: f"f0()"
+    f = lambda x: f"f({x})"
+    g = lambda x: f"g({x})"
+    h1 = lambda x: f"h1({x})"
+    h2 = lambda x, y: f"h2({x}, {y})"
+
+    assert compose(f0)() == "f0()" == f0()
+    assert compose(f, f0)() == "f(f0())" == f(f0())
+    assert compose(f)("x") == "f(x)" == f("x")
+    assert compose(f, g)("y") == "f(g(y))" == f(g("y"))
+    assert compose(f, g, f0)() == "f(g(f0()))" == f(g(f0()))
+    assert compose(f, g, h1)("z") == "f(g(h1(z)))" == f(g(h1("z")))
+    assert compose(f, g, h2)("u", "v") == "f(g(h2(u, v)))" == f(g(h2("u", "v")))
+    assert compose(h2)("u", "v") == "h2(u, v)" == h2("u", "v")
