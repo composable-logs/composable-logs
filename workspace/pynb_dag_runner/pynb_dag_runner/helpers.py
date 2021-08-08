@@ -18,3 +18,16 @@ def ranges_intersect(range1, range2) -> bool:
     """
     range12 = ranges_intersection(range1, range2)
     return range12.start < range12.stop
+
+
+def flatten(xss):
+    assert isinstance(xss, list)
+    result = []
+
+    for xs in xss:
+        if isinstance(xs, list):
+            result += flatten(xs)
+        else:
+            result += [xs]
+
+    return result

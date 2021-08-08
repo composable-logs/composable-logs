@@ -1,6 +1,6 @@
 import random
 
-from pynb_dag_runner.helpers import ranges_intersection, ranges_intersect
+from pynb_dag_runner.helpers import ranges_intersection, ranges_intersect, flatten
 
 
 def test_ranges_intersection_random():
@@ -30,3 +30,15 @@ def test_ranges():
     assert ranges_intersection(range(1, 2), range(-4, 1)) == range(0, 0)
     assert ranges_intersection(range(1, 2), range(-4, 2)) == range(1, 2)
     assert ranges_intersection(range(1, 2), range(2, 10)) == range(2, 2)
+
+
+def test_flatten():
+    def flatten2(xss):
+        assert flatten(flatten(xss)) == flatten(xss)
+        return flatten(xss)
+
+    assert flatten2([]) == flatten2([[]]) == flatten2([[], [], [[]]]) == []
+    assert flatten2([1, [2]]) == [1, 2]
+    assert flatten2([1, [2], [[[3]]]]) == [1, 2, 3]
+    assert flatten2([[1, 2, 3, [4]]]) == [1, 2, 3, 4]
+    assert flatten2(list(range(10))) == list(range(10))
