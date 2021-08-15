@@ -27,6 +27,6 @@ def repeat_in_stress_tests(f):
     if os.environ.get("RUN_ENVIRONMENT", "") == "stress-tests":
         repeat_count = 50
     else:
-        repeat_count = 10
+        repeat_count = 5
 
     return pytest.mark.parametrize("repeat_count", range(repeat_count))(f)
