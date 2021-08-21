@@ -23,6 +23,13 @@ class StateActor:
         return self._state
 
 
+### Test Future static functions
+
+
+def test_future_value():
+    assert ray.get(Future.value(42)) == 42
+
+
 def test_future_map():
     @ray.remote(num_cpus=0)
     def f() -> int:
@@ -33,6 +40,10 @@ def test_future_map():
     future: Future[bool] = f.remote()
 
     assert ray.get(Future.map(future, lambda x: x + 1)) == 124
+
+
+def test_future_lift():
+    assert ray.get(Future.lift(lambda x: x + 1)(Future.value(1))) == 2
 
 
 ### tests for try_eval_f_async_wrapper wrapper

@@ -12,13 +12,20 @@ class Future(Generic[A]):
     """
     Helper class that can be used to add type hints for Ray Futures (or object ref:s).
 
-    We can not type check all of our Ray code, but type hints can be used to document
+    We can not type check all interfaces to Ray, but type hints can be used to document
     the code and at least catch some type errors.
     """
 
+    @staticmethod
+    def value(a: A) -> "Future[A]":
+        return ray.put(a)
+
+    @staticmethod
     def map(future: "Future[A]", f: Callable[[A], B]) -> "Future[B]":
         """
         Return a new Future with the value of future mapped through f.
+
+        TODO: argument order should be consistent with Python's map.
         """
 
         @ray.remote(num_cpus=0)
@@ -26,6 +33,10 @@ class Future(Generic[A]):
             return f(future_value)
 
         return do_map.remote(future)
+
+    @staticmethod
+    def lift(f: Callable[[B], C]) -> "Callable[[Future[B]], Future[C]]":
+        return lambda future: Future.map(future, f)
 
 
 def try_eval_f_async_wrapper(
