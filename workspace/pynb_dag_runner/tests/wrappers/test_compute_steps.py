@@ -6,7 +6,7 @@ from pynb_dag_runner.helpers import compose
 from pynb_dag_runner.ray_helpers import Future
 from pynb_dag_runner.core.dag_runner import Task
 from pynb_dag_runner.wrappers.runlog import Runlog
-from pynb_dag_runner.wrappers.compute_steps import T, AddParameters
+from pynb_dag_runner.wrappers.compute_steps import T, AddParameters, AddDynamicParameter
 
 
 # define identity transformation Future[Runlog] -> Future[Runlog]
@@ -42,3 +42,17 @@ def test_pipeline_run_parameters():
         assert ray.get(task.get_ref()) == Runlog(
             first_parameter=42, another_parameter="foobar"
         )
+
+
+def test_pipeline_dynamic_run_parameter():
+    task = Task(
+        compose(
+            AddDynamicParameter("z", lambda runlog: runlog["y"] + 1),
+            AddDynamicParameter("y", lambda runlog: runlog["x"] + 1),
+            AddParameters(x=42),
+        )(id_tf)
+    )
+
+    task.start(Future.value(Runlog()))
+
+    assert ray.get(task.get_ref()) == Runlog(x=42, y=43, z=44)
