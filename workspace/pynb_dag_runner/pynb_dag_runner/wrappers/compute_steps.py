@@ -1,13 +1,13 @@
 import time, os
 from pathlib import Path
-from typing import TypeVar, Generic, Callable, Dict, Any, Optional
+from typing import TypeVar, Generic, Callable, Dict, Any, Optional, List
 
 #
 import ray
 
 #
 from pynb_dag_runner.wrappers.runlog import Runlog
-from pynb_dag_runner.ray_helpers import Future, try_eval_f_async_wrapper
+from pynb_dag_runner.ray_helpers import Future, try_eval_f_async_wrapper, retry_wrapper
 from pynb_dag_runner.helpers import compose
 
 A = TypeVar("A")
@@ -146,3 +146,44 @@ class AddTiming(TaskFunctionWrapper):
             return run_post_t.remote(run_pre_t.remote(runlog_future), t(runlog_future))
 
         return add_timing
+
+
+class AddRetries(TaskFunctionWrapper):
+    """
+    Wrapper for adding retry logic.
+
+    Unlike the above wrappers the retry wrapper is not in T[Future[Runlog]], but rather
+    a transformation Future[Runlog] -> Future[List[Runlog]]. Ie., the result contains
+    a list of runlogs for all retries of the input task. Therefore to compose with
+    other wrappers, this needs to be the outermost/last wrapper.
+
+    Terminology: each retry of a task is a run. So, n_max_retries is a parameter
+    associated to a task, and retry_nr is a parameter associated to a retry of a task
+    (ie a run).
+    """
+
+    def __init__(self, n_max_retries: int = 1):
+        self.n_max_retries: int = n_max_retries
+
+    def __call__(
+        self, t: T[Future[Runlog]]
+    ) -> Callable[[Future[Runlog]], Future[List[Runlog]]]:
+        def do_retries(runlog_future: Future[Runlog]) -> Future[List[Runlog]]:
+            return retry_wrapper(
+                f_task_remote=lambda retry_nr: t(
+                    # retry parameters are added to runlog before running task t
+                    Future.map(
+                        runlog_future,
+                        lambda runlog: runlog.add(  # type: ignore
+                            **{  # type: ignore
+                                "parameters.task.n_max_retries": self.n_max_retries,  # type: ignore
+                                "parameters.run.retry_nr": retry_nr,  # type: ignore
+                            }  # type: ignore
+                        ),  # type: ignore
+                    )
+                ),
+                max_retries=self.n_max_retries,
+                is_success=lambda runlog: runlog["out.status"] == "SUCCESS",
+            )
+
+        return do_retries
