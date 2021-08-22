@@ -13,6 +13,7 @@ from pynb_dag_runner.wrappers.compute_steps import (
     AddParameters,
     AddDynamicParameter,
     AddPythonFunctionCall,
+    AddTiming,
 )
 
 
@@ -30,7 +31,7 @@ def test_pipeline_no_compute_steps():
 
 
 ###
-### test AddParameters wrapper
+### ---- AddParameters tests ----
 ###
 
 
@@ -150,3 +151,36 @@ def test_add_python_function_call_func_can_depend_on_runlog_content():
             "out.result": 43,
         },
     )
+
+
+###
+### ---- AddParameters tests ----
+###
+
+
+def test_pipeline_add_timing_wrapper():
+    def f_wait(_: Runlog):
+        time.sleep(0.3)
+
+    task = Task(compose(AddTiming(), AddPythonFunctionCall(f_wait))(id_tf))
+    task.start(Future.value(Runlog()))
+
+    result_runlog = ray.get(task.get_ref())
+    assert result_runlog.keys() == set(
+        [
+            # keys added by AddPythonFunctionCall-wrapper
+            "out.error",
+            "out.status",
+            "out.result",
+            "parameters.task.timeout_s",
+            # keys added by AddTiming-wrapper
+            "out.timing.start_ts",
+            "out.timing.end_ts",
+            "out.timing.duration_ms",
+        ]
+    )
+
+    # Timing can be ~2000ms on 2 core Github runner.
+    # Thus, duration_ms is not currently not very precise. This could be due to lots of
+    # ray.remote-functions (that each may have overhead?). Or, maybe Ray startup?
+    assert result_runlog["out.timing.duration_ms"] in range(300, 4000)
