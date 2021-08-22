@@ -159,7 +159,7 @@ class AddRetries(TaskFunctionWrapper):
 
     Terminology: each retry of a task is a run. So, n_max_retries is a parameter
     associated to a task, and retry_nr is a parameter associated to a retry of a task
-    (ie a run).
+    (ie to a run).
     """
 
     def __init__(self, n_max_retries: int = 1):
