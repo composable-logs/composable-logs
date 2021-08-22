@@ -1,3 +1,4 @@
+from pathlib import Path
 import random
 
 from pynb_dag_runner.helpers import (
@@ -5,6 +6,8 @@ from pynb_dag_runner.helpers import (
     ranges_intersect,
     flatten,
     compose,
+    write_json,
+    read_json,
 )
 
 
@@ -64,3 +67,11 @@ def test_compose():
     assert compose(f, g, h1)("z") == "f(g(h1(z)))" == f(g(h1("z")))
     assert compose(f, g, h2)("u", "v") == "f(g(h2(u, v)))" == f(g(h2("u", "v")))
     assert compose(h2)("u", "v") == "h2(u, v)" == h2("u", "v")
+
+
+def test_write_read_json(tmp_path: Path):
+    test_obj = [42, {"42": [0, None, []]}]
+    test_path = tmp_path / "test.json"
+
+    write_json(test_path, test_obj)
+    assert read_json(test_path) == test_obj

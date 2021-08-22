@@ -1,3 +1,8 @@
+import json
+from pathlib import Path
+from typing import Any
+
+
 def ranges_intersection(range1, range2):
     """
     Return intersection range of two non-empty Python ranges.
@@ -52,3 +57,13 @@ def compose(*fs):
         return lambda *xs: compose(*fs_outers)(f_innermost(*xs))
     else:
         return f_innermost
+
+
+def read_json(filepath: Path) -> Any:
+    with open(filepath, "r") as f:
+        return json.load(f)
+
+
+def write_json(filepath: Path, obj: Any):
+    with open(filepath, "w") as f:
+        json.dump(obj, f, indent=2)
