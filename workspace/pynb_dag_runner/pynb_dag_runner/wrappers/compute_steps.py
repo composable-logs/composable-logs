@@ -8,7 +8,7 @@ import ray
 #
 from pynb_dag_runner.wrappers.runlog import Runlog
 from pynb_dag_runner.ray_helpers import Future, try_eval_f_async_wrapper, retry_wrapper
-from pynb_dag_runner.helpers import compose
+from pynb_dag_runner.helpers import compose, write_json
 
 A = TypeVar("A")
 
@@ -187,3 +187,53 @@ class AddRetries(TaskFunctionWrapper):
             )
 
         return do_retries
+
+
+class AddCreateRunlogOutputPath(TaskFunctionWrapper):
+    """
+    The wrappers AddCreateRunlogOutputPath and AddPersistRunlog are intended to be
+    used together.
+
+    The first wrapper (optionally) creates a local path for each run and stores
+    the local path in the runlog so that the path is available for use when running
+    the task.
+
+    Note:
+    - Since this approach uses local file paths, it does not work on a Ray cluster
+      with multiple nodes. (TODO)
+
+    """
+
+    def __init__(self, get_run_path: Optional[Callable[[Runlog], Path]] = None):
+        self.get_run_path = get_run_path
+
+    def __call__(self, t: T[Future[Runlog]]) -> T[Future[Runlog]]:
+        def pre_handler(runlog: Runlog) -> Runlog:
+            logpath: Path = self.get_run_path(runlog)  # type: ignore
+
+            os.makedirs(logpath, exist_ok=True)
+
+            return runlog.add(**{"parameters.run.run_directory": str(logpath)})  # type: ignore
+
+        if self.get_run_path is not None:
+            return compose(Future.lift(pre_handler), t)
+        else:
+            return t
+
+
+class AddPersistRunlog(TaskFunctionWrapper):
+    def __call__(self, t: T[Future[Runlog]]) -> T[Future[Runlog]]:
+        def post_handler(runlog: Runlog) -> Runlog:
+            if "parameters.run.run_directory" in runlog.keys():
+                run_path: Path = Path(runlog["parameters.run.run_directory"])
+                write_json(
+                    run_path / "runlog.json",
+                    runlog.as_dict(),
+                )
+
+                if runlog["out.status"] == "SUCCESS":
+                    (run_path / "_SUCCESS").touch()
+
+            return runlog
+
+        return compose(Future.lift(post_handler), t)

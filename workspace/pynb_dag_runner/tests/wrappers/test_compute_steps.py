@@ -1,10 +1,11 @@
 import time
+from pathlib import Path
 
 #
-import ray
+import ray, pytest
 
 #
-from pynb_dag_runner.helpers import compose
+from pynb_dag_runner.helpers import compose, read_json
 from pynb_dag_runner.ray_helpers import Future
 from pynb_dag_runner.core.dag_runner import Task
 from pynb_dag_runner.wrappers.runlog import Runlog
@@ -15,6 +16,8 @@ from pynb_dag_runner.wrappers.compute_steps import (
     AddPythonFunctionCall,
     AddTiming,
     AddRetries,
+    AddPersistRunlog,
+    AddCreateRunlogOutputPath,
 )
 
 
@@ -237,3 +240,51 @@ def test_pipeline_add_retries():
             },
         )
     ]
+
+
+###
+### ---- Persist runlog wrapper tests ----
+###
+
+
+@pytest.mark.parametrize("should_succeed", [True, False])
+def test_pipeline_persist_runlog(tmp_path: Path, should_succeed: bool):
+    def f(_: Runlog):
+        if should_succeed:
+            return 10
+        else:
+            raise Exception("BOOM!")
+
+    task = Task(
+        compose(
+            AddPersistRunlog(),
+            AddPythonFunctionCall(f),
+            AddCreateRunlogOutputPath(get_run_path=lambda runlog: runlog["path"]),
+            AddParameters(path=str(tmp_path)),  # type: ignore
+        )(id_tf)
+    )
+    task.start(Future.value(Runlog()))
+
+    _ = ray.get(task.get_ref())
+
+    assert (tmp_path / "_SUCCESS").is_file() == should_succeed
+    persisted_runlog = read_json(tmp_path / "runlog.json")
+
+    if should_succeed:
+        assert persisted_runlog == {
+            "path": str(tmp_path),
+            "parameters.task.timeout_s": None,
+            "parameters.run.run_directory": str(tmp_path),
+            "out.status": "SUCCESS",
+            "out.error": None,
+            "out.result": 10,
+        }
+    else:
+        assert persisted_runlog == {
+            "path": str(tmp_path),
+            "parameters.task.timeout_s": None,
+            "parameters.run.run_directory": str(tmp_path),
+            "out.status": "FAILURE",
+            "out.error": "BOOM!",
+            "out.result": None,
+        }
