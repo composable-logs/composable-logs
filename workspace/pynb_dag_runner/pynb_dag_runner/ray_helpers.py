@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic, Callable, List
+from typing import TypeVar, Generic, Callable, List, Optional
 
 import ray
 
@@ -41,7 +41,7 @@ class Future(Generic[A]):
 
 def try_eval_f_async_wrapper(
     f: Callable[[A], B],
-    timeout_s: float,
+    timeout_s: Optional[float],
     success_handler: Callable[[B], C],
     error_handler: Callable[[Exception], C],
 ) -> Callable[[Future[A]], Future[C]]:
