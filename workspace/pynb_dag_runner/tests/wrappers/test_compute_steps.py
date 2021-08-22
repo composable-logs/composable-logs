@@ -249,8 +249,9 @@ def test_pipeline_add_retries():
 
 @pytest.mark.parametrize("should_succeed", [True, False])
 def test_pipeline_persist_runlog(tmp_path: Path, should_succeed: bool):
-    def f(_: Runlog):
+    def f(runlog: Runlog):
         if should_succeed:
+            (Path(runlog["path"]) / "some-logged-artefacts").touch()
             return 10
         else:
             raise Exception("BOOM!")
@@ -268,8 +269,9 @@ def test_pipeline_persist_runlog(tmp_path: Path, should_succeed: bool):
     _ = ray.get(task.get_ref())
 
     assert (tmp_path / "_SUCCESS").is_file() == should_succeed
-    persisted_runlog = read_json(tmp_path / "runlog.json")
+    assert (tmp_path / "some-logged-artefacts").is_file() == should_succeed
 
+    persisted_runlog = read_json(tmp_path / "runlog.json")
     if should_succeed:
         assert persisted_runlog == {
             "path": str(tmp_path),
