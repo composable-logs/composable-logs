@@ -114,3 +114,35 @@ class AddPythonFunctionCall(TaskFunctionWrapper):
         )
 
         return compose(eval_f, add_timeout_s(t))
+
+
+class AddTiming(TaskFunctionWrapper):
+    """
+    Wrapper to add timing data to runlog
+    """
+
+    def __call__(self, t: T[Future[Runlog]]) -> T[Future[Runlog]]:
+        def add_timing(runlog_future: Future[Runlog]) -> Future[Runlog]:
+            @ray.remote(num_cpus=0)
+            def run_pre_t(_: Runlog) -> int:
+                return time.time_ns()
+
+            @ray.remote(num_cpus=0)
+            def run_post_t(pre_t_ts: int, post_t_runlog: Runlog) -> Runlog:
+                post_t_ts: int = time.time_ns()
+
+                # TODO: can mypy type ignore:s be removed here?
+                return post_t_runlog.add(  # type: ignore
+                    **{  # type: ignore
+                        "out.timing.start_ts": pre_t_ts,  # type: ignore
+                        "out.timing.end_ts": post_t_ts,  # type: ignore
+                        "out.timing.duration_ms": (post_t_ts - pre_t_ts) // 1000000,  # type: ignore
+                    }  # type: ignore
+                )  # type: ignore
+
+            # Note: by passing runlog_future as an argument to both of the above
+            # functions, neither is started before runlog_future (=previous steps
+            # in computation) are finished.
+            return run_post_t.remote(run_pre_t.remote(runlog_future), t(runlog_future))
+
+        return add_timing
