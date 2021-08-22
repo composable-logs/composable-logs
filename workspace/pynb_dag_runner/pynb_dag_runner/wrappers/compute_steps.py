@@ -1,16 +1,19 @@
 import time, os
 from pathlib import Path
-from typing import TypeVar, Generic, Callable, Dict, Any
+from typing import TypeVar, Generic, Callable, Dict, Any, Optional
 
 #
 import ray
 
 #
 from pynb_dag_runner.wrappers.runlog import Runlog
-from pynb_dag_runner.ray_helpers import Future
+from pynb_dag_runner.ray_helpers import Future, try_eval_f_async_wrapper
 from pynb_dag_runner.helpers import compose
 
 A = TypeVar("A")
+
+# Define type for functions (or transforms) A -> A. Eg. the identity function: A -> A
+# would have type T[A].
 T = Callable[[A], A]
 
 
@@ -65,3 +68,49 @@ class AddDynamicParameter(TaskFunctionWrapper):
             return runlog.add(**{self.parameter_name: self.f(runlog)})
 
         return compose(Future.lift(add_parameter), t)
+
+
+class AddPythonFunctionCall(TaskFunctionWrapper):
+    """
+    Wrapper to execute a Python function (of signature f: Runlog -> Any).
+
+    The argument timeout_s specifies maximum seconds that the function may run before
+    the execution is canceled (with an exception). When timeout_s is None there is no
+    timeout limit.
+
+    The return value for the function (or any exception thrown, like for a timeout) is
+    stored to the runlog.
+    """
+
+    def __init__(self, f: Callable[[Runlog], Any], timeout_s: Optional[float] = None):
+        self.f = f
+        self.timeout_s = timeout_s
+
+    def __call__(self, t: T[Future[Runlog]]) -> T[Future[Runlog]]:
+        def eval_f(runlog_future: Future[Runlog]) -> Future[Runlog]:
+            f_result_future = try_eval_f_async_wrapper(
+                f=self.f,
+                timeout_s=self.timeout_s,
+                success_handler=lambda f_result: {
+                    "out.status": "SUCCESS",
+                    "out.result": f_result,
+                    "out.error": None,
+                },
+                error_handler=lambda exception: {
+                    "out.status": "FAILURE",
+                    "out.result": None,
+                    "out.error": str(exception),
+                },
+            )(runlog_future)
+
+            @ray.remote(num_cpus=0)
+            def add_keys(runlog: Runlog, new_values: Dict) -> Runlog:
+                return runlog.add(**new_values)
+
+            return add_keys.remote(runlog_future, f_result_future)
+
+        add_timeout_s: T[T[Future[Runlog]]] = AddDynamicParameter(
+            "parameters.task.timeout_s", lambda _: self.timeout_s
+        )
+
+        return compose(eval_f, add_timeout_s(t))
