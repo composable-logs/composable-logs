@@ -14,6 +14,7 @@ from pynb_dag_runner.wrappers.compute_steps import (
     AddDynamicParameter,
     AddPythonFunctionCall,
     AddTiming,
+    AddRetries,
 )
 
 
@@ -184,3 +185,55 @@ def test_pipeline_add_timing_wrapper():
     # Thus, duration_ms is not currently not very precise. This could be due to lots of
     # ray.remote-functions (that each may have overhead?). Or, maybe Ray startup?
     assert result_runlog["out.timing.duration_ms"] in range(300, 4000)
+
+
+###
+### ---- AddRetries tests ----
+###
+
+
+def test_pipeline_add_retries():
+    # Note: this test becomes slow for larger retry counts
+    n_max_retries: int = 3
+
+    def f_crash_but_succeed_on_last_retry(runlog: Runlog):
+        assert "parameters.run.retry_nr" in runlog.keys()
+        assert "parameters.task.n_max_retries" in runlog.keys()
+
+        if runlog["parameters.run.retry_nr"] == n_max_retries - 1:
+            return 123
+
+        raise Exception("BOOM!")
+
+    task = Task(
+        compose(
+            AddRetries(n_max_retries=n_max_retries),
+            AddPythonFunctionCall(f_crash_but_succeed_on_last_retry),
+        )(id_tf)
+    )
+    task.start(Future.value(Runlog()))
+
+    assert ray.get(task.get_ref()) == [
+        Runlog(
+            **{
+                "parameters.task.timeout_s": None,
+                "out.status": "FAILURE",
+                "out.error": "BOOM!",
+                "out.result": None,
+                "parameters.run.retry_nr": i,
+                "parameters.task.n_max_retries": n_max_retries,
+            },
+        )
+        for i in range(n_max_retries - 1)
+    ] + [
+        Runlog(
+            **{
+                "parameters.task.timeout_s": None,
+                "out.status": "SUCCESS",
+                "out.error": None,
+                "out.result": 123,
+                "parameters.run.retry_nr": n_max_retries - 1,
+                "parameters.task.n_max_retries": n_max_retries,
+            },
+        )
+    ]
