@@ -1,4 +1,5 @@
 from pathlib import Path
+import tempfile, os
 
 #
 import jupytext
@@ -9,6 +10,24 @@ class JupyterIpynbNotebook:
     def __init__(self, filepath: Path):
         assert filepath.suffix == ".ipynb"
         self.filepath = filepath
+
+    @staticmethod
+    def temp(path: Path) -> "JupyterIpynbNotebook":
+        """
+        Return a JupyterIpynbNotebook with a (random) non-existent filename in the
+        provided path.
+        """
+        assert path.is_dir()
+
+        fp, tmp_filepath = tempfile.mkstemp(
+            dir=path,
+            prefix="temp-notebook-",
+            suffix=".ipynb",
+        )
+        os.close(fp)
+        os.remove(tmp_filepath)
+
+        return JupyterIpynbNotebook(Path(tmp_filepath))
 
 
 class JupytextNotebook:

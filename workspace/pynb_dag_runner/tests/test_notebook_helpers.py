@@ -34,3 +34,10 @@ def test_can_convert_jupytext_notebook_to_ipynb(tmp_path: Path):
     # assert that generated ipynb file exists and parses as json
     assert notebook_ipynb.filepath.is_file()
     assert isinstance(read_json(notebook_ipynb.filepath)["cells"], list)
+
+
+def test_random_ipynb_notebook_path(tmp_path: Path):
+    notebook_ipynb = JupyterIpynbNotebook.temp(tmp_path)
+
+    assert not notebook_ipynb.filepath.is_file()
+    assert str(notebook_ipynb.filepath).startswith(str(tmp_path))
