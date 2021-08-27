@@ -12,6 +12,8 @@ TEST_JUPYTEXT_NOTEBOOK = """# %%
 # Example comment
 print(1 + 12 + 123)
 # %%
+print(f"variable_a={variable_a}")
+# %%
 """
 
 
@@ -25,7 +27,7 @@ def write_test_jupytext_notebook(path: Path) -> JupytextNotebook:
     return notebook_py
 
 
-def test_can_convert_jupytext_notebook_to_ipynb(tmp_path: Path):
+def test_can_convert_jupytext_notebook_to_ipynb_and_html(tmp_path: Path):
     notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
 
     # Convert py-percent jupytext file into ipynb-notebook file format
@@ -41,6 +43,23 @@ def test_can_convert_jupytext_notebook_to_ipynb(tmp_path: Path):
     filepath_html = notebook_ipynb.filepath.with_suffix(".html")
     assert filepath_html.is_file()
     assert "# Example comment" in filepath_html.read_text()
+
+
+def test_can_convert_jupytext_notebook_to_ipynb_and_evaluate(tmp_path: Path):
+    notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
+
+    # Convert py-percent jupytext file into ipynb-notebook file format
+    notebook_ipynb = JupyterIpynbNotebook(tmp_path / "notebook.ipynb")
+    notebook_py.to_jupyter_ipynb_notebook(notebook_ipynb)
+
+    # Evaluation ipynb notebook
+    notebook_eval_ipynb = JupyterIpynbNotebook(tmp_path / "notebook_evaluated.ipynb")
+    notebook_ipynb.evaluate(
+        output=notebook_eval_ipynb, cwd=tmp_path, parameters={"variable_a": "hello"}
+    )
+
+    assert notebook_eval_ipynb.filepath.is_file()
+    assert "variable_a=hello" in notebook_eval_ipynb.filepath.read_text()
 
 
 def test_random_ipynb_notebook_path(tmp_path: Path):

@@ -1,8 +1,9 @@
 from pathlib import Path
 import tempfile, os
+from typing import Any, Dict
 
 #
-import jupytext
+import jupytext, papermill
 from nbconvert import HTMLExporter
 
 
@@ -11,6 +12,39 @@ class JupyterIpynbNotebook:
     def __init__(self, filepath: Path):
         assert filepath.suffix == ".ipynb"
         self.filepath = filepath
+
+    def evaluate(
+        self,
+        output: "JupyterIpynbNotebook",
+        cwd: Path,
+        parameters: Dict[str, Any],
+    ):
+        """
+        Evaluate this Jupyter notebook and write evaluated notebook to output_path.
+
+        Evaluation and parameters are injected using papermill (BSD licensed)
+        """
+        assert self.filepath.is_file()
+        assert not output.filepath.is_file()
+        assert cwd.is_dir()
+
+        # For all parameters, see
+        # https://github.com/nteract/papermill/blob/main/papermill/cli.py
+        # https://github.com/nteract/papermill/blob/main/papermill/execute.py
+
+        papermill.execute_notebook(
+            input_path=self.filepath,
+            output_path=output.filepath,
+            parameters=parameters,
+            request_save_on_cell_execute=True,
+            kernel_name="python",
+            language="python",
+            progress_bar=True,
+            stdout_file=None,
+            stderr_file=None,
+            log_output=True,
+            cwd=cwd,
+        )
 
     def to_html(self):
         """
