@@ -9,6 +9,7 @@ from pynb_dag_runner.helpers import read_json
 TEST_JUPYTEXT_NOTEBOOK = """# %%
 # %% tags=["parameters"]
 # %%
+# Example comment
 print(1 + 12 + 123)
 # %%
 """
@@ -34,6 +35,12 @@ def test_can_convert_jupytext_notebook_to_ipynb(tmp_path: Path):
     # assert that generated ipynb file exists and parses as json
     assert notebook_ipynb.filepath.is_file()
     assert isinstance(read_json(notebook_ipynb.filepath)["cells"], list)
+
+    # assert that this ipynb can be converted into html
+    notebook_ipynb.to_html()
+    filepath_html = notebook_ipynb.filepath.with_suffix(".html")
+    assert filepath_html.is_file()
+    assert "# Example comment" in filepath_html.read_text()
 
 
 def test_random_ipynb_notebook_path(tmp_path: Path):

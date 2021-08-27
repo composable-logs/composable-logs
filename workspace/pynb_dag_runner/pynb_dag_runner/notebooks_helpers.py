@@ -3,6 +3,7 @@ import tempfile, os
 
 #
 import jupytext
+from nbconvert import HTMLExporter
 
 
 class JupyterIpynbNotebook:
@@ -10,6 +11,18 @@ class JupyterIpynbNotebook:
     def __init__(self, filepath: Path):
         assert filepath.suffix == ".ipynb"
         self.filepath = filepath
+
+    def to_html(self):
+        """
+        Convert this ipynb notebook into an html file
+
+        See unit tests in nbconvert (BSD licensed):
+        https://github.com/jupyter/nbconvert/blob/main/nbconvert/exporters/tests/test_html.py
+        """
+        assert self.filepath.is_file()
+
+        output, _ = HTMLExporter(template_name="classic").from_filename(self.filepath)
+        self.filepath.with_suffix(".html").write_text(output)
 
     @staticmethod
     def temp(path: Path) -> "JupyterIpynbNotebook":
