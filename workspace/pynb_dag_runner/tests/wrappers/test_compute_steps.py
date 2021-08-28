@@ -28,10 +28,14 @@ id_tf: T[Future[Runlog]] = Future.lift(lambda runlog: runlog)
 def test_pipeline_no_compute_steps():
     # check expected output for task that does nothing to runlog
 
-    task = Task(id_tf)
-    task.start(Future.value(Runlog()))
+    task1 = Task(f_remote=id_tf)
+    task1.start(Future.value(Runlog()))
 
-    assert ray.get(task.get_ref()) == Runlog()
+    task2 = Task(f_remote=lambda: Future.value(Runlog()))
+    task2.start()
+
+    for task in [task1, task2]:
+        assert ray.get(task.get_ref()) == Runlog()
 
 
 ###

@@ -3,13 +3,20 @@ from pathlib import Path
 from typing import Any
 
 
-def ranges_intersection(range1, range2):
+def range_is_empty(range):
+    assert range.step == 1
+    return not (range.start < range.stop)
+
+
+def range_intersection(range1, range2):
     """
-    Return intersection range of two non-empty Python ranges.
+    Return intersection range of two Python ranges.
     """
-    for r in [range1, range2]:
-        assert r.step == 1
-        assert r.start < r.stop
+    if range_is_empty(range1):
+        return range1
+
+    if range_is_empty(range2):
+        return range2
 
     last_start: int = max(range1.start, range2.start)
     first_stop: int = min(range1.stop, range2.stop)
@@ -17,12 +24,11 @@ def ranges_intersection(range1, range2):
     return range(last_start, first_stop)
 
 
-def ranges_intersect(range1, range2) -> bool:
+def range_intersect(range1, range2) -> bool:
     """
     Return bool-ean representing whether two non-empty Python ranges intersect
     """
-    range12 = ranges_intersection(range1, range2)
-    return range12.start < range12.stop
+    return not range_is_empty(range_intersection(range1, range2))
 
 
 def flatten(xss):
