@@ -2,6 +2,7 @@ from pathlib import Path
 import random
 
 from pynb_dag_runner.helpers import (
+    range_is_empty,
     ranges_intersection,
     ranges_intersect,
     flatten,
@@ -11,15 +12,19 @@ from pynb_dag_runner.helpers import (
 )
 
 
+def test_ranges_empty():
+    assert range_is_empty(range(0, 0))
+    assert not range_is_empty(range(0, 10))
+
+
 def test_ranges_intersection_random():
-    max_r = 20
+    max_r = 100
 
     def random_range():
         while True:
             a = random.randint(-max_r, max_r)
             b = random.randint(-max_r, max_r)
-            if a < b:
-                return range(a, b)
+            return range(a, b)
 
     for _ in range(1000):
         r1, r2 = random_range(), random_range()
@@ -38,6 +43,11 @@ def test_ranges():
     assert ranges_intersection(range(1, 2), range(-4, 1)) == range(0, 0)
     assert ranges_intersection(range(1, 2), range(-4, 2)) == range(1, 2)
     assert ranges_intersection(range(1, 2), range(2, 10)) == range(2, 2)
+
+    # intersection and empty ranges
+    assert range_is_empty(ranges_intersection(range(1, 2), range(0, -10)))
+    assert range_is_empty(ranges_intersection(range(-2, 0), range(0, -10)))
+    assert range_is_empty(ranges_intersection(range(1, 10), range(100, 1000)))
 
 
 def test_flatten():
