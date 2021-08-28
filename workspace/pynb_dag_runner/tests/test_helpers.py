@@ -3,8 +3,8 @@ import random
 
 from pynb_dag_runner.helpers import (
     range_is_empty,
-    ranges_intersection,
-    ranges_intersect,
+    range_intersection,
+    range_intersect,
     flatten,
     compose,
     write_json,
@@ -12,13 +12,13 @@ from pynb_dag_runner.helpers import (
 )
 
 
-def test_ranges_empty():
+def test_range_empty():
     assert range_is_empty(range(0, 0))
     assert not range_is_empty(range(0, 10))
 
 
-def test_ranges_intersection_random():
-    max_r = 100
+def test_range_intersection_random():
+    max_r = 25
 
     def random_range():
         while True:
@@ -30,24 +30,24 @@ def test_ranges_intersection_random():
         r1, r2 = random_range(), random_range()
 
         # check functions are symmetric in arguments
-        for f in [ranges_intersection, ranges_intersect]:
+        for f in [range_intersection, range_intersect]:
             assert f(r1, r2) == f(r2, r1)
 
         # check implementations against (slower) set-based implementations
-        assert set(r1) & set(r2) == set(ranges_intersection(r1, r2))
-        assert (len(set(r1) & set(r2)) > 0) == ranges_intersect(r1, r2)
+        assert set(r1) & set(r2) == set(range_intersection(r1, r2))
+        assert (len(set(r1) & set(r2)) > 0) == range_intersect(r1, r2)
 
 
 def test_ranges():
-    assert ranges_intersection(range(1, 2), range(-4, 0)) == range(0, 0)
-    assert ranges_intersection(range(1, 2), range(-4, 1)) == range(0, 0)
-    assert ranges_intersection(range(1, 2), range(-4, 2)) == range(1, 2)
-    assert ranges_intersection(range(1, 2), range(2, 10)) == range(2, 2)
+    assert range_intersection(range(1, 2), range(-4, 0)) == range(0, 0)
+    assert range_intersection(range(1, 2), range(-4, 1)) == range(0, 0)
+    assert range_intersection(range(1, 2), range(-4, 2)) == range(1, 2)
+    assert range_intersection(range(1, 2), range(2, 10)) == range(2, 2)
 
     # intersection and empty ranges
-    assert range_is_empty(ranges_intersection(range(1, 2), range(0, -10)))
-    assert range_is_empty(ranges_intersection(range(-2, 0), range(0, -10)))
-    assert range_is_empty(ranges_intersection(range(1, 10), range(100, 1000)))
+    assert range_is_empty(range_intersection(range(1, 2), range(0, -10)))
+    assert range_is_empty(range_intersection(range(-2, 0), range(0, -10)))
+    assert range_is_empty(range_intersection(range(1, 10), range(100, 1000)))
 
 
 def test_flatten():

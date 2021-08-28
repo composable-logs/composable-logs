@@ -7,7 +7,7 @@ from typing import Callable
 import pytest, ray
 
 #
-from pynb_dag_runner.helpers import flatten, ranges_intersect
+from pynb_dag_runner.helpers import flatten, range_intersect
 from pynb_dag_runner.ray_helpers import try_eval_f_async_wrapper, retry_wrapper, Future
 
 
@@ -243,7 +243,7 @@ def test_multiple_retrys_should_run_in_parallel():
             max(r["stop_ts"] for r in task_results),
         )
 
-    assert ranges_intersect(get_range("task-a"), get_range("task-b"))
+    assert range_intersect(get_range("task-a"), get_range("task-b"))
 
 
 ### Test composition of both retry and timeout wrappers

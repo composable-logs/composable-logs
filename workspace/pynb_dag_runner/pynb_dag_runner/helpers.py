@@ -8,7 +8,7 @@ def range_is_empty(range):
     return not (range.start < range.stop)
 
 
-def ranges_intersection(range1, range2):
+def range_intersection(range1, range2):
     """
     Return intersection range of two Python ranges.
     """
@@ -24,11 +24,11 @@ def ranges_intersection(range1, range2):
     return range(last_start, first_stop)
 
 
-def ranges_intersect(range1, range2) -> bool:
+def range_intersect(range1, range2) -> bool:
     """
     Return bool-ean representing whether two non-empty Python ranges intersect
     """
-    return not range_is_empty(ranges_intersection(range1, range2))
+    return not range_is_empty(range_intersection(range1, range2))
 
 
 def flatten(xss):
