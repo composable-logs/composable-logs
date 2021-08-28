@@ -37,6 +37,6 @@ RUN mkdir -p $MYPY_CACHE_DIR
 
 ENV PYTHONPYCACHEPREFIX=/home/host_user/.cache/pycache
 
-ENV PYTEST_ADDOPTS="-vvv -p no:cacheprovider"
+ENV PYTEST_ADDOPTS="-vvv -o cache_dir=/home/host_user/.cache/pytest"
 
 ENTRYPOINT ["/bin/bash", "-c"]
