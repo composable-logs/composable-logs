@@ -1,6 +1,9 @@
-import time, itertools
+import time, random, itertools
 from pathlib import Path
 from typing import List
+
+#
+import pytest
 
 #
 from pynb_dag_runner.tasks.tasks import PythonTask, get_task_dependencies
@@ -134,6 +137,7 @@ def test_tasks_run_in_parallel():
             dependencies,
         )
     )
+    assert len(runlog_results) == 2
 
     # Check: since there are no order constraints, the the time ranges should
     # overlap provided tests are run on 2+ CPUs
@@ -161,6 +165,8 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
             dependencies,
         )
     )
+    assert len(runlog_results) == 4
+
     end_ts = time.time_ns()
 
     # Check 1: with only 2 CPU:s running the above tasks with no constraints should
@@ -197,6 +203,7 @@ def test_retry_logic_in_python_function_task():
     dependencies = TaskDependencies(t0 >> t1)
 
     runlog_results = flatten(run_tasks([t0, t1], dependencies))
+    assert len(runlog_results) == 4
 
     # All retries should have a distinct run-id:s
     assert len(set([r["parameters.run.id"] for r in runlog_results])) == 4
@@ -261,4 +268,93 @@ def test_retry_logic_in_python_function_task():
     ]
 
     assert deterministic_runlog == expected_det_runlog
+    assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+
+
+@pytest.mark.parametrize(
+    "dependencies_list",
+    [
+        [],
+        #
+        #  t0  --->  t1
+        #
+        ["t0 >> t1"],
+        #
+        #  t0  --->  t1
+        #
+        #  t2  --->  t3  ---> t4
+        #
+        ["t0 >> t1", "t2 >> t3", "t3 >> t4"],
+        # same as above, but one constraint repeated
+        ["t0 >> t1", "t2 >> t3", "t3 >> t4", "t3 >> t4"],
+        #
+        #  t0  --->  t1  ---\
+        #                   v
+        #  t2  --->  t3  ---> t4
+        #
+        ["t0 >> t1", "t1 >> t4", "t2 >> t3", "t3 >> t4"],
+        #
+        #      --->  t0  ---> t1
+        #     /
+        #  t2  --->  t3  ---> t4
+        #
+        ["t2 >> t0", "t2 >> t3", "t0 >> t1", "t3 >> t4"],
+        #
+        #  t0  --->  t1  --->  t2  --->  t3  ---> t4
+        #
+        ["t0 >> t1", "t1 >> t2", "t2 >> t3", "t3 >> t4"],
+        #
+        #       --->  t1  ---\
+        #      /              v
+        #  t0  ---->  t2  --->  t4
+        #      \              ^
+        #       --->  t3  ---/
+        #
+        [
+            "t0 >> t1",
+            "t0 >> t2",
+            "t0 >> t3",
+            "t1 >> t4",
+            "t2 >> t4",
+            "t3 >> t4",
+        ],
+        #
+        #  t0  ---\
+        #          v
+        #            t1  ---\
+        #          ^         v
+        #  t2  ---/           t4
+        #                    ^
+        #  t3  -------------/
+        #
+        ["t0 >> t1", "t2 >> t1", "t1 >> t4", "t3 >> t4"],
+        # same as above, and two redundant constraints
+        ["t0 >> t1", "t2 >> t1", "t1 >> t4", "t3 >> t4", "t0 >> t4", "t2 >> t4"],
+        #
+        #  t0  --->  t1  --->  t2
+        #      \          \ ^
+        #       \          X
+        #        \        / v
+        #         >  t3  --->  t4
+        #
+        ["t0 >> t1", "t0 >> t3", "t1 >> t2", "t3 >> t4", "t1 >> t4", "t3 >> t2"],
+    ],
+)
+def test_random_sleep_tasks_with_order_dependencies(dependencies_list):
+    def sleep_f():
+        sleep_ms = random.randint(10, 100)
+        return lambda _: time.sleep(sleep_ms / 1000)
+
+    t0 = PythonTask(sleep_f(), task_id="t0")
+    t1 = PythonTask(sleep_f(), task_id="t1")
+    t2 = PythonTask(sleep_f(), task_id="t2")
+    t3 = PythonTask(sleep_f(), task_id="t3")
+    t4 = PythonTask(sleep_f(), task_id="t4")
+
+    # See https://stackoverflow.com/questions/55084171
+    f_locals = locals()
+    dependencies = TaskDependencies(*[eval(d, f_locals) for d in dependencies_list])
+    runlog_results = flatten(run_tasks([t0, t1, t2, t3, t4], dependencies))
+    assert len(runlog_results) == 5
+
     assert_compatibility(runlog_results, get_task_dependencies(dependencies))
