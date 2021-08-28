@@ -39,8 +39,7 @@ def test_can_convert_jupytext_notebook_to_ipynb_and_html(tmp_path: Path):
     assert isinstance(read_json(notebook_ipynb.filepath)["cells"], list)
 
     # assert that this ipynb can be converted into html
-    notebook_ipynb.to_html()
-    filepath_html = notebook_ipynb.filepath.with_suffix(".html")
+    filepath_html = notebook_ipynb.to_html()
     assert filepath_html.is_file()
     assert "# Example comment" in filepath_html.read_text()
 

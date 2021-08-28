@@ -46,17 +46,23 @@ class JupyterIpynbNotebook:
             cwd=cwd,
         )
 
-    def to_html(self):
+    def to_html(self) -> Path:
         """
-        Convert this ipynb notebook into an html file
+        Convert this ipynb notebook into an html file.
+
+        Return Path of output html file.
 
         See unit tests in nbconvert (BSD licensed):
         https://github.com/jupyter/nbconvert/blob/main/nbconvert/exporters/tests/test_html.py
         """
         assert self.filepath.is_file()
 
+        output_filepath = self.filepath.with_suffix(".html")
+
         output, _ = HTMLExporter(template_name="classic").from_filename(self.filepath)
-        self.filepath.with_suffix(".html").write_text(output)
+        output_filepath.write_text(output)
+
+        return output_filepath
 
     @staticmethod
     def temp(path: Path) -> "JupyterIpynbNotebook":
