@@ -1,4 +1,5 @@
 import time, itertools
+from pathlib import Path
 
 #
 from pynb_dag_runner.tasks.tasks import PythonTask, get_task_dependencies
@@ -9,6 +10,7 @@ from pynb_dag_runner.helpers import (
     range_intersect,
     range_intersection,
     range_is_empty,
+    read_json,
 )
 from pynb_dag_runner.core.dag_runner import (
     TaskDependencies,
@@ -39,11 +41,13 @@ def test_get_task_dependencies():
 ### ---- Test PythonTask evaluation ----
 
 
-def test_tasks_runlog_output():
+def test_tasks_runlog_output(tmp_path: Path):
     runlog_results = flatten(
         run_tasks(
             [
-                PythonTask(lambda _: 123, task_id="t1"),
+                PythonTask(
+                    lambda _: 123, get_run_path=lambda _: tmp_path, task_id="t1"
+                ),
             ],
             TaskDependencies(),
         )
@@ -59,6 +63,7 @@ def test_tasks_runlog_output():
             "parameters.task.timeout_s",
             "parameters.run.retry_nr",
             "parameters.run.id",
+            "parameters.run.run_directory",
             "out.timing.start_ts",
             "out.timing.end_ts",
             "out.timing.duration_ms",
@@ -67,6 +72,9 @@ def test_tasks_runlog_output():
             "out.result",
         ]
     )
+
+    # assert that runlog json has been written to disk
+    assert runlog_results[0].as_dict() == read_json(tmp_path / "runlog.json")
 
 
 def test_tasks_run_in_parallel():
