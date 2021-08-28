@@ -23,6 +23,7 @@ RUN pip3 install --user \
         jupytext==1.11.4 \
         pytest==6.2.4 \
         black==21.7b0 \
+        papermill==2.3.3 \
         mypy==0.910 && \
     : && \
     : Add py-percent format support for Jupyter notebooks, see && \
@@ -36,6 +37,6 @@ RUN mkdir -p $MYPY_CACHE_DIR
 
 ENV PYTHONPYCACHEPREFIX=/home/host_user/.cache/pycache
 
-ENV PYTEST_ADDOPTS="-vvv -p no:cacheprovider"
+ENV PYTEST_ADDOPTS="-vvv -o cache_dir=/home/host_user/.cache/pytest"
 
 ENTRYPOINT ["/bin/bash", "-c"]
