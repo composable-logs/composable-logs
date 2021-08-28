@@ -22,10 +22,8 @@ from pynb_dag_runner.core.dag_runner import (
 )
 from pynb_dag_runner.wrappers.runlog import Runlog
 
-## TODO: all the below tests should run multiple times for stress testing
-
-
-### ---- test order dependence for PythonFunctionTask:s ----
+# TODO: all the below tests should run multiple times in stress tests
+# See, https://github.com/pynb-dag-runner/pynb-dag-runner/pull/5
 
 
 def assert_compatibility(runlog_results: List[Runlog], task_id_dependencies):
@@ -87,12 +85,14 @@ def test_get_task_dependencies():
 
 
 def test_tasks_runlog_output(tmp_path: Path):
+    run_path = tmp_path / "run_directory_that_does_not_exist"
+
     dependencies = TaskDependencies()
     runlog_results = flatten(
         run_tasks(
             [
                 PythonFunctionTask(
-                    lambda _: 123, get_run_path=lambda _: tmp_path, task_id="t1"
+                    lambda _: 123, get_run_path=lambda _: run_path, task_id="t1"
                 ),
             ],
             dependencies,
@@ -120,7 +120,7 @@ def test_tasks_runlog_output(tmp_path: Path):
     )
 
     # assert that runlog json has been written to disk
-    assert runlog_results[0].as_dict() == read_json(tmp_path / "runlog.json")
+    assert runlog_results[0].as_dict() == read_json(run_path / "runlog.json")
 
     assert_compatibility(runlog_results, get_task_dependencies(dependencies))
 
@@ -139,7 +139,7 @@ def test_tasks_run_in_parallel():
     )
     assert len(runlog_results) == 2
 
-    # Check: since there are no order constraints, the the time ranges should
+    # Check: since there are no order constraints, the time ranges should
     # overlap provided tests are run on 2+ CPUs
     range1, range2 = [
         range(runlog["out.timing.start_ts"], runlog["out.timing.end_ts"])
@@ -271,6 +271,9 @@ def test_retry_logic_in_python_function_task():
     assert_compatibility(runlog_results, get_task_dependencies(dependencies))
 
 
+### ---- test order dependence for PythonFunctionTask:s ----
+
+
 @pytest.mark.parametrize(
     "dependencies_list",
     [
@@ -282,7 +285,7 @@ def test_retry_logic_in_python_function_task():
         #
         #  t0  --->  t1
         #
-        #  t2  --->  t3  ---> t4
+        #  t2  --->  t3  --->  t4
         #
         ["t0 >> t1", "t2 >> t3", "t3 >> t4"],
         # same as above, but one constraint repeated
@@ -294,13 +297,13 @@ def test_retry_logic_in_python_function_task():
         #
         ["t0 >> t1", "t1 >> t4", "t2 >> t3", "t3 >> t4"],
         #
-        #      --->  t0  ---> t1
+        #      --->  t0  --->  t1
         #     /
-        #  t2  --->  t3  ---> t4
+        #  t2  --->  t3  --->  t4
         #
         ["t2 >> t0", "t2 >> t3", "t0 >> t1", "t3 >> t4"],
         #
-        #  t0  --->  t1  --->  t2  --->  t3  ---> t4
+        #  t0  --->  t1  --->  t2  --->  t3  --->  t4
         #
         ["t0 >> t1", "t1 >> t2", "t2 >> t3", "t3 >> t4"],
         #
@@ -323,7 +326,7 @@ def test_retry_logic_in_python_function_task():
         #          v
         #            t1  ---\
         #          ^         v
-        #  t2  ---/           t4
+        #  t2  ---/            t4
         #                    ^
         #  t3  -------------/
         #
@@ -331,11 +334,11 @@ def test_retry_logic_in_python_function_task():
         # same as above, and two redundant constraints
         ["t0 >> t1", "t2 >> t1", "t1 >> t4", "t3 >> t4", "t0 >> t4", "t2 >> t4"],
         #
-        #  t0  --->  t1  --->  t2
-        #      \          \ ^
-        #       \          X
-        #        \        / v
-        #         >  t3  --->  t4
+        #  t0  ------>  t1  --->  t2
+        #      \             \ ^
+        #       \             X
+        #        \           / v
+        #         --->  t3  --->  t4
         #
         ["t0 >> t1", "t0 >> t3", "t1 >> t2", "t3 >> t4", "t1 >> t4", "t3 >> t2"],
     ],
