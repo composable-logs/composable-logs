@@ -93,7 +93,7 @@ class JupytextNotebook:
         assert filepath.suffix == ".py"
         self.filepath = filepath
 
-    def to_jupyter_ipynb_notebook(self, output: JupyterIpynbNotebook):
+    def to_ipynb(self):
         """
         Notes:
         This method only converts one file format to another, and no code cells are
@@ -102,7 +102,10 @@ class JupytextNotebook:
         However, cell inputs (code and tags) from input Jupytext notebook are
         included in the output ipynb notebook.
         """
+        output = JupyterIpynbNotebook(self.filepath.with_suffix(".ipynb"))
 
         # see https://jupytext.readthedocs.io/en/latest/using-library.html
         nb = jupytext.read(self.filepath, fmt="py:percent")
         jupytext.write(nb, fp=output.filepath, fmt="notebook")
+
+        return output

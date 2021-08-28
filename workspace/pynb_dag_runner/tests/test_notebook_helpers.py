@@ -18,21 +18,18 @@ print(f"variable_a={variable_a}")
 
 
 def write_test_jupytext_notebook(path: Path) -> JupytextNotebook:
-    notebook_py = JupytextNotebook(path / "notebook.py")
+    output_path = path / "notebook.py"
+    output_path.write_text(TEST_JUPYTEXT_NOTEBOOK)
 
-    with open(notebook_py.filepath, "tw") as f:
-        f.write(TEST_JUPYTEXT_NOTEBOOK)
-
-    assert os.path.getsize(notebook_py.filepath) == len(TEST_JUPYTEXT_NOTEBOOK)
-    return notebook_py
+    assert os.path.getsize(output_path) == len(TEST_JUPYTEXT_NOTEBOOK)
+    return JupytextNotebook(output_path)
 
 
 def test_can_convert_jupytext_notebook_to_ipynb_and_html(tmp_path: Path):
     notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
 
     # Convert py-percent jupytext file into ipynb-notebook file format
-    notebook_ipynb = JupyterIpynbNotebook(tmp_path / "notebook.ipynb")
-    notebook_py.to_jupyter_ipynb_notebook(notebook_ipynb)
+    notebook_ipynb = notebook_py.to_ipynb()
 
     # assert that generated ipynb file exists and parses as json
     assert notebook_ipynb.filepath.is_file()
@@ -48,8 +45,7 @@ def test_can_convert_jupytext_notebook_to_ipynb_and_evaluate(tmp_path: Path):
     notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
 
     # Convert py-percent jupytext file into ipynb-notebook file format
-    notebook_ipynb = JupyterIpynbNotebook(tmp_path / "notebook.ipynb")
-    notebook_py.to_jupyter_ipynb_notebook(notebook_ipynb)
+    notebook_ipynb = notebook_py.to_ipynb()
 
     # Evaluation ipynb notebook
     notebook_eval_ipynb = JupyterIpynbNotebook(tmp_path / "notebook_evaluated.ipynb")
