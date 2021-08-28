@@ -1,7 +1,7 @@
 import time, itertools
 
 #
-from pynb_dag_runner.tasks.tasks import PythonTask
+from pynb_dag_runner.tasks.tasks import PythonTask, get_task_dependencies
 
 #
 from pynb_dag_runner.helpers import (
@@ -11,13 +11,32 @@ from pynb_dag_runner.helpers import (
     range_is_empty,
 )
 from pynb_dag_runner.core.dag_runner import (
-    Edges,
     TaskDependencies,
     run_tasks,
 )
-from pynb_dag_runner.wrappers.runlog import Runlog
 
 ## TODO: all the below tests should run multiple times for stress testing
+
+
+### ---- Tests for get_task_dependencies ----
+
+
+def test_get_task_dependencies():
+    assert len(get_task_dependencies(TaskDependencies())) == 0
+
+    t0 = PythonTask(f=lambda: None, task_id="t0")
+    t1 = PythonTask(f=lambda: None, task_id="t1")
+    t2 = PythonTask(f=lambda: None, task_id="t2")
+    t3 = PythonTask(f=lambda: None, task_id="t3")
+
+    assert get_task_dependencies((t0 >> t1 >> t2) + TaskDependencies(t1 >> t3)) == [
+        {"from": "t0", "to": "t1"},
+        {"from": "t1", "to": "t2"},
+        {"from": "t1", "to": "t3"},
+    ]
+
+
+### ---- Test PythonTask evaluation ----
 
 
 def test_tasks_runlog_output():
@@ -116,7 +135,7 @@ def test_retry_logic_in_python_function_task():
     t0 = PythonTask(f, task_id="t0", timeout_s=timeout_s, n_max_retries=3)
     t1 = PythonTask(lambda _: 42, task_id="t1")
 
-    result_runlog = flatten(run_tasks([t0, t1], Edges(t0 >> t1)))
+    result_runlog = flatten(run_tasks([t0, t1], TaskDependencies(t0 >> t1)))
 
     # All retries should have a distinct run-id:s
     assert len(set([r["parameters.run.id"] for r in result_runlog])) == 4
