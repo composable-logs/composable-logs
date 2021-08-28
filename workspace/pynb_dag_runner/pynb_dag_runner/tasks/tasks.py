@@ -19,7 +19,7 @@ from pynb_dag_runner.helpers import compose
 from pynb_dag_runner.ray_helpers import Future
 
 
-class PythonTask(Task):
+class PythonFunctionTask(Task):
     def __init__(
         self,
         f,
@@ -54,7 +54,7 @@ class PythonTask(Task):
 def get_task_dependencies(dependencies: TaskDependencies):
     """
     This function assumes that each Task (or Edge) instance referenced in dependencies
-    contains an task_id-attribute. See eg. PythonTask.
+    contains an task_id-attribute. See eg. PythonFunctionTask.
 
     This function converts this input into a native Python list with
     the task dependencies. This can, for example, be serialized to a JSON object

@@ -6,7 +6,7 @@ from typing import List
 import pytest
 
 #
-from pynb_dag_runner.tasks.tasks import PythonTask, get_task_dependencies
+from pynb_dag_runner.tasks.tasks import PythonFunctionTask, get_task_dependencies
 
 #
 from pynb_dag_runner.helpers import (
@@ -25,7 +25,7 @@ from pynb_dag_runner.wrappers.runlog import Runlog
 ## TODO: all the below tests should run multiple times for stress testing
 
 
-### ---- test order dependence for PythonTasks ----
+### ---- test order dependence for PythonFunctionTask:s ----
 
 
 def assert_compatibility(runlog_results: List[Runlog], task_id_dependencies):
@@ -71,10 +71,10 @@ def assert_compatibility(runlog_results: List[Runlog], task_id_dependencies):
 def test_get_task_dependencies():
     assert len(get_task_dependencies(TaskDependencies())) == 0
 
-    t0 = PythonTask(f=lambda: None, task_id="t0")
-    t1 = PythonTask(f=lambda: None, task_id="t1")
-    t2 = PythonTask(f=lambda: None, task_id="t2")
-    t3 = PythonTask(f=lambda: None, task_id="t3")
+    t0 = PythonFunctionTask(f=lambda: None, task_id="t0")
+    t1 = PythonFunctionTask(f=lambda: None, task_id="t1")
+    t2 = PythonFunctionTask(f=lambda: None, task_id="t2")
+    t3 = PythonFunctionTask(f=lambda: None, task_id="t3")
 
     assert get_task_dependencies((t0 >> t1 >> t2) + TaskDependencies(t1 >> t3)) == [
         {"from": "t0", "to": "t1"},
@@ -83,7 +83,7 @@ def test_get_task_dependencies():
     ]
 
 
-### ---- Test PythonTask evaluation ----
+### ---- Test PythonFunctionTask evaluation ----
 
 
 def test_tasks_runlog_output(tmp_path: Path):
@@ -91,7 +91,7 @@ def test_tasks_runlog_output(tmp_path: Path):
     runlog_results = flatten(
         run_tasks(
             [
-                PythonTask(
+                PythonFunctionTask(
                     lambda _: 123, get_run_path=lambda _: tmp_path, task_id="t1"
                 ),
             ],
@@ -131,8 +131,8 @@ def test_tasks_run_in_parallel():
     runlog_results = flatten(
         run_tasks(
             [
-                PythonTask(lambda _: time.sleep(1.0), task_id="t0"),
-                PythonTask(lambda _: time.sleep(1.0), task_id="t1"),
+                PythonFunctionTask(lambda _: time.sleep(1.0), task_id="t0"),
+                PythonFunctionTask(lambda _: time.sleep(1.0), task_id="t1"),
             ],
             dependencies,
         )
@@ -157,10 +157,10 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
     runlog_results = flatten(
         run_tasks(
             [
-                PythonTask(lambda _: time.sleep(0.5), task_id="t0"),
-                PythonTask(lambda _: time.sleep(0.5), task_id="t1"),
-                PythonTask(lambda _: time.sleep(0.5), task_id="t2"),
-                PythonTask(lambda _: time.sleep(0.5), task_id="t3"),
+                PythonFunctionTask(lambda _: time.sleep(0.5), task_id="t0"),
+                PythonFunctionTask(lambda _: time.sleep(0.5), task_id="t1"),
+                PythonFunctionTask(lambda _: time.sleep(0.5), task_id="t2"),
+                PythonFunctionTask(lambda _: time.sleep(0.5), task_id="t3"),
             ],
             dependencies,
         )
@@ -198,8 +198,8 @@ def test_retry_logic_in_python_function_task():
         elif runlog["parameters.run.retry_nr"] == 2:
             return 123
 
-    t0 = PythonTask(f, task_id="t0", timeout_s=timeout_s, n_max_retries=3)
-    t1 = PythonTask(lambda _: 42, task_id="t1")
+    t0 = PythonFunctionTask(f, task_id="t0", timeout_s=timeout_s, n_max_retries=3)
+    t1 = PythonFunctionTask(lambda _: 42, task_id="t1")
     dependencies = TaskDependencies(t0 >> t1)
 
     runlog_results = flatten(run_tasks([t0, t1], dependencies))
@@ -289,7 +289,7 @@ def test_retry_logic_in_python_function_task():
         ["t0 >> t1", "t2 >> t3", "t3 >> t4", "t3 >> t4"],
         #
         #  t0  --->  t1  ---\
-        #                   v
+        #                    v
         #  t2  --->  t3  ---> t4
         #
         ["t0 >> t1", "t1 >> t4", "t2 >> t3", "t3 >> t4"],
@@ -345,11 +345,11 @@ def test_random_sleep_tasks_with_order_dependencies(dependencies_list):
         sleep_ms = random.randint(10, 100)
         return lambda _: time.sleep(sleep_ms / 1000)
 
-    t0 = PythonTask(sleep_f(), task_id="t0")
-    t1 = PythonTask(sleep_f(), task_id="t1")
-    t2 = PythonTask(sleep_f(), task_id="t2")
-    t3 = PythonTask(sleep_f(), task_id="t3")
-    t4 = PythonTask(sleep_f(), task_id="t4")
+    t0 = PythonFunctionTask(sleep_f(), task_id="t0")
+    t1 = PythonFunctionTask(sleep_f(), task_id="t1")
+    t2 = PythonFunctionTask(sleep_f(), task_id="t2")
+    t3 = PythonFunctionTask(sleep_f(), task_id="t3")
+    t4 = PythonFunctionTask(sleep_f(), task_id="t4")
 
     # See https://stackoverflow.com/questions/55084171
     f_locals = locals()
