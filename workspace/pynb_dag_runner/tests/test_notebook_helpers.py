@@ -70,11 +70,13 @@ def test_evaluate_jupytext_notebook(tmp_path: Path):
 
     notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
 
+    output_ipynb = JupyterIpynbNotebook(output_path / "foo.ipynb")
+
     evaluated_notebook: JupyterIpynbNotebook = notebook_py.evaluate(
-        output_path=output_path,
+        output=output_ipynb,
         parameters={"variable_a": "baz"},
     )
 
-    assert evaluated_notebook.filepath.is_file()
-    assert str(evaluated_notebook.filepath).startswith(str(output_path))
-    assert "variable_a=baz" in evaluated_notebook.filepath.read_text()
+    assert output_ipynb.filepath.is_file()
+    assert str(output_ipynb.filepath).startswith(str(output_path))
+    assert "variable_a=baz" in output_ipynb.filepath.read_text()

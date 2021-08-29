@@ -111,45 +111,27 @@ class JupytextNotebook:
 
         return output
 
-    def evaluate(
-        self, output_path: Path, parameters: Dict[str, Any] = {}
-    ) -> JupyterIpynbNotebook:
+    def evaluate(self, output: JupyterIpynbNotebook, parameters: Dict[str, Any] = {}):
         """
         Evaluate a Jupytext notebook, and inject provided parameters using Papermill.
-
-        Output written to an ipynb file in output_path-directory. The base filename
-        is determined from the input Python file.
-
-        Eg., if we are asked to evaluate /path/to/jupytext/data_tables.py into output
-        path /tmp, then the output file is /tmp/data_tables.ipynb.
-
-        Returns
-          JupyterIpynbNotebook instance of evaluate notebook.
         """
-        assert self.filepath.is_file()
-        assert output_path.is_dir()
-
-        # Split input Jupytext filepath into directory and filename parts
-        py_notebook_filename: str = self.filepath.name
-        py_notebook_path: Path = self.filepath.parent
-        assert py_notebook_path.is_dir()
-
         # Convert input Jupytext notebook to a random ipynb file in output directory
-        tmp_notebook_ipynb = JupyterIpynbNotebook.temp(output_path)
-        self.to_ipynb(output=tmp_notebook_ipynb)
+        tmp_notebook_ipynb = JupyterIpynbNotebook.temp(output.filepath.parent)
 
-        # Determine name of output evaluated notebook, evaluate temp notebook, and
-        # clean up.
-        evaluated_ipynb_notebook = JupyterIpynbNotebook(
-            (output_path / py_notebook_filename).with_suffix(".ipynb")
-        )
+        try:
+            assert self.filepath.is_file()
+            assert not output.filepath.is_file()
 
-        tmp_notebook_ipynb.evaluate(
-            output=evaluated_ipynb_notebook,
-            cwd=py_notebook_path,
-            parameters=parameters,
-        )
+            self.to_ipynb(output=tmp_notebook_ipynb)
 
-        os.remove(tmp_notebook_ipynb.filepath)
-
-        return evaluated_ipynb_notebook
+            tmp_notebook_ipynb.evaluate(
+                output=output,
+                # Run with jupytext notebook directory as current directory
+                cwd=self.filepath.parent,
+                parameters=parameters,
+            )
+        finally:
+            # Note: this may not run if the Python process is cancelled by Ray
+            # (eg by timeout)
+            if tmp_notebook_ipynb.filepath.is_file():
+                os.remove(tmp_notebook_ipynb.filepath)
