@@ -125,7 +125,7 @@ def test_jupytext_notebook_task(tmp_path: Path):
          - evaluated cells may not be present in output notebook
          - the temp ipynb file is not deleted
         """
-        assert set(["ipynb", "runlog", "other_files"]) <= data.keys()
+        assert set(["runlog", "other_files"]) <= data.keys()
 
         # runlog content should, however, accurately describe the failure
         assert data["runlog"]["parameters.run.run_directory"] == str(out_path / "stuck")
