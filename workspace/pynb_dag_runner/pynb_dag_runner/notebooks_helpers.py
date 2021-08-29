@@ -1,6 +1,6 @@
 from pathlib import Path
 import tempfile, os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 #
 import jupytext, papermill
@@ -93,7 +93,7 @@ class JupytextNotebook:
         assert filepath.suffix == ".py"
         self.filepath = filepath
 
-    def to_ipynb(self):
+    def to_ipynb(self, output: Optional[JupyterIpynbNotebook] = None):
         """
         Notes:
         This method only converts one file format to another, and no code cells are
@@ -102,10 +102,54 @@ class JupytextNotebook:
         However, cell inputs (code and tags) from input Jupytext notebook are
         included in the output ipynb notebook.
         """
-        output = JupyterIpynbNotebook(self.filepath.with_suffix(".ipynb"))
+        if output is None:
+            output = JupyterIpynbNotebook(self.filepath.with_suffix(".ipynb"))
 
         # see https://jupytext.readthedocs.io/en/latest/using-library.html
         nb = jupytext.read(self.filepath, fmt="py:percent")
         jupytext.write(nb, fp=output.filepath, fmt="notebook")
 
         return output
+
+    def evaluate(
+        self, output_path: Path, parameters: Dict[str, Any] = {}
+    ) -> JupyterIpynbNotebook:
+        """
+        Evaluate a Jupytext notebook, and inject provided parameters using Papermill.
+
+        Output written to an ipynb file in output_path-directory. The base filename
+        is determined from the input Python file.
+
+        Eg., if we are asked to evaluate /path/to/jupytext/data_tables.py into output
+        path /tmp, then the output file is /tmp/data_tables.ipynb.
+
+        Returns
+          JupyterIpynbNotebook instance of evaluate notebook.
+        """
+        assert self.filepath.is_file()
+        assert output_path.is_dir()
+
+        # Split input Jupytext filepath into directory and filename parts
+        py_notebook_filename: str = self.filepath.name
+        py_notebook_path: Path = self.filepath.parent
+        assert py_notebook_path.is_dir()
+
+        # Convert input Jupytext notebook to a random ipynb file in output directory
+        tmp_notebook_ipynb = JupyterIpynbNotebook.temp(output_path)
+        self.to_ipynb(output=tmp_notebook_ipynb)
+
+        # Determine name of output evaluated notebook, evaluate temp notebook, and
+        # clean up.
+        evaluated_ipynb_notebook = JupyterIpynbNotebook(
+            (output_path / py_notebook_filename).with_suffix(".ipynb")
+        )
+
+        tmp_notebook_ipynb.evaluate(
+            output=evaluated_ipynb_notebook,
+            cwd=py_notebook_path,
+            parameters=parameters,
+        )
+
+        os.remove(tmp_notebook_ipynb.filepath)
+
+        return evaluated_ipynb_notebook
