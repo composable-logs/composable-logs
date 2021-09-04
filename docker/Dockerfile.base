@@ -19,7 +19,4 @@ ENV PATH "/home/host_user/.local/bin:$PATH"
 
 ENV PYTHONPYCACHEPREFIX=/home/host_user/.cache/python
 
-COPY requirements.base.txt /home/host_user/
-RUN pip3 install --user -r /home/host_user/requirements.base.txt
-
 ENTRYPOINT ["/bin/bash", "-c"]
