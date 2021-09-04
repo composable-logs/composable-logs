@@ -42,10 +42,18 @@ docker-build-all:
 ### Manually start/stop the dev-docker container (can be used without VS Code)
 
 dev-up:
-	docker-compose up --remove-orphans --abort-on-container-exit dev-environment
+	docker-compose \
+	    -f .devcontainer-docker-compose.yml \
+	    up \
+	    --remove-orphans \
+	    --abort-on-container-exit \
+	    dev-environment
 
 dev-down:
-	docker-compose down --remove-orphans
+	docker-compose \
+	    -f .devcontainer-docker-compose.yml \
+	    down \
+	    --remove-orphans
 
 ### Define tasks run inside Docker
 
