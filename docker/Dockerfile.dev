@@ -1,0 +1,20 @@
+FROM pynb-dag-runner-cicd
+
+USER root
+RUN apt-get install -y -q entr
+USER host_user
+
+RUN : && \
+    : Add py-percent format support for Jupyter notebooks, see && \
+    : https://jupytext.readthedocs.io/en/latest/install.html && \
+    jupyter nbextension install --py jupytext --user && \
+    jupyter nbextension enable --py jupytext --user && \
+    jupyter serverextension enable jupytext
+
+# Jupyter server is only run in dev-mode
+ARG JUPYTER_TOKEN
+ENV JUPYTER_TOKEN=$JUPYTER_TOKEN
+
+# See
+# https://docs.python.org/3/using/cmdline.html#environment-variables
+# ENV PYTHONDEVMODE="1"
