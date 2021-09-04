@@ -56,10 +56,19 @@ jobs:
               COMMAND="(cd pynb_dag_runner; make test-black )" \
               docker-run-in-cicd
 
-      - name: "Build Python wheel file"
+      - name: "Build Python wheel-file for the pynb-dag-runner library"
         shell: bash
         run: |
           cd ${{ github.workspace }}
           make \
               COMMAND="(cd pynb_dag_runner; make clean build )" \
               docker-run-in-cicd
+
+      - name: "Store wheel-file as build artefact"
+        uses: actions/upload-artifact@v2
+        with:
+          name: pynb_dag_runner
+          path: |
+            ${{ github.workspace }}/workspace/pynb_dag_runner/dist/
+          if-no-files-found: error
+          retention-days: 10
