@@ -139,8 +139,8 @@ def test_mini_jupytext_pipeline(tmp_path: Path):
             == "Timeout error: execution did not finish within timeout limit"
         )
 
-        # temp ipynb notebook file is not deleted
-        assert len(data["other_files"].keys()) == 1
+        # temp ipynb notebook file may or may not have been deleted
+        assert len(data["other_files"].keys()) <= 1
 
     validate_stuck_notebook_run_directory(get_data(out_path / "stuck"))
 
