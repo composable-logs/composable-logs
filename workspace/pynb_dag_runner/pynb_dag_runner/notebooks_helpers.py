@@ -1,6 +1,6 @@
 from pathlib import Path
 import tempfile, os
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 #
 import jupytext, papermill
@@ -93,7 +93,7 @@ class JupytextNotebook:
         assert filepath.suffix == ".py"
         self.filepath = filepath
 
-    def to_ipynb(self):
+    def to_ipynb(self, output: Optional[JupyterIpynbNotebook] = None):
         """
         Notes:
         This method only converts one file format to another, and no code cells are
@@ -102,10 +102,36 @@ class JupytextNotebook:
         However, cell inputs (code and tags) from input Jupytext notebook are
         included in the output ipynb notebook.
         """
-        output = JupyterIpynbNotebook(self.filepath.with_suffix(".ipynb"))
+        if output is None:
+            output = JupyterIpynbNotebook(self.filepath.with_suffix(".ipynb"))
 
         # see https://jupytext.readthedocs.io/en/latest/using-library.html
         nb = jupytext.read(self.filepath, fmt="py:percent")
         jupytext.write(nb, fp=output.filepath, fmt="notebook")
 
         return output
+
+    def evaluate(self, output: JupyterIpynbNotebook, parameters: Dict[str, Any] = {}):
+        """
+        Evaluate a Jupytext notebook, and inject provided parameters using Papermill.
+        """
+        # Convert input Jupytext notebook to a random ipynb file in output directory
+        tmp_notebook_ipynb = JupyterIpynbNotebook.temp(output.filepath.parent)
+
+        try:
+            assert self.filepath.is_file()
+            assert not output.filepath.is_file()
+
+            self.to_ipynb(output=tmp_notebook_ipynb)
+
+            tmp_notebook_ipynb.evaluate(
+                output=output,
+                # Run with jupytext notebook directory as current directory
+                cwd=self.filepath.parent,
+                parameters=parameters,
+            )
+        finally:
+            # Note: this may not run if the Python process is cancelled by Ray
+            # (eg by timeout)
+            if tmp_notebook_ipynb.filepath.is_file():
+                os.remove(tmp_notebook_ipynb.filepath)

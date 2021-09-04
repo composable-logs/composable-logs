@@ -15,11 +15,12 @@ from pynb_dag_runner.wrappers.compute_steps import (
     AddCreateRunlogOutputPath,
     AddPersistRunlog,
 )
-from pynb_dag_runner.helpers import compose
 from pynb_dag_runner.ray_helpers import Future
+from pynb_dag_runner.helpers import compose
+from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook
 
 
-class PythonFunctionTask(Task):
+class PythonFunctionTask(Task[Runlog]):
     def __init__(
         self,
         f,
@@ -48,6 +49,39 @@ class PythonFunctionTask(Task):
                     lambda _runlog_future: _runlog_future
                 )
             )(Future.value(Runlog()))
+        )
+
+
+class JupytextNotebookTask(PythonFunctionTask):
+    def __init__(
+        self,
+        notebook: JupytextNotebook,
+        task_id: str,
+        get_run_path: Callable[[Runlog], Path],
+        timeout_s: float = None,
+        n_max_retries: int = 1,
+        parameters: Dict[str, Any] = {},
+    ):
+        def f(runlog: Runlog):
+            evaluated_notebook = JupyterIpynbNotebook(
+                (get_run_path(runlog) / notebook.filepath.name).with_suffix(".ipynb")
+            )
+
+            try:
+                notebook.evaluate(
+                    output=evaluated_notebook,
+                    parameters={"P": runlog.as_dict(prefix_filter="parameters.")},
+                )
+            finally:
+                evaluated_notebook.to_html()
+
+        super().__init__(
+            f=f,
+            task_id=task_id,
+            get_run_path=get_run_path,
+            timeout_s=timeout_s,
+            n_max_retries=n_max_retries,
+            parameters=parameters,
         )
 
 

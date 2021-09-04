@@ -62,3 +62,21 @@ def test_random_ipynb_notebook_path(tmp_path: Path):
 
     assert not notebook_ipynb.filepath.is_file()
     assert str(notebook_ipynb.filepath).startswith(str(tmp_path))
+
+
+def test_evaluate_jupytext_notebook(tmp_path: Path):
+    output_path = tmp_path / "output"
+    output_path.mkdir()
+
+    notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
+
+    output_ipynb = JupyterIpynbNotebook(output_path / "foo.ipynb")
+
+    evaluated_notebook: JupyterIpynbNotebook = notebook_py.evaluate(
+        output=output_ipynb,
+        parameters={"variable_a": "baz"},
+    )
+
+    assert output_ipynb.filepath.is_file()
+    assert str(output_ipynb.filepath).startswith(str(output_path))
+    assert "variable_a=baz" in output_ipynb.filepath.read_text()
