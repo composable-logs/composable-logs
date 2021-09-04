@@ -26,15 +26,18 @@ def isotimestamp_normalized():
     return datetime.datetime.now(datetime.timezone.utc).isoformat().replace(":", "-")
 
 
-def test_jupytext_notebook_task(tmp_path: Path):
+def test_mini_jupytext_pipeline(tmp_path: Path):
+
     nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
+
+    # tmp_path = nb_path     # uncomment for easier access to runlogs when debugging
     out_path: Path = tmp_path / "out" / isotimestamp_normalized()
 
     notebook_ok = JupytextNotebookTask(
         notebook=JupytextNotebook(nb_path / "notebook_ok.py"),
         task_id="id=ok",
         get_run_path=lambda _: out_path / "ok",
-        parameters={"variable_a": "hello"},
+        parameters={"parameters.task.variable_a": "hello"},
     )
 
     notebook_stuck = JupytextNotebookTask(
@@ -96,16 +99,15 @@ def test_jupytext_notebook_task(tmp_path: Path):
         assert (
             set(["ipynb", "html", "runlog", "_SUCCESS", "other_files"]) == data.keys()
         )
-        for expected_string in [str(1 + 12 + 123)]:
-            # TODO test variable injection into notebook
+        for expected_string in [str(1 + 12 + 123), "variable_a=hello"]:
             assert expected_string in data["ipynb"]
             assert expected_string in data["html"]
 
         # runlog content
+        assert data["runlog"]["parameters.task.variable_a"] == "hello"
         assert data["runlog"]["parameters.run.run_directory"] == str(out_path / "ok")
         assert data["runlog"]["task_id"] == "id=ok"
         assert data["runlog"]["out.status"] == "SUCCESS"
-        # TODO test variable injection into notebook
 
         #
         assert data["_SUCCESS"] == ""
@@ -125,9 +127,10 @@ def test_jupytext_notebook_task(tmp_path: Path):
          - evaluated cells may not be present in output notebook
          - the temp ipynb file is not deleted
         """
+        # html file version of notebook might be missing
         assert set(["runlog", "other_files"]) <= data.keys()
 
-        # runlog content should, however, accurately describe the failure
+        # runlog content should describe the failure
         assert data["runlog"]["parameters.run.run_directory"] == str(out_path / "stuck")
         assert data["runlog"]["task_id"] == "id=stuck"
         assert data["runlog"]["out.status"] == "FAILURE"
@@ -135,7 +138,6 @@ def test_jupytext_notebook_task(tmp_path: Path):
             data["runlog"]["out.error"]
             == "Timeout error: execution did not finish within timeout limit"
         )
-        # TODO test variable injection into notebook
 
         # temp ipynb notebook file is not deleted
         assert len(data["other_files"].keys()) == 1
@@ -154,7 +156,6 @@ def test_jupytext_notebook_task(tmp_path: Path):
         assert set(["ipynb", "html", "runlog", "other_files"]) == data.keys()
 
         for expected_string in [str(1 + 12 + 123)]:
-            # TODO test variable injection into notebook
             assert expected_string in data["ipynb"]
 
         # runlog content
@@ -164,7 +165,6 @@ def test_jupytext_notebook_task(tmp_path: Path):
         assert data["runlog"]["task_id"] == "id=exception"
         assert data["runlog"]["out.status"] == "FAILURE"
         assert "Exception: Thrown from notebook!" in data["runlog"]["out.error"]
-        # TODO test variable injection into notebook
 
         assert data["other_files"] == dict()
 

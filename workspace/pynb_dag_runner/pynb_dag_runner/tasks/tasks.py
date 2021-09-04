@@ -68,7 +68,10 @@ class JupytextNotebookTask(PythonFunctionTask):
             )
 
             try:
-                notebook.evaluate(output=evaluated_notebook, parameters=parameters)
+                notebook.evaluate(
+                    output=evaluated_notebook,
+                    parameters={"P": runlog.as_dict(prefix_filter="parameters.")},
+                )
             finally:
                 evaluated_notebook.to_html()
 
