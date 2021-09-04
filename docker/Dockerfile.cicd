@@ -1,3 +1,5 @@
+# Setup for testing and building pynb-dag-runner library
+
 FROM pynb-dag-runner-base
 
 RUN pip3 install --user \
@@ -8,8 +10,4 @@ RUN pip3 install --user \
 ENV MYPY_CACHE_DIR=/home/host_user/.cache/mypy
 RUN mkdir -p $MYPY_CACHE_DIR
 
-ENV PYTHONPYCACHEPREFIX=/home/host_user/.cache/pycache
-
 ENV PYTEST_ADDOPTS="-vvv -o cache_dir=/home/host_user/.cache/pytest"
-
-ENTRYPOINT ["/bin/bash", "-c"]

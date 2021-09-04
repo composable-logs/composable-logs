@@ -1,0 +1,4 @@
+ray[default]==1.5.1
+notebook==6.3.0
+jupytext==1.11.4
+papermill==2.3.3

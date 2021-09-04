@@ -6,17 +6,19 @@ docker-build-base-env:
 	# setup with Python dependencies required downstreams, "prod"
 	docker \
 	    build \
-	    --file Dockerfile.base \
+	    --file ./docker/Dockerfile.base \
 	    --build-arg HOST_UID=$$(id -u) \
 	    --build-arg HOST_GID="$$(id -g)" \
-	    --tag pynb-dag-runner-base .
+	    --tag pynb-dag-runner-base \
+	    ./docker
 
 docker-build-cicd-env:
 	# setup for cicd (test + build)
 	docker \
 	    build \
-	    --file Dockerfile.cicd \
-	    --tag pynb-dag-runner-cicd .
+	    --file ./docker/Dockerfile.cicd \
+	    --tag pynb-dag-runner-cicd \
+	    ./docker
 
 JUPYTER_TOKEN:
 	# Create random JUPYTER_TOKEN for Jupyter running in Docker
@@ -26,9 +28,10 @@ docker-build-dev-env: JUPYTER_TOKEN
 	# setup for interactive Jupyter development
 	docker \
 	    build \
-	    --file Dockerfile.dev \
+	    --file ./docker/Dockerfile.dev \
 	    --build-arg JUPYTER_TOKEN=$$(cat JUPYTER_TOKEN) \
-	    --tag pynb-dag-runner-dev .
+	    --tag pynb-dag-runner-dev \
+	    ./docker
 
 docker-build-all:
 	make \
