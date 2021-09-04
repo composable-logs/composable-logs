@@ -62,7 +62,10 @@ docker-run-in-cicd:
 clean:
 	make COMMAND="(cd pynb_dag_runner; make clean)" docker-run-in-cicd
 
-test-library:
+build:
+	make COMMAND="(cd pynb_dag_runner; make build)" docker-run-in-cicd
+
+test:
 	# Run all tests for library and ensure we can build the library wheel file
 
 	make COMMAND="(\
@@ -71,5 +74,4 @@ test-library:
 	        test-pytest \
 	        test-mypy \
 	        test-black \
-	        build \
 	)" docker-run-in-cicd

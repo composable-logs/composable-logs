@@ -2,7 +2,7 @@
 {
   "name": "pynb-dag-runner dev",
   "dockerComposeFile": [
-    "docker-compose.yml"
+    ".devcontainer-docker-compose.yml"
   ],
   "service": "dev-environment",
   "runServices": [],
