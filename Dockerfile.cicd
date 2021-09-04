@@ -1,0 +1,15 @@
+FROM pynb-dag-runner-base
+
+RUN pip3 install --user \
+        pytest==6.2.4 \
+        black==21.7b0 \
+        mypy==0.910
+
+ENV MYPY_CACHE_DIR=/home/host_user/.cache/mypy
+RUN mkdir -p $MYPY_CACHE_DIR
+
+ENV PYTHONPYCACHEPREFIX=/home/host_user/.cache/pycache
+
+ENV PYTEST_ADDOPTS="-vvv -o cache_dir=/home/host_user/.cache/pytest"
+
+ENTRYPOINT ["/bin/bash", "-c"]

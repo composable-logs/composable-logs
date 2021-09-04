@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           cd ${{ github.workspace }}
-          make docker-build
+          make docker-build-all
 
       - name: "Run unit tests"
         shell: bash
@@ -38,7 +38,7 @@ jobs:
           make \
               RUN_ENVIRONMENT="${{ env.RUN_ENVIRONMENT }}" \
               COMMAND="(cd pynb_dag_runner; make test-pytest )" \
-              docker-run
+              docker-run-in-cicd
 
       - name: "Run mypy type checks"
         shell: bash
@@ -46,7 +46,7 @@ jobs:
           cd ${{ github.workspace }}
           make \
               COMMAND="(cd pynb_dag_runner; make test-mypy )" \
-              docker-run
+              docker-run-in-cicd
 
       - name: "Check black formatting"
         shell: bash
@@ -54,7 +54,7 @@ jobs:
           cd ${{ github.workspace }}
           make \
               COMMAND="(cd pynb_dag_runner; make test-black )" \
-              docker-run
+              docker-run-in-cicd
 
       - name: "Build Python wheel file"
         shell: bash
@@ -62,4 +62,4 @@ jobs:
           cd ${{ github.workspace }}
           make \
               COMMAND="(cd pynb_dag_runner; make clean build )" \
-              docker-run
+              docker-run-in-cicd
