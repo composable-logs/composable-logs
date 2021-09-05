@@ -1,5 +1,11 @@
-// Dynamically created tasks.json -- do not edit.
-// See make_tasks_json.py
+// This file is dynamically created -- do not edit.
+//
+// The below are task definitions for use by VS Code editor.
+//
+// Run tasks in VS Code by pressing Ctrl + Shift + P,
+// select 'Tasks: Run task' and choose the task to run.
+//
+// See, https://code.visualstudio.com/docs/editor/tasks
 {
     "version": "2.0.0",
     "tasks": [
@@ -7,8 +13,8 @@
             "label": "pynb_dag_runner library - watch and run all tasks",
             "dependsOn": [
                 "(pynb_dag_runner library: run unit tests)",
-                "(pynb_dag_runner library: mypy static code analysis)",
-                "(pynb_dag_runner library: black format code check)"
+                "(pynb_dag_runner library: run static code analysis)",
+                "(pynb_dag_runner library: check code is linted)"
             ],
             "problemMatcher": []
         },
@@ -23,12 +29,12 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "new",
-                "group": "pynb_dag_runner library (terminal-group-id)"
+                "group": "terminal-group-id=pynb_dag_runner library"
             },
             "problemMatcher": []
         },
         {
-            "label": "(pynb_dag_runner library: mypy static code analysis)",
+            "label": "(pynb_dag_runner library: run static code analysis)",
             "type": "shell",
             "command": "(cd pynb_dag_runner; find . | grep \".py\" | entr make test-mypy)",
             "group": {
@@ -38,12 +44,12 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "new",
-                "group": "pynb_dag_runner library (terminal-group-id)"
+                "group": "terminal-group-id=pynb_dag_runner library"
             },
             "problemMatcher": []
         },
         {
-            "label": "(pynb_dag_runner library: black format code check)",
+            "label": "(pynb_dag_runner library: check code is linted)",
             "type": "shell",
             "command": "(cd pynb_dag_runner; find . | grep \".py\" | entr make test-black)",
             "group": {
@@ -53,7 +59,7 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "new",
-                "group": "pynb_dag_runner library (terminal-group-id)"
+                "group": "terminal-group-id=pynb_dag_runner library"
             },
             "problemMatcher": []
         }

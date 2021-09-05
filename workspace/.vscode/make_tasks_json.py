@@ -1,24 +1,16 @@
 """
-Script to create .vscode/tasks.json (VS Code tasks).
+This script create the .vscode/tasks.json file with dev task definitions.
 
-- Update task definitions by manually running
+The tasks typically watch all Python files for a component and run unit (pytest),
+type (mypy) and black format testing on the component whenever a Python file is
+saved. However, the tasks and commands are configurable, see below.
 
-    python3 make_tasks_json.py
-
-(in the ./workspace/.vscode/ directory).
-
-- In VS Code, the tasks can be started by
-
-    Ctrl+Shift+P -> "Tasks: Run task" -> select task to run
-
-- The dev-tasks run the make-commands (see below) in watch mode and they are triggered
-  whenever a component .py file is saved.
-
-- Documentation: https://code.visualstudio.com/docs/editor/tasks
-
+Note: the list of files to watch is determined when the a task is started. So, if a
+new file is created after that, the file will not be watched by the entr tool.
 """
 
 import json
+from typing import Dict
 
 
 def make_task_dict(
@@ -28,7 +20,7 @@ def make_task_dict(
     make_command: str,
 ):
     """
-    Create dict for an individual task
+    Create task-dict for an individual task.
     """
     return {
         "label": f"({component}: {task_desc})",
@@ -38,26 +30,24 @@ def make_task_dict(
         "presentation": {
             "reveal": "always",
             "panel": "new",
-            # create component-based id for which tasks should be shown side-by-side
-            "group": f"{component} (terminal-group-id)",
+            # terminals in the group are shown side-by-side
+            "group": f"terminal-group-id={component}",
         },
         "problemMatcher": [],
     }
 
 
-def make_component_tasks(component_name: str, component_relative_path: str):
-    dev_tasks = [
-        ("run unit tests", "make test-pytest"),
-        ("mypy static code analysis", "make test-mypy"),
-        ("black format code check", "make test-black"),
-    ]
-
+def make_component_tasks(
+    component_name: str,
+    component_relative_path: str,
+    task_commands: Dict[str, str],
+):
     individual_tasks = [
         make_task_dict(component_name, component_relative_path, task_desc, command)
-        for task_desc, command in dev_tasks
+        for task_desc, command in task_commands.items()
     ]
 
-    # Add single task to start all three tasks (for this component) in split terminal
+    # Add task to start all tasks (for this component) side by side in one terminal
     return [
         {
             "label": f"{component_name} - watch and run all tasks",
@@ -67,22 +57,42 @@ def make_component_tasks(component_name: str, component_relative_path: str):
     ] + individual_tasks
 
 
-with open("tasks.json", "w") as f:
-    f.write("// Dynamically created tasks.json -- do not edit.\n")
-    f.write("// See make_tasks_json.py\n")
-
-    f.write(
-        json.dumps(
-            {
-                "version": "2.0.0",
-                "tasks": (
-                    make_component_tasks(
-                        component_name="pynb_dag_runner library",
-                        component_relative_path="pynb_dag_runner",
-                    )
-                ),
-            },
-            indent=4,
+def write_tasks_file_dict(output_file, tasks):
+    with open(output_file, "wt") as f:
+        f.write("// This file is dynamically created -- do not edit.\n")
+        f.write("//\n")
+        f.write("// The below are task definitions for use by VS Code editor.\n")
+        f.write("//\n")
+        f.write("// Run tasks in VS Code by pressing Ctrl + Shift + P,\n")
+        f.write("// select 'Tasks: Run task' and choose the task to run.\n")
+        f.write("//\n")
+        f.write("// See, https://code.visualstudio.com/docs/editor/tasks\n")
+        f.write(
+            json.dumps(
+                {
+                    "version": "2.0.0",
+                    "tasks": tasks,
+                },
+                indent=4,
+            )
         )
+        f.write("\n")
+
+
+if __name__ == "__main__":
+    print(" - Updating tasks.json for pynb_dag_runner library ...")
+
+    write_tasks_file_dict(
+        output_file="tasks.json",
+        tasks=make_component_tasks(
+            component_name="pynb_dag_runner library",
+            component_relative_path="pynb_dag_runner",
+            task_commands={
+                "run unit tests": "make test-pytest",
+                "run static code analysis": "make test-mypy",
+                "check code is linted": "make test-black",
+            },
+        ),
     )
-    f.write("\n")
+
+    print(" - Done")
