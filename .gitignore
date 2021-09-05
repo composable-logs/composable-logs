@@ -1,4 +1,4 @@
-JUPYTER_TOKEN
+docker/JUPYTER_TOKEN
 
 # build files
 **/build/

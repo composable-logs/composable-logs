@@ -1,5 +1,10 @@
 FROM pynb-dag-runner-cicd
 
+# Docker image for
+#  - interactive Jupyter development
+#  - running tests in watch mode (using entr)
+#  - VS Code devcontainer
+
 USER root
 RUN apt-get install -y -q entr
 USER host_user

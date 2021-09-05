@@ -1,4 +1,5 @@
-# Setup for testing and building pynb-dag-runner library
+# Docker image for testing and building pynb-dag-runner library
+# Used by ci/cd (automated tests and build process) in Github.
 
 FROM pynb-dag-runner-base
 
