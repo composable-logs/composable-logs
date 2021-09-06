@@ -5,6 +5,9 @@ on:
     branches:
       - development
 
+  # See:
+  # https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+  # https://docs.github.com/en/actions/reference/events-that-trigger-workflows#pull_request
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
@@ -24,17 +27,19 @@ jobs:
           echo "RUN_ENVIRONMENT=ci" >> $GITHUB_ENV
 
       - uses: actions/checkout@v2
+        with:
+          persist-credentials: false
 
       - name: "Build docker image"
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
-          cd ${{ github.workspace }}
           make docker-build-all
 
       - name: "Run unit tests"
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
-          cd ${{ github.workspace }}
           make \
               RUN_ENVIRONMENT="${{ env.RUN_ENVIRONMENT }}" \
               COMMAND="(cd pynb_dag_runner; make test-pytest )" \
@@ -42,24 +47,24 @@ jobs:
 
       - name: "Run mypy type checks"
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
-          cd ${{ github.workspace }}
           make \
               COMMAND="(cd pynb_dag_runner; make test-mypy )" \
               docker-run-in-cicd
 
       - name: "Check black formatting"
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
-          cd ${{ github.workspace }}
           make \
               COMMAND="(cd pynb_dag_runner; make test-black )" \
               docker-run-in-cicd
 
       - name: "Build Python wheel-file for the pynb-dag-runner library"
         shell: bash
+        working-directory: ${{ github.workspace }}
         run: |
-          cd ${{ github.workspace }}
           make \
               COMMAND="(cd pynb_dag_runner; make clean build )" \
               docker-run-in-cicd
@@ -68,7 +73,6 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: pynb_dag_runner
-          path: |
-            ${{ github.workspace }}/workspace/pynb_dag_runner/dist/
+          path: ${{ github.workspace }}/workspace/pynb_dag_runner/dist/
           if-no-files-found: error
           retention-days: 10
