@@ -3,7 +3,7 @@ SHELL := /bin/bash
 draw-runlog-visuals:
 	echo "RUNLOGS_ROOT=$${RUNLOGS_ROOT:?}"   # ensure parameter is given
 
-	# convert runlog.json files under RUNLOGS_ROOT into Mermaid input file
+	# Convert runlog.json files under RUNLOGS_ROOT into a Mermaid input file
 	docker run --rm \
 	    --network none \
 	    --volume $(RUNLOGS_ROOT):/runlogs_root \
@@ -13,13 +13,17 @@ draw-runlog-visuals:
 	            --runlogs_root /runlogs_root \
 	            --output /runlogs_root/runtimes-gantt-chart.mmd"
 
-	# render Mermaid input file to png, see
+	# Next, render Mermaid input file to a png, see
 	#  - https://github.com/mermaid-js/mermaid-cli
 	#  - https://hub.docker.com/r/minlag/mermaid-cli
+	#
+	# Note/TODO: the below uses Mermaid 8.8.0. If we upgrade to 8.12.1, the
+	# docker run-command fails with a permission error:
+	#
+	# [Error: EACCES: permission denied, open '/data/runtimes-gantt-chart.png']
+	#
 	docker pull minlag/mermaid-cli:8.8.0
 
-	# Note/TODO: if upgrading to 8.12.1, the below fails with
-	# [Error: EACCES: permission denied, open '/data/runtimes-gantt-chart.png']
 	docker run --rm \
 	    --network none \
 	    --volume $(RUNLOGS_ROOT):/runlogs_root \
