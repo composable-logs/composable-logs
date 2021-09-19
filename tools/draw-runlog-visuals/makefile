@@ -5,15 +5,15 @@ draw-runlog-visuals:
 	#  - a directory of runlog files (runlog.json files under RUNLOGS_ROOT).
 	#  - a task_dependency.json file listing the dependencies between tasks.
 	#
-	# This make target converts these inputs into two images (both writted to
+	# This make target converts these inputs into two images (both written to
 	# PNG_OUTPUT_DIRECTORY):
 	#
 	# runtimes-gantt-chart.png
-	#    This image show the relative runtimes of tasks as a Gantt chart. From
+	#    This image shows the relative runtimes of tasks as a Gantt chart. From
 	#    the image one can eg. see which tasks have run in parallel.
 	#
 	# task-dependencies.png
-	#    This image show which tasks are dependent on each other. Moreover,
+	#    This image shows which tasks are dependent on each other. Moreover,
 	#    this png file contains run-parameters (eg retry/timeout settings)
 	#    for each tasks.
 	#
