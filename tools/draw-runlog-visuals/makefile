@@ -11,7 +11,7 @@ draw-runlog-visuals:
 	    pynb-dag-runner-base \
 	        "python3 /app-src/runtimes-gantt-chart.py \
 	            --runlogs_root /runlogs_root \
-	            --output /runlogs_root/runtimes-gantt-chart.mmd"
+	            --gantt_mmd_outputfile /runlogs_root/runtimes-gantt-chart.mmd"
 
 	# Next, render Mermaid input file to a png, see
 	#  - https://github.com/mermaid-js/mermaid-cli
