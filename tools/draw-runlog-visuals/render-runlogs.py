@@ -13,19 +13,29 @@ def args():
         help="root directory for pipeline runlogs",
     )
     parser.add_argument(
-        "--gantt_mmd_outputfile",
+        "--output_gantt_mmd",
         type=str,
         required=False,
-        help="Output filepath for writing Mermaid input file",
+        help="output filepath for writing Gantt diagram Mermaid file",
+    )
+    parser.add_argument(
+        "--output_dependency_mmd",
+        type=str,
+        required=False,
+        help="output filepath for writing dependency graph Mermaid file",
     )
     args = parser.parse_args()
 
     return args
 
 
+def read_json(filepath: str):
+    return json.loads(Path(filepath).read_text())
+
+
 def load_runlogs():
     return [
-        json.loads(Path(f).read_text())
+        read_json(f)
         for f in glob.glob(f"{args().runlogs_root}/**/runlog.json", recursive=True)
     ]
 
@@ -88,11 +98,57 @@ def make_gantt_mermaid_file_content(runlogs):
 
 print(" - runlogs_root :", args().runlogs_root)
 
-if args().gantt_mmd_outputfile is not None:
-    print(" - writing Mermaid Gantt output file to :", args().gantt_mmd_outputfile)
-    Path(args().gantt_mmd_outputfile).write_text(
+if args().output_gantt_mmd is not None:
+    print(" - writing Mermaid Gantt output file to :", args().output_gantt_mmd)
+    Path(args().output_gantt_mmd).write_text(
         make_gantt_mermaid_file_content(load_runlogs())
     )
     print(f"    done!")
+
+
+def make_dependency_mermaid_file_content(runlogs):
+    output_lines = [
+        "graph LR",
+        "    %% Mermaid input file for drawing task dependencies ",
+        "    %% See https://mermaid-js.github.io/mermaid",
+        "    %%",
+    ]
+
+    # for tasks that have been retried, the same task_id may occur in multiple runlog.json
+    # files
+    all_task_ids = set([runlog["task_id"] for runlog in runlogs])
+
+    task_id_to_node_name = {
+        task_id: f"NODE_{idx}" for idx, task_id in enumerate(all_task_ids)
+    }
+
+    def get_task_description(task_id):
+        return task_id
+
+    # add one node to the graph per task_id
+    for task_id, node_name in task_id_to_node_name.items():
+        output_lines += [f"    {node_name}[{get_task_description(task_id)}]"]
+
+    # add arrows between nodes in the graph where tasks are dependent on each other
+    for dependency in read_json(f"{args().runlogs_root}/task_dependencies.json"):
+        from_id = dependency["from"]
+        to_id = dependency["to"]
+        output_lines += [
+            f"    {task_id_to_node_name[from_id]} --> {task_id_to_node_name[to_id]}"
+        ]
+
+    return "\n".join(output_lines)
+
+
+if args().output_dependency_mmd is not None:
+    print(
+        " - writing Mermaid dependency graph output file to :",
+        args().output_dependency_mmd,
+    )
+    Path(args().output_dependency_mmd).write_text(
+        make_dependency_mermaid_file_content(load_runlogs())
+    )
+    print(f"    done!")
+
 
 print("Done")

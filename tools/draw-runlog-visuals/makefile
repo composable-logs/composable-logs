@@ -9,9 +9,10 @@ draw-runlog-visuals:
 	    --volume $(RUNLOGS_ROOT):/runlogs_root \
 	    --volume $$(pwd):/app-src:ro \
 	    pynb-dag-runner-base \
-	        "python3 /app-src/runtimes-gantt-chart.py \
+	        "python3 /app-src/render-runlogs.py \
 	            --runlogs_root /runlogs_root \
-	            --gantt_mmd_outputfile /runlogs_root/runtimes-gantt-chart.mmd"
+	            --output_gantt_mmd /runlogs_root/runtimes-gantt-chart.mmd \
+	            --output_dependency_mmd /runlogs_root/task-dependencies.mmd"
 
 	# Next, render Mermaid input file to a png, see
 	#  - https://github.com/mermaid-js/mermaid-cli
@@ -32,4 +33,12 @@ draw-runlog-visuals:
 	        --input /runlogs_root/runtimes-gantt-chart.mmd \
 	        --output /runlogs_root/runtimes-gantt-chart.png
 
-	rm $(RUNLOGS_ROOT)/runtimes-gantt-chart.mmd
+	docker run --rm \
+	    --network none \
+	    --volume $(RUNLOGS_ROOT):/runlogs_root \
+	    minlag/mermaid-cli:8.8.0 \
+	        --scale 2 \
+	        --input /runlogs_root/task-dependencies.mmd \
+	        --output /runlogs_root/task-dependencies.png
+
+	rm $(RUNLOGS_ROOT)/{runtimes-gantt-chart,task-dependencies}.mmd
