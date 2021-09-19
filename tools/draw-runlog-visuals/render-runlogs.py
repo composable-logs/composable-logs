@@ -3,6 +3,8 @@ import glob, json, datetime
 from pathlib import Path
 from argparse import ArgumentParser
 
+# --- i/o helpers ---
+
 
 def args():
     parser = ArgumentParser()
@@ -33,6 +35,12 @@ def read_json(filepath: str):
     return json.loads(Path(filepath).read_text())
 
 
+def write_output(filepath: Path, text_content: str):
+    print(" - writing output to ", filepath)
+    filepath.write_text(text_content)
+    print(" - done")
+
+
 def load_runlogs():
     return [
         read_json(f)
@@ -40,14 +48,21 @@ def load_runlogs():
     ]
 
 
+# --- common helper to parse runlog content ---
+
+
 def runlog_taskname(runlog) -> str:
-    if runlog["task_type"]:
-        return runlog["notebook_path"]
+    if runlog["task_type"] == "PythonNotebookTask":
+        return f"""{runlog["notebook_path"]} (nb)"""
     else:
         raise Exception(f"Unknown task_type field in runlog={str(runlog)}")
 
 
 def make_gantt_mermaid_file_content(runlogs):
+    """
+    Draw Gantt chart from runtimes
+    """
+
     def runlog_duration_text(runlog) -> str:
         # runtime for a runlog is only used when drawing Gantt-charts
         seconds: float = runlog["out.timing.duration_ms"] / 1000
@@ -96,17 +111,10 @@ def make_gantt_mermaid_file_content(runlogs):
     return "\n".join(output_lines)
 
 
-print(" - runlogs_root :", args().runlogs_root)
-
-if args().output_gantt_mmd is not None:
-    print(" - writing Mermaid Gantt output file to :", args().output_gantt_mmd)
-    Path(args().output_gantt_mmd).write_text(
-        make_gantt_mermaid_file_content(load_runlogs())
-    )
-    print(f"    done!")
-
-
-def make_dependency_mermaid_file_content(runlogs):
+def make_dependency_mermaid_file_content(runlogs, task_dependencies):
+    """
+    Draw task dependency graph
+    """
     output_lines = [
         "graph LR",
         "    %% Mermaid input file for drawing task dependencies ",
@@ -122,15 +130,44 @@ def make_dependency_mermaid_file_content(runlogs):
         task_id: f"NODE_{idx}" for idx, task_id in enumerate(all_task_ids)
     }
 
+    def get_unique(xs):
+        xs_set = set(xs)
+        assert len(xs_set) == 1
+        return list(xs_set)[0]
+
     def get_task_description(task_id):
-        return task_id
+        # get all runlogs for this task_id
+        task_id_runlogs = [runlog for runlog in runlogs if runlog["task_id"] == task_id]
+        assert len(task_id_runlogs) >= 1
+
+        result = []
+
+        # add task name as first line in node content
+        result += [get_unique(runlog_taskname(runlog) for runlog in task_id_runlogs)]
+
+        # loop over all keys in all runlogs for this task(_id)
+        for key in set.union(*[set(runlog.keys()) for runlog in task_id_runlogs]):
+            if key.startswith("parameters.task"):
+                task_key = key.replace("parameters.task.", "", 1)
+                value = get_unique(runlog[key] for runlog in task_id_runlogs)
+
+                # do not render default retry/timout settings
+                if task_key == "n_max_retries" and value == 1:
+                    continue
+
+                if task_key == "timeout_s" and value is None:
+                    continue
+
+                result += [f"{task_key}={value}"]
+
+        return '"' + "<br /> ".join(result) + '"'
 
     # add one node to the graph per task_id
     for task_id, node_name in task_id_to_node_name.items():
         output_lines += [f"    {node_name}[{get_task_description(task_id)}]"]
 
     # add arrows between nodes in the graph where tasks are dependent on each other
-    for dependency in read_json(f"{args().runlogs_root}/task_dependencies.json"):
+    for dependency in task_dependencies:
         from_id = dependency["from"]
         to_id = dependency["to"]
         output_lines += [
@@ -140,15 +177,27 @@ def make_dependency_mermaid_file_content(runlogs):
     return "\n".join(output_lines)
 
 
+# --- main script logic ---
+
+print(" - runlogs_root :", args().runlogs_root)
+
+if args().output_gantt_mmd is not None:
+    write_output(
+        filepath=Path(args().output_gantt_mmd),
+        text_content=make_gantt_mermaid_file_content(load_runlogs()),
+    )
+
 if args().output_dependency_mmd is not None:
-    print(
-        " - writing Mermaid dependency graph output file to :",
-        args().output_dependency_mmd,
+    write_output(
+        filepath=Path(args().output_dependency_mmd),
+        text_content=make_dependency_mermaid_file_content(
+            runlogs=load_runlogs(),
+            task_dependencies=read_json(
+                f"{args().runlogs_root}/task_dependencies.json"
+            ),
+        ),
     )
-    Path(args().output_dependency_mmd).write_text(
-        make_dependency_mermaid_file_content(load_runlogs())
-    )
-    print(f"    done!")
 
+print(" - render-runlogs script done")
 
-print("Done")
+# ---
