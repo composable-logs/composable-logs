@@ -10,7 +10,7 @@ on:
 
   workflow_dispatch:
 
-# We only access public reposotories so GITHUB_TOKEN does not need any access
+# We only access public repos so GITHUB_TOKEN does not need any access
 permissions:
   contents: none
 
