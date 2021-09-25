@@ -1,12 +1,22 @@
 name: "Security scan"
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
     branches:
       - development
+    paths-ignore:
+      - "**/*.md"
 
-  # TODO: trigger also regularly (to catch new findings)
+  #pull_request:
+  #  types: [opened, synchronize, reopened]
+  #  branches:
+  #    - development
+  #  paths-ignore:
+  #    - "**/*.md"
+
+  # Run every 4:20 UTC, Mondays
+  schedule:
+    - cron: "20 4 * * 1"
 
   workflow_dispatch:
 
@@ -15,7 +25,7 @@ permissions:
   security-events: write
 
 jobs:
-  run-sec-scans:
+  run-trivy-docker-scans:
     runs-on: [ubuntu-20.04]
 
     steps:
@@ -39,7 +49,7 @@ jobs:
       #
       # Trivy (and the below Trivy action) are Apache 2 licensed.
 
-      - name: Run Trivy vulnerability scanner
+      - name: "Trivy: Scan 'pynb-dag-runner-dev' Docker image"
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: pynb-dag-runner-dev
@@ -47,7 +57,7 @@ jobs:
           template: '@/contrib/sarif.tpl'
           output: trivy-results.sarif
 
-      - name: Upload Trivy scan results to GitHub Security tab
+      - name: "upload all Trivy scan results to GitHub Security tab"
         uses: github/codeql-action/upload-sarif@v1
         with:
           sarif_file: trivy-results.sarif
