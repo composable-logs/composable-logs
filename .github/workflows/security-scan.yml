@@ -10,9 +10,9 @@ on:
 
   workflow_dispatch:
 
-# We only access public repos so GITHUB_TOKEN does not need any access
 permissions:
   contents: none
+  security-events: write
 
 jobs:
   run-sec-scans:
