@@ -1,0 +1,55 @@
+name: "Security scan"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - development
+
+  # TODO: trigger also regularly (to catch new findings)
+
+  workflow_dispatch:
+
+# We only access public reposotories so GITHUB_TOKEN does not need any access
+permissions:
+  contents: none
+
+jobs:
+  run-sec-scans:
+    runs-on: [ubuntu-20.04]
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          persist-credentials: false
+
+      - name: Build docker images
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          make docker-build-all
+
+      # ------
+      # The below following instructions from here:
+      #
+      #  https://github.com/aquasecurity/trivy-action
+      #
+      # Note that we build three docker images, but one scan the last one
+      # since each image is built based on the previous one.
+      #
+      # Trivy (and the below Trivy action) are Apache 2 licensed.
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: pynb-dag-runner-dev
+          format: template
+          template: '@/contrib/sarif.tpl'
+          output: trivy-results.sarif
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: trivy-results.sarif
+
+      # ------
