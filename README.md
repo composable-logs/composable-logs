@@ -26,14 +26,14 @@ A limitation of this approach is that there is no real-time monitoring. For inte
 
 ----
 
-[^jupytext] Jupyter notebooks source files are assumed to be in Jupytext format. That means
+[^jupytext]: Jupyter notebooks source files are assumed to be in Jupytext format. That means
    1. notebooks are stored (in git) as ordinary Python (text) files that can be version controlled and reviewed in pull requests.
    2. unlike ipynb files, Jupytext notebooks can not contain images or tables.
    3. Notebooks are run with the Paramill library, and notebooks can therefore also depend on parameters.
 
    With the Jupytext format, notebooks can be linted (using black) and type checked (using mypy), see demo pipeline linked above for an example of this.
 
-[^ray] The [Ray framework](https://www.ray.io/) supports execution on a Ray cluster of multiple nodes, but currently py_dag_runner only supports single node setups.
+[^ray]: The [Ray framework](https://www.ray.io/) supports execution on a Ray cluster of multiple nodes, but currently py_dag_runner only supports single node setups.
 
 ----
 
