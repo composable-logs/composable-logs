@@ -12,9 +12,9 @@ Main features:
 
 After a pipeline has run, `py_dag_runner` stores outputs from all tasks in the pipeline to a directory structure. This includes:
 
-- Notebook outputs in `.html` formats.
+- Evaluated notebooks in both `.ipynb` and `.html` formats.
 - Parameters used to trigger tasks.
-- Timing and other outcomes (eg., did task fail, succeed, or timeout).
+- Timing and other outcomes (eg., did a task fail, succeed, or timeout).
 
 An implication of storing output as files is that `py_dag_runner` is independent of any external service, database, or infrastructure. Eg., if `py_dag_runner` is used to run a pipeline in a CI-setup all outputs can be saved as build-artefacts.
 
