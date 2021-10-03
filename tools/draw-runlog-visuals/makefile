@@ -6,21 +6,23 @@ draw-runlog-visuals:
 	#  - a task_dependency.json file listing the dependencies between tasks.
 	#
 	# This make target converts these inputs into two images (both written to
-	# PNG_OUTPUT_DIRECTORY):
+	# IMG_OUTPUT_DIRECTORY):
 	#
-	# runtimes-gantt-chart.png
+	# runtimes-gantt-chart.{png, svg}
 	#    This image shows the relative runtimes of tasks as a Gantt chart. From
 	#    the image one can eg. see which tasks have run in parallel.
 	#
-	# task-dependencies.png
+	# task-dependencies.{png, svg}
 	#    This image shows which tasks are dependent on each other. Moreover,
 	#    this png file contains run-parameters (eg retry/timeout settings)
 	#    for each tasks.
 	#
+	# IMG_OUTPUT_FORMAT determines output file format ("png" or "svg")
 
 	# ensure the required parameters are given
 	echo "RUNLOGS_ROOT=$${RUNLOGS_ROOT:?}"
-	echo "PNG_OUTPUT_DIRECTORY=$${PNG_OUTPUT_DIRECTORY:?}"
+	echo "IMG_OUTPUT_DIRECTORY=$${IMG_OUTPUT_DIRECTORY:?}"
+	echo "IMG_OUTPUT_FORMAT=$${IMG_OUTPUT_FORMAT:?}"
 
 	# Convert runlog.json files under RUNLOGS_ROOT into a Mermaid input file
 	docker run --rm \
@@ -47,19 +49,17 @@ draw-runlog-visuals:
 	docker run --rm \
 	    --network none \
 	    --volume $(RUNLOGS_ROOT):/runlogs_root \
-	    --volume $(PNG_OUTPUT_DIRECTORY):/png_output_dir \
+	    --volume $(IMG_OUTPUT_DIRECTORY):/img_output_dir \
 	    minlag/mermaid-cli:8.8.0 \
-	        --scale 2 \
 	        --input /runlogs_root/runtimes-gantt-chart.mmd \
-	        --output /png_output_dir/runtimes-gantt-chart.png
+	        --output /img_output_dir/runtimes-gantt-chart.$(IMG_OUTPUT_FORMAT)
 
 	docker run --rm \
 	    --network none \
 	    --volume $(RUNLOGS_ROOT):/runlogs_root \
-	    --volume $(PNG_OUTPUT_DIRECTORY):/png_output_dir \
+	    --volume $(IMG_OUTPUT_DIRECTORY):/img_output_dir \
 	    minlag/mermaid-cli:8.8.0 \
-	        --scale 2 \
 	        --input /runlogs_root/task-dependencies.mmd \
-	        --output /png_output_dir/task-dependencies.png
+	        --output /img_output_dir/task-dependencies.$(IMG_OUTPUT_FORMAT)
 
 	rm $(RUNLOGS_ROOT)/{runtimes-gantt-chart,task-dependencies}.mmd
