@@ -201,12 +201,11 @@ def test_retry_random():
             assert all(r < 5 for r in results[:-1])  # other is failures
 
 
-@pytest.mark.xfail(run=False, reason="last assert fail after upgrade to Ray 1.70")
 def test_multiple_retrys_should_run_in_parallel():
     def make_f(task_label: str):
         def f(retry_count):
             start_ts = time.time_ns()
-            time.sleep(0.1)
+            time.sleep(3)
             return {
                 "task_label": task_label,
                 "retry_count": retry_count,
