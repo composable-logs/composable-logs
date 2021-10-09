@@ -205,7 +205,7 @@ def test_multiple_retrys_should_run_in_parallel():
     def make_f(task_label: str):
         def f(retry_count):
             start_ts = time.time_ns()
-            time.sleep(0.1)
+            time.sleep(2)
             return {
                 "task_label": task_label,
                 "retry_count": retry_count,
