@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - development
+      - optl_development
 
   # See:
   # https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
@@ -12,6 +13,7 @@ on:
     types: [opened, synchronize, reopened]
     branches:
       - development
+      - optl_development
 
   workflow_dispatch:
 

@@ -2,3 +2,6 @@ ray[default]==1.7.0
 notebook==6.4.1
 jupytext==1.11.4
 papermill==2.3.3
+opentelemetry-api==1.5.0
+opentelemetry-sdk==1.5.0
+opentelemetry-exporter-otlp==1.5.0
