@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar, List
+
+A = TypeVar("A")
 
 
 def range_is_empty(range):
@@ -73,3 +75,14 @@ def read_json(filepath: Path) -> Any:
 def write_json(filepath: Path, obj: Any):
     with open(filepath, "w") as f:
         json.dump(obj, f, indent=2)
+
+
+def one(xs: List[A]) -> A:
+    """
+    Assert that a list has only one element and return that element
+    """
+    assert isinstance(xs, list)
+    if not len(xs) == 1:
+        raise Exception(f"one: expected list with single element; got {str(xs)}.")
+
+    return xs[0]
