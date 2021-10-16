@@ -1,6 +1,8 @@
 from typing import TypeVar, Generic, Callable, List, Optional
 
 import ray
+import opentelemetry as otel
+from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 
 A = TypeVar("A")
@@ -52,10 +54,22 @@ class LiftedFunctionActor(CallableActor):
         self.error_handler = error_handler
 
     def call(self, *args, **kwargs):
-        try:
-            return self.success_handler(self.f(*args, **kwargs))
-        except Exception as e:
-            return self.error_handler(e)
+        tracer = otel.trace.get_tracer(__name__)
+
+        # Execute function in new OpenTelemetry span.
+        # Note that arguments to function are not logged.
+        with tracer.start_as_current_span("execute-python-function") as span:
+            try:
+                result = self.success_handler(self.f(*args, **kwargs))
+                span.set_status(Status(StatusCode.OK, "Success"))
+
+            except Exception as e:
+                result = self.error_handler(e)
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, "Failure"))
+
+            span.set_attribute("result_value", result)
+            return result
 
 
 def timeout_guard(
@@ -106,9 +120,9 @@ def try_eval_f_async_wrapper(
     error_handler: Callable[[Exception], C],
 ) -> Callable[[Future[A]], Future[C]]:
     return timeout_guard(
-        make_actor=lambda: LiftedFunctionActor.remote(
-            f, success_handler, error_handler
-        ),
+        make_actor=lambda: LiftedFunctionActor.remote(  # type: ignore
+            f, success_handler, error_handler  # type: ignore
+        ),  # type: ignore
         timeout_result=error_handler(
             Exception("Timeout error: execution did not finish within timeout limit")
         ),
