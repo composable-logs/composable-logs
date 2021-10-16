@@ -1,6 +1,10 @@
 from pathlib import Path
 import random
 
+#
+import pytest
+
+#
 from pynb_dag_runner.helpers import (
     range_is_empty,
     range_intersection,
@@ -9,6 +13,7 @@ from pynb_dag_runner.helpers import (
     compose,
     write_json,
     read_json,
+    one,
 )
 
 
@@ -85,3 +90,12 @@ def test_write_read_json(tmp_path: Path):
 
     write_json(test_path, test_obj)
     assert read_json(test_path) == test_obj
+
+
+def test_one():
+    assert one([1]) == 1
+
+
+def test_one_raises_exception():
+    with pytest.raises(Exception):
+        assert one([1, 2])
