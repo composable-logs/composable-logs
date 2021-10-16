@@ -1,9 +1,14 @@
-# location of this file indicates root for pytest
+import shutil
+
+# location of this file (conftest.py) indicates root for pytest
 import pytest, ray
 
 
 @pytest.fixture(scope="session", autouse=True)
 def init_ray_before_all_tests():
+    # Clean up any spans from previous runs
+    shutil.rmtree("/tmp/spans", ignore_errors=True)
+
     # - Init ray once before all tests.
     # - This way there is no need for ray.init commands in the in test python files.
     #   Hence ray do not need to start when VS Code is discovering tests (which seems
