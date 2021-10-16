@@ -39,13 +39,11 @@ class Future(Generic[A]):
         return lambda future: Future.map(future, f)
 
 
-def try_eval_f_async_wrapper(
-    f: Callable[[A], B],
+def timeout_guard(
+    f: Callable[[A], C],
+    timeout_result: C,
     timeout_s: Optional[float],
-    success_handler: Callable[[B], C],
-    error_handler: Callable[[Exception], C],
 ) -> Callable[[Future[A]], Future[C]]:
-
     # See Ray issues
     # - "Support timeout option in Ray tasks",
     #   https://github.com/ray-project/ray/issues/17451
@@ -58,16 +56,12 @@ def try_eval_f_async_wrapper(
             self.f = f
 
         def make_call(self, *args):
+            # TODO: I/O in FunctionExecution-span
             return self.f(*args)
 
-    def tryf(*args) -> C:
-        try:
-            return success_handler(f(*args))
-        except Exception as e:
-            return error_handler(e)
-
     def result(arg_f: Future[A]) -> Future[C]:
-        exec_actor = ExecActor.options(max_concurrency=2).remote(tryf)  # type: ignore
+        # TODO: TimeoutGuard-span for below
+        exec_actor = ExecActor.options(max_concurrency=2).remote(f)  # type: ignore
 
         future = exec_actor.make_call.remote(arg_f)
 
@@ -78,18 +72,33 @@ def try_eval_f_async_wrapper(
         else:
             assert refs_not_done == [future]
 
-            # https://simon-ray.readthedocs.io/en/latest/actors.html#terminating-actors
+            # https://docs.ray.io/en/latest/actors.html#terminating-actors
             ray.kill(exec_actor)
 
-            return ray.put(
-                error_handler(
-                    Exception(
-                        "Timeout error: execution did not finish within timeout limit"
-                    )
-                )
-            )
+            return ray.put(timeout_result)
 
     return result
+
+
+def try_eval_f_async_wrapper(
+    f: Callable[[A], B],
+    timeout_s: Optional[float],
+    success_handler: Callable[[B], C],
+    error_handler: Callable[[Exception], C],
+) -> Callable[[Future[A]], Future[C]]:
+    def tryf(*args) -> C:
+        try:
+            return success_handler(f(*args))
+        except Exception as e:
+            return error_handler(e)
+
+    return timeout_guard(
+        f=tryf,
+        timeout_result=error_handler(
+            Exception("Timeout error: execution did not finish within timeout limit")
+        ),
+        timeout_s=timeout_s,
+    )
 
 
 RetryCount = int
