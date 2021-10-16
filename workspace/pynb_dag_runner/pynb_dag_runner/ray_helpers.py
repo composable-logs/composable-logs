@@ -61,14 +61,26 @@ class LiftedFunctionActor(CallableActor):
         with tracer.start_as_current_span("execute-python-function") as span:
             try:
                 result = self.success_handler(self.f(*args, **kwargs))
-                span.set_status(Status(StatusCode.OK, "Success"))
+                span.set_status(Status(StatusCode.OK))
 
             except Exception as e:
                 result = self.error_handler(e)
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, "Failure"))
 
-            span.set_attribute("result_value", result)
+            # --- log result (todo, integrate into success/error handler callbacks)
+            if isinstance(result, dict):
+                for k, v in result.items():
+                    if isinstance(k, str):
+                        span.set_attribute(k, v)
+            elif result is None or any(
+                isinstance(result, t) for t in [str, float, bytearray, int]
+            ):
+                span.set_attribute("result", result)
+            else:
+                span.set_attribute("result", "<UNKNOWN>")
+            # ---
+
             return result
 
 
