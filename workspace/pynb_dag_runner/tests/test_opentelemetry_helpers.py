@@ -12,6 +12,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     read_key,
     is_parent_child,
     get_duration_s,
+    Spans,
     SpanRecorder,
 )
 from pynb_dag_runner.helpers import one
@@ -71,20 +72,27 @@ def test_tracing_native_python(dummy_loop_parameter):
 
 @pytest.mark.parametrize("dummy_loop_parameter", range(3))
 def test_tracing_nested_native_python(dummy_loop_parameter):
-    with SpanRecorder() as sr:
-        tracer = ot.trace.get_tracer(__name__)
+    # test that we can record and validate properties of spans emitted by native
+    # Python code
 
-        with tracer.start_as_current_span("top"):
-            time.sleep(0.2)
-            with tracer.start_as_current_span("sub1"):
-                time.sleep(0.3)
-                with tracer.start_as_current_span("sub11"):
-                    time.sleep(0.4)
+    def get_test_spans():
+        with SpanRecorder() as sr:
+            tracer = ot.trace.get_tracer(__name__)
 
-            with tracer.start_as_current_span("sub2"):
-                time.sleep(0.1)
+            with tracer.start_as_current_span("top"):
+                time.sleep(0.2)
+                with tracer.start_as_current_span("sub1") as span_sub1:
+                    time.sleep(0.3)
+                    span_sub1.set_attribute("sub1attribute", 12345)
+                    with tracer.start_as_current_span("sub11"):
+                        time.sleep(0.4)
 
-    spans = sr.spans
+                with tracer.start_as_current_span("sub2"):
+                    time.sleep(0.1)
+
+        return sr.spans
+
+    spans: Spans = get_test_spans()
 
     assert len(spans) == 4
 
@@ -107,3 +115,5 @@ def test_tracing_nested_native_python(dummy_loop_parameter):
     assert check_duration(sub1, 0.3 + 0.4)
     assert check_duration(sub11, 0.4)
     assert check_duration(sub2, 0.1)
+
+    assert read_key(sub1, ["attributes", "sub1attribute"]) == 12345
