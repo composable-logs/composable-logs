@@ -77,12 +77,18 @@ def write_json(filepath: Path, obj: Any):
         json.dump(obj, f, indent=2)
 
 
+def read_jsonl(path: Path):
+    assert path.is_file()
+
+    return [json.loads(span_line) for span_line in path.read_text().splitlines()]
+
+
 def one(xs: List[A]) -> A:
     """
     Assert that a list has only one element and return that element
     """
-    assert isinstance(xs, list)
-    if not len(xs) == 1:
-        raise Exception(f"one: expected list with single element; got {str(xs)}.")
+    xs_list = list(xs)
+    if not len(xs_list) == 1:
+        raise Exception(f"one: expected list with single element; got {str(xs_list)}.")
 
-    return xs[0]
+    return xs_list[0]
