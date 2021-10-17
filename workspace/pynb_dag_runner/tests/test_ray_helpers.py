@@ -71,13 +71,15 @@ def test_timeout_w_success():
 
         return rec.spans
 
-    # --- check spans ---
-    func_call_spans: Spans = get_test_spans().filter(["name"], "call-python-function")
-    assert len(func_call_spans) == N_calls
+    def validate_spans(spans: Spans):
+        func_call_spans: Spans = spans.filter(["name"], "call-python-function")
+        assert len(func_call_spans) == N_calls
 
-    for span in func_call_spans:
-        assert read_key(span, ["status", "status_code"]) == "OK"
-        assert read_key(span, ["attributes", "return_value"]) in ["2", "4", "6"]
+        for span in func_call_spans:
+            assert read_key(span, ["status", "status_code"]) == "OK"
+            assert read_key(span, ["attributes", "return_value"]) in ["2", "4", "6"]
+
+    validate_spans(get_test_spans())
 
 
 def test_timeout_w_exception():
@@ -103,29 +105,31 @@ def test_timeout_w_exception():
                     assert f"BOOM{x}" in str(e)
         return rec.spans
 
-    # --- check spans ---
-    func_call_spans: Spans = get_test_spans().filter(["name"], "call-python-function")
-    assert len(func_call_spans) == N_calls
+    def validate_spans(spans: Spans):
+        func_call_spans: Spans = spans.filter(["name"], "call-python-function")
+        assert len(func_call_spans) == N_calls
 
-    for span in func_call_spans:
-        assert read_key(span, ["status", "status_code"]) == "ERROR"
-        assert read_key(span, ["status", "description"]) == "Failure"
-        assert read_key(span, ["attributes", "return_value"]) in [
-            f"BOOM{x}" for x in range(N_calls)
-        ]
-
-        event = one(read_key(span, ["events"]))
-        assert set(event.keys()) == set(["name", "timestamp", "attributes"])
-        assert event["name"] == "exception"
-        assert set(event["attributes"]) == set(
-            [
-                "exception.type",
-                "exception.message",
-                "exception.stacktrace",
-                "exception.escaped",
+        for span in func_call_spans:
+            assert read_key(span, ["status", "status_code"]) == "ERROR"
+            assert read_key(span, ["status", "description"]) == "Failure"
+            assert read_key(span, ["attributes", "return_value"]) in [
+                f"BOOM{x}" for x in range(N_calls)
             ]
-        )
-        assert read_key(event, ["attributes", "exception.type"]) == "ValueError"
+
+            event = one(read_key(span, ["events"]))
+            assert set(event.keys()) == set(["name", "timestamp", "attributes"])
+            assert event["name"] == "exception"
+            assert set(event["attributes"]) == set(
+                [
+                    "exception.type",
+                    "exception.message",
+                    "exception.stacktrace",
+                    "exception.escaped",
+                ]
+            )
+            assert read_key(event, ["attributes", "exception.type"]) == "ValueError"
+
+    validate_spans(get_test_spans())
 
 
 # this test has failed randomly (TODO)
