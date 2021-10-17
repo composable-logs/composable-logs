@@ -10,6 +10,8 @@ import pytest, ray
 from pynb_dag_runner.helpers import flatten, range_intersect
 from pynb_dag_runner.ray_helpers import try_eval_f_async_wrapper, retry_wrapper, Future
 
+from pynb_dag_runner.opentelemetry_helpers import read_key, Spans, SpanRecorder
+
 
 @ray.remote(num_cpus=0)
 class StateActor:
@@ -50,18 +52,33 @@ def test_future_lift():
 
 
 def test_timeout_w_success():
-    def f(x: int) -> int:
-        return x + 1
+    N_calls = 3
 
-    f_timeout: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
-        f,
-        timeout_s=10,
-        success_handler=lambda x: 2 * x,
-        error_handler=lambda _: None,
-    )
+    def get_test_spans():
+        with SpanRecorder() as rec:
 
-    for x in range(3):
-        assert ray.get(f_timeout(ray.put(x))) == 2 * (x + 1)
+            def f(x: int) -> int:
+                return x + 1
+
+            f_timeout: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
+                f,
+                timeout_s=10,
+                success_handler=lambda x: 2 * x,
+                error_handler=lambda _: None,
+            )
+
+            for x in range(N_calls):
+                assert ray.get(f_timeout(ray.put(x))) == 2 * (x + 1)
+
+        return rec.spans
+
+    # --- check spans ---
+    func_call_spans: Spans = get_test_spans().filter(["name"], "call-python-function")
+    assert len(func_call_spans) == N_calls
+
+    for span in func_call_spans:
+        assert read_key(span, ["status", "status_code"]) == "OK"
+        assert read_key(span, ["attributes", "return_value"]) in ["2", "4", "6"]
 
 
 def test_timeout_w_exception():

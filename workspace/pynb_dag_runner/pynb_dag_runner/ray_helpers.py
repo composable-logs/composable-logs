@@ -58,7 +58,7 @@ class LiftedFunctionActor(CallableActor):
 
         # Execute function in new OpenTelemetry span.
         # Note that arguments to function are not logged.
-        with tracer.start_as_current_span("execute-python-function") as span:
+        with tracer.start_as_current_span("call-python-function") as span:
             try:
                 result = self.success_handler(self.f(*args, **kwargs))
                 span.set_status(Status(StatusCode.OK))
