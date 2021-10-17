@@ -41,13 +41,8 @@ class Future(Generic[A]):
         return lambda future: Future.map(future, f)
 
 
-class CallableActor:
-    def call(self, *args, **kwargs):
-        raise Exception("call not implemented")
-
-
 @ray.remote(num_cpus=0)
-class LiftedFunctionActor(CallableActor):
+class LiftedFunctionActor:
     def __init__(self, f, success_handler, error_handler):
         self.f = f
         self.success_handler = success_handler
