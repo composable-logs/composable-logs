@@ -1,6 +1,8 @@
 from typing import TypeVar, Generic, Callable, List, Optional
 
 import ray
+import opentelemetry as otel
+from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 
 A = TypeVar("A")
@@ -39,31 +41,58 @@ class Future(Generic[A]):
         return lambda future: Future.map(future, f)
 
 
+@ray.remote(num_cpus=0)
+class LiftedFunctionActor:
+    def __init__(self, f, success_handler, error_handler):
+        self.f = f
+        self.success_handler = success_handler
+        self.error_handler = error_handler
+
+    def call(self, *args, **kwargs):
+        tracer = otel.trace.get_tracer(__name__)
+
+        # Execute function in new OpenTelemetry span.
+        # Note that arguments to function are not logged.
+        with tracer.start_as_current_span("call-python-function") as span:
+            try:
+                result = self.success_handler(self.f(*args, **kwargs))
+                span.set_status(Status(StatusCode.OK))
+
+            except Exception as e:
+                result = self.error_handler(e)
+                span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR, "Failure"))
+
+            span.set_attribute("return_value", str(result))
+
+            return result
+
+
 def timeout_guard(
-    f: Callable[[A], C],
+    make_actor,
     timeout_result: C,
     timeout_s: Optional[float],
 ) -> Callable[[Future[A]], Future[C]]:
-    # See Ray issues
-    # - "Support timeout option in Ray tasks",
-    #   https://github.com/ray-project/ray/issues/17451
-    # - "Set time-out on individual ray task"
-    #   https://github.com/ray-project/ray/issues/15672
+    """
+    Note we are passing in a lambda for creating actor; not the actor itself. Otherwise
+    we get errors in unit tests like: "ray.exceptions.RayActorError: The actor died
+    unexpectedly before finishing this task".
 
-    @ray.remote(num_cpus=0)
-    class ExecActor:
-        def __init__(self, f):
-            self.f = f
+    Maybe this ensures the correct hierarchy between actors (relevant when killing
+    actors)?
 
-        def make_call(self, *args):
-            # TODO: I/O in FunctionExecution-span
-            return self.f(*args)
+    See also Ray issues:
+     - "Support timeout option in Ray tasks",
+       https://github.com/ray-project/ray/issues/17451
+     - "Set time-out on individual ray task"
+       https://github.com/ray-project/ray/issues/15672
+    """
 
     def result(arg_f: Future[A]) -> Future[C]:
         # TODO: TimeoutGuard-span for below
-        exec_actor = ExecActor.options(max_concurrency=2).remote(f)  # type: ignore
 
-        future = exec_actor.make_call.remote(arg_f)
+        work_actor = make_actor()
+        future = work_actor.call.remote(arg_f)
 
         refs_done, refs_not_done = ray.wait([future], num_returns=1, timeout=timeout_s)
         if len(refs_done) == 1:
@@ -73,7 +102,7 @@ def timeout_guard(
             assert refs_not_done == [future]
 
             # https://docs.ray.io/en/latest/actors.html#terminating-actors
-            ray.kill(exec_actor)
+            ray.kill(work_actor)
 
             return ray.put(timeout_result)
 
@@ -86,14 +115,10 @@ def try_eval_f_async_wrapper(
     success_handler: Callable[[B], C],
     error_handler: Callable[[Exception], C],
 ) -> Callable[[Future[A]], Future[C]]:
-    def tryf(*args) -> C:
-        try:
-            return success_handler(f(*args))
-        except Exception as e:
-            return error_handler(e)
-
     return timeout_guard(
-        f=tryf,
+        make_actor=lambda: LiftedFunctionActor.remote(  # type: ignore
+            f, success_handler, error_handler  # type: ignore
+        ),  # type: ignore
         timeout_result=error_handler(
             Exception("Timeout error: execution did not finish within timeout limit")
         ),

@@ -7,8 +7,9 @@ from typing import Callable
 import pytest, ray
 
 #
-from pynb_dag_runner.helpers import flatten, range_intersect
+from pynb_dag_runner.helpers import flatten, range_intersect, one
 from pynb_dag_runner.ray_helpers import try_eval_f_async_wrapper, retry_wrapper, Future
+from pynb_dag_runner.opentelemetry_helpers import read_key, Spans, SpanRecorder
 
 
 @ray.remote(num_cpus=0)
@@ -50,36 +51,85 @@ def test_future_lift():
 
 
 def test_timeout_w_success():
-    def f(x: int) -> int:
-        return x + 1
+    N_calls = 3
 
-    f_timeout: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
-        f,
-        timeout_s=10,
-        success_handler=lambda x: 2 * x,
-        error_handler=lambda _: None,
-    )
+    def get_test_spans():
+        with SpanRecorder() as rec:
 
-    for x in range(3):
-        assert ray.get(f_timeout(ray.put(x))) == 2 * (x + 1)
+            def f(x: int) -> int:
+                return x + 1
+
+            f_timeout: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
+                f,
+                timeout_s=10,
+                success_handler=lambda x: 2 * x,
+                error_handler=lambda _: None,
+            )
+
+            for x in range(N_calls):
+                assert ray.get(f_timeout(ray.put(x))) == 2 * (x + 1)
+
+        return rec.spans
+
+    def validate_spans(spans: Spans):
+        func_call_spans: Spans = spans.filter(["name"], "call-python-function")
+        assert len(func_call_spans) == N_calls
+
+        for span in func_call_spans:
+            assert read_key(span, ["status", "status_code"]) == "OK"
+            assert read_key(span, ["attributes", "return_value"]) in ["2", "4", "6"]
+
+    validate_spans(get_test_spans())
 
 
 def test_timeout_w_exception():
-    def f(dummy):
-        raise Exception(f"BOOM{dummy}")
+    N_calls = 3
 
-    f_timeout = try_eval_f_async_wrapper(
-        f,
-        timeout_s=10,
-        success_handler=lambda _: None,
-        error_handler=lambda x: x,
-    )
+    def get_test_spans():
+        with SpanRecorder() as rec:
 
-    for x in range(3):
-        try:
-            _ = ray.get(f_timeout(ray.put(x)))
-        except Exception as e:
-            assert f"BOOM{x}" in str(e)
+            def f(dummy):
+                raise ValueError(f"BOOM{dummy}")
+
+            f_timeout = try_eval_f_async_wrapper(
+                f,
+                timeout_s=10,
+                success_handler=lambda _: None,
+                error_handler=lambda x: x,
+            )
+
+            for x in range(N_calls):
+                try:
+                    _ = ray.get(f_timeout(ray.put(x)))
+                except ValueError as e:
+                    assert f"BOOM{x}" in str(e)
+        return rec.spans
+
+    def validate_spans(spans: Spans):
+        func_call_spans: Spans = spans.filter(["name"], "call-python-function")
+        assert len(func_call_spans) == N_calls
+
+        for span in func_call_spans:
+            assert read_key(span, ["status", "status_code"]) == "ERROR"
+            assert read_key(span, ["status", "description"]) == "Failure"
+            assert read_key(span, ["attributes", "return_value"]) in [
+                f"BOOM{x}" for x in range(N_calls)
+            ]
+
+            event = one(read_key(span, ["events"]))
+            assert set(event.keys()) == set(["name", "timestamp", "attributes"])
+            assert event["name"] == "exception"
+            assert set(event["attributes"]) == set(
+                [
+                    "exception.type",
+                    "exception.message",
+                    "exception.stacktrace",
+                    "exception.escaped",
+                ]
+            )
+            assert read_key(event, ["attributes", "exception.type"]) == "ValueError"
+
+    validate_spans(get_test_spans())
 
 
 # this test has failed randomly (TODO)
