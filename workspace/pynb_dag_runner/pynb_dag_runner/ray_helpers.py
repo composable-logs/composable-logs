@@ -68,18 +68,7 @@ class LiftedFunctionActor(CallableActor):
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR, "Failure"))
 
-            # --- log result (todo, integrate into success/error handler callbacks)
-            if isinstance(result, dict):
-                for k, v in result.items():
-                    if isinstance(k, str):
-                        span.set_attribute(k, v)
-            elif result is None or any(
-                isinstance(result, t) for t in [str, float, bytearray, int]
-            ):
-                span.set_attribute("result", result)
-            else:
-                span.set_attribute("result", "<UNKNOWN>")
-            # ---
+            span.set_attribute("return_value", str(result))
 
             return result
 
