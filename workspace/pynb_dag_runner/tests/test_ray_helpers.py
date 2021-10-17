@@ -1,7 +1,7 @@
 import time, random
 from pathlib import Path
 from uuid import uuid4
-from typing import Callable
+from typing import Any, Callable
 
 #
 import pytest, ray
@@ -110,8 +110,7 @@ def test_timeout_w_exception():
         assert len(func_call_spans) == N_calls
 
         for span in func_call_spans:
-            assert read_key(span, ["status", "status_code"]) == "ERROR"
-            assert read_key(span, ["status", "description"]) == "Failure"
+            assert span["status"] == {"status_code": "ERROR", "description": "Failure"}
             assert read_key(span, ["attributes", "return_value"]) in [
                 f"BOOM{x}" for x in range(N_calls)
             ]
@@ -128,6 +127,38 @@ def test_timeout_w_exception():
                 ]
             )
             assert read_key(event, ["attributes", "exception.type"]) == "ValueError"
+
+    validate_spans(get_test_spans())
+
+
+def test_timeout_w_timeout_cancel():
+    N_calls = 3
+
+    def get_test_spans():
+        with SpanRecorder() as rec:
+
+            def f(_: Any) -> None:
+                time.sleep(1e6)
+
+            f_timeout: Callable[[Future[Any]], Future[Any]] = try_eval_f_async_wrapper(
+                f,
+                timeout_s=0.5,
+                success_handler=lambda _: "OK",
+                error_handler=lambda e: "FAIL:" + str(e),
+            )
+
+            for _ in range(N_calls):
+                assert "FAIL:" in ray.get(f_timeout(ray.put(None)))
+
+        return rec.spans
+
+    def validate_spans(spans: Spans):
+        func_call_spans: Spans = spans.filter(["name"], "call-python-function-x")
+        assert len(func_call_spans) == N_calls
+
+        for span in func_call_spans:
+            assert read_key(span, ["attributes", "timeout_s"]) == 0.5
+            assert span["status"] == {"status_code": "ERROR", "description": "Timeout"}
 
     validate_spans(get_test_spans())
 

@@ -88,25 +88,31 @@ def timeout_guard(
        https://github.com/ray-project/ray/issues/15672
     """
 
-    def result(arg_f: Future[A]) -> Future[C]:
-        # TODO: TimeoutGuard-span for below
+    def compute_after_dependency_ready(a: A) -> C:
+        tracer = otel.trace.get_tracer(__name__)
+        with tracer.start_as_current_span("call-python-function-x") as span:
+            span.set_attribute("timeout_s", timeout_s)
+            work_actor = make_actor()
+            future = work_actor.call.remote(a)
 
-        work_actor = make_actor()
-        future = work_actor.call.remote(arg_f)
+            refs_done, refs_not_done = ray.wait(
+                [future], num_returns=1, timeout=timeout_s
+            )
+            assert len(refs_done) + len(refs_not_done) == 1
+            if len(refs_done) == 1:
+                assert refs_done == [future]
+                span.set_status(Status(StatusCode.OK))
+                return ray.get(future)
+            else:
+                assert refs_not_done == [future]
+                span.set_status(Status(StatusCode.ERROR, "Timeout"))
 
-        refs_done, refs_not_done = ray.wait([future], num_returns=1, timeout=timeout_s)
-        if len(refs_done) == 1:
-            assert refs_done == [future]
-            return future
-        else:
-            assert refs_not_done == [future]
+                # https://docs.ray.io/en/latest/actors.html#terminating-actors
+                ray.kill(work_actor)
 
-            # https://docs.ray.io/en/latest/actors.html#terminating-actors
-            ray.kill(work_actor)
+                return timeout_result
 
-            return ray.put(timeout_result)
-
-    return result
+    return Future.lift(compute_after_dependency_ready)
 
 
 def try_eval_f_async_wrapper(
