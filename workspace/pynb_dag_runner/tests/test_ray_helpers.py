@@ -172,14 +172,14 @@ def test_logging_for_nested_lift_functions():
 
             f_inner: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
                 f=f,
-                timeout_s=1,
+                timeout_s=5,
                 success_handler=lambda x: {"inner": x},
                 error_handler=lambda e: "FAIL:" + str(e),
             )
 
             f_outer: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
                 f=lambda x: ray.get(f_inner(ray.put(x))),
-                timeout_s=1,
+                timeout_s=5,
                 success_handler=lambda x: {"outer": x},
                 error_handler=lambda e: "FAIL:" + str(e),
             )
