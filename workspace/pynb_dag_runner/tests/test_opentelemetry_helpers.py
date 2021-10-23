@@ -101,12 +101,21 @@ def test_tracing_nested_native_python(dummy_loop_parameter):
     sub11 = one(spans.filter(["name"], "sub11"))
     sub2 = one(spans.filter(["name"], "sub2"))
 
-    assert is_parent_child(top, sub1)
-    assert is_parent_child(top, sub2)
-    assert is_parent_child(sub1, sub11)
+    def check_parent_child(parent, child):
+        assert spans.contains_path(parent, child, recursive=True)
+        assert spans.contains_path(parent, child, recursive=False)
+        assert is_parent_child(parent, child)
+
+    check_parent_child(top, sub1)
+    check_parent_child(top, sub2)
+    check_parent_child(sub1, sub11)
 
     assert not is_parent_child(top, top)
     assert not is_parent_child(sub1, top)
+
+    # Check that we can find "top -> sub11" relationship in "top -> sub1 -> sub11"
+    assert spans.contains_path(parent=top, child=sub11, recursive=True)
+    assert not spans.contains_path(parent=top, child=sub11, recursive=False)
 
     def check_duration(span, expected_duration_s: float) -> bool:
         return abs(get_duration_s(span) - expected_duration_s) < 0.05

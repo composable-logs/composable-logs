@@ -60,6 +60,30 @@ class Spans:
     def __iter__(self):
         return iter(self.spans)
 
+    def contains(self, span):
+        return get_span_id(span) in map(get_span_id, self)
+
+    def contains_path(self, parent, child, recursive: bool) -> bool:
+        """
+        Return true/false depending on whether there is a parent-child relationship
+        between the provided spans: parent and child.
+
+        If recursive=False, the relation should be direct. Otherwise multiple
+        parent-child relationships/links are allowed.
+
+        Cycles are not detected.
+        """
+        assert self.contains(parent) and self.contains(child)
+
+        if is_parent_child(parent, child):
+            return True
+
+        if recursive:
+            child_subspans = [s for s in self if is_parent_child(parent, s)]
+            return any(self.contains_path(s, child, True) for s in child_subspans)
+        else:
+            return False
+
 
 def _get_all_spans():
     return flatten([read_jsonl(Path(f)) for f in glob.glob("/tmp/spans/*.txt")])
@@ -69,12 +93,14 @@ class SpanRecorder:
     """
     Recorder for getting logged OpenTelemetry spans emitted from a code block. Eg.,
 
+    ```
     with SpanRecorder() as rec:
         # ...
         # code emitting OpenTelemetry spans
         # ...
 
     spans: Spans = rec.spans
+    ```
 
     This below implementation assumes that spans are written using Ray's default to-file
     span logger. See ray.init for details of how this is enabled during unit testing.
