@@ -57,7 +57,7 @@ def try_eval_f_async_wrapper(
     @ray.remote(num_cpus=0)
     class ExecActor:
         def call(self, *args, **kwargs):
-            tracer = otel.trace.get_tracer(__name__)
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
 
             # Execute function in separate OpenTelemetry span.
             with tracer.start_as_current_span("call-python-function") as span:
@@ -80,7 +80,7 @@ def try_eval_f_async_wrapper(
          - "Set time-out on individual ray task"
            https://github.com/ray-project/ray/issues/15672
         """
-        tracer = otel.trace.get_tracer(__name__)
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("timeout-guard") as span:
             span.set_attribute("timeout_s", timeout_s)
 
