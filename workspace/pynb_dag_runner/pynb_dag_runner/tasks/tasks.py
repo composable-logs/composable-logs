@@ -1,6 +1,6 @@
 import uuid
 from pathlib import Path
-from typing import Callable, Dict, Any, Optional
+from typing import Callable, Dict, Mapping, Any, Optional
 
 #
 from pynb_dag_runner.core.dag_runner import Task, TaskDependencies
@@ -15,9 +15,53 @@ from pynb_dag_runner.wrappers.compute_steps import (
     AddCreateRunlogOutputPath,
     AddPersistRunlog,
 )
-from pynb_dag_runner.ray_helpers import Future
+
+#
+from pynb_dag_runner.ray_helpers import Future, try_eval_f_async_wrapper
 from pynb_dag_runner.helpers import compose
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook
+
+RunParameters = Mapping[str, Any]
+
+
+class PythonFunctionTask_OT(Task[bool]):
+    def __init__(
+        self,
+        f: Callable[[RunParameters], Any],
+        task_id: str,
+        timeout_s: float = None,
+        # n_max_retries: int = 1, TODO
+        parameters: RunParameters = {},
+    ):
+        """
+        (to replace old PythonFunctionTask below)
+
+        Task[None] to execute Python function with OpenTelemetry logging
+
+        task_id:s should be 1-1 with the nodes in the dependency DAG, but one
+        task_id may correspond to many run_id:s if there are retries.
+        """
+        self.task_id = task_id
+
+        def call_f(args: RunParameters) -> None:
+            f(
+                {
+                    **parameters,
+                    "task_id": task_id,
+                    "parameters.run.id": str(uuid.uuid4()),
+                    **args,
+                }
+            )
+
+        f_remote: Callable[
+            [Future[RunParameters]], Future[bool]
+        ] = try_eval_f_async_wrapper(
+            f=call_f,
+            timeout_s=timeout_s,
+            success_handler=lambda _: True,
+            error_handler=lambda _: False,
+        )
+        super().__init__(f_remote=f_remote)
 
 
 class PythonFunctionTask(Task[Runlog]):

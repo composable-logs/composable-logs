@@ -56,13 +56,13 @@ def try_eval_f_async_wrapper(
 
     @ray.remote(num_cpus=0)
     class ExecActor:
-        def call(self, *args, **kwargs):
+        def call(self, *args):
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
 
             # Execute function in separate OpenTelemetry span.
             with tracer.start_as_current_span("call-python-function") as span:
                 try:
-                    result = success_handler(f(*args, **kwargs))
+                    result = success_handler(f(*args))
                     span.set_status(Status(StatusCode.OK))
 
                 except Exception as e:

@@ -1,4 +1,4 @@
-from typing import Set, Dict, Tuple, Iterable, Any
+from typing import Set, Dict, Tuple, Iterable, Any, Mapping
 
 
 class Runlog:
@@ -8,7 +8,7 @@ class Runlog:
     All keys are required to be strings
     """
 
-    def __init__(self, **log_dict: Dict[str, Any]):
+    def __init__(self, **log_dict: Mapping[str, Any]):
         assert all(isinstance(k, str) for k in log_dict.keys())
 
         self._log_dict: Dict[str, Any] = log_dict
