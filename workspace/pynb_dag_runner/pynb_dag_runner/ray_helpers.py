@@ -41,89 +41,74 @@ class Future(Generic[A]):
         return lambda future: Future.map(future, f)
 
 
-@ray.remote(num_cpus=0)
-class LiftedFunctionActor:
-    def __init__(self, f, success_handler, error_handler):
-        self.f = f
-        self.success_handler = success_handler
-        self.error_handler = error_handler
-
-    def call(self, *args, **kwargs):
-        tracer = otel.trace.get_tracer(__name__)
-
-        # Execute function in new OpenTelemetry span.
-        # Note that arguments to function are not logged.
-        with tracer.start_as_current_span("call-python-function") as span:
-            try:
-                result = self.success_handler(self.f(*args, **kwargs))
-                span.set_status(Status(StatusCode.OK))
-
-            except Exception as e:
-                result = self.error_handler(e)
-                span.record_exception(e)
-                span.set_status(Status(StatusCode.ERROR, "Failure"))
-
-            span.set_attribute("return_value", str(result))
-
-            return result
-
-
-def timeout_guard(
-    make_actor,
-    timeout_result: C,
-    timeout_s: Optional[float],
-) -> Callable[[Future[A]], Future[C]]:
-    """
-    Note we are passing in a lambda for creating actor; not the actor itself. Otherwise
-    we get errors in unit tests like: "ray.exceptions.RayActorError: The actor died
-    unexpectedly before finishing this task".
-
-    Maybe this ensures the correct hierarchy between actors (relevant when killing
-    actors)?
-
-    See also Ray issues:
-     - "Support timeout option in Ray tasks",
-       https://github.com/ray-project/ray/issues/17451
-     - "Set time-out on individual ray task"
-       https://github.com/ray-project/ray/issues/15672
-    """
-
-    def result(arg_f: Future[A]) -> Future[C]:
-        # TODO: TimeoutGuard-span for below
-
-        work_actor = make_actor()
-        future = work_actor.call.remote(arg_f)
-
-        refs_done, refs_not_done = ray.wait([future], num_returns=1, timeout=timeout_s)
-        if len(refs_done) == 1:
-            assert refs_done == [future]
-            return future
-        else:
-            assert refs_not_done == [future]
-
-            # https://docs.ray.io/en/latest/actors.html#terminating-actors
-            ray.kill(work_actor)
-
-            return ray.put(timeout_result)
-
-    return result
-
-
 def try_eval_f_async_wrapper(
     f: Callable[[A], B],
     timeout_s: Optional[float],
     success_handler: Callable[[B], C],
     error_handler: Callable[[Exception], C],
 ) -> Callable[[Future[A]], Future[C]]:
-    return timeout_guard(
-        make_actor=lambda: LiftedFunctionActor.remote(  # type: ignore
-            f, success_handler, error_handler  # type: ignore
-        ),  # type: ignore
-        timeout_result=error_handler(
-            Exception("Timeout error: execution did not finish within timeout limit")
-        ),
-        timeout_s=timeout_s,
-    )
+    """
+    Lift a function f: A -> B and result/error handlers into a function operating
+    on futures Future[A] -> Future[C].
+
+    The lifted function logs to OpenTelemetry
+    """
+
+    @ray.remote(num_cpus=0)
+    class ExecActor:
+        def call(self, *args, **kwargs):
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
+
+            # Execute function in separate OpenTelemetry span.
+            with tracer.start_as_current_span("call-python-function") as span:
+                try:
+                    result = success_handler(f(*args, **kwargs))
+                    span.set_status(Status(StatusCode.OK))
+
+                except Exception as e:
+                    result = error_handler(e)
+                    span.record_exception(e)
+                    span.set_status(Status(StatusCode.ERROR, "Failure"))
+
+            return result
+
+    def timeout_guard(a: A) -> C:
+        """
+        See also Ray issues:
+         - "Support timeout option in Ray tasks",
+           https://github.com/ray-project/ray/issues/17451
+         - "Set time-out on individual ray task"
+           https://github.com/ray-project/ray/issues/15672
+        """
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("timeout-guard") as span:
+            span.set_attribute("timeout_s", timeout_s)
+
+            work_actor = ExecActor.remote()  # type: ignore
+            future = work_actor.call.remote(a)
+
+            refs_done, refs_not_done = ray.wait(
+                [future], num_returns=1, timeout=timeout_s
+            )
+            assert len(refs_done) + len(refs_not_done) == 1
+            if len(refs_done) == 1:
+                assert refs_done == [future]
+                span.set_status(Status(StatusCode.OK))
+                return ray.get(future)
+            else:
+                assert refs_not_done == [future]
+                span.set_status(Status(StatusCode.ERROR, "Timeout"))
+
+                # https://docs.ray.io/en/latest/actors.html#terminating-actors
+                ray.kill(work_actor)
+
+                return error_handler(
+                    Exception(
+                        "Timeout error: execution did not finish within timeout limit"
+                    )
+                )
+
+    return Future.lift(timeout_guard)
 
 
 RetryCount = int
