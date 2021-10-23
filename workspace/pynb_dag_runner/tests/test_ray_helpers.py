@@ -77,7 +77,6 @@ def test_timeout_w_success():
 
         for span in func_call_spans:
             assert read_key(span, ["status", "status_code"]) == "OK"
-            assert read_key(span, ["attributes", "return_value"]) in ["2", "4", "6"]
 
     validate_spans(get_test_spans())
 
@@ -111,9 +110,6 @@ def test_timeout_w_exception():
 
         for span in func_call_spans:
             assert span["status"] == {"status_code": "ERROR", "description": "Failure"}
-            assert read_key(span, ["attributes", "return_value"]) in [
-                f"BOOM{x}" for x in range(N_calls)
-            ]
 
             event = one(read_key(span, ["events"]))
             assert set(event.keys()) == set(["name", "timestamp", "attributes"])
@@ -153,7 +149,7 @@ def test_timeout_w_timeout_cancel():
         return rec.spans
 
     def validate_spans(spans: Spans):
-        func_call_spans: Spans = spans.filter(["name"], "call-python-function-x")
+        func_call_spans: Spans = spans.filter(["name"], "timeout-guard")
         assert len(func_call_spans) == N_calls
 
         for span in func_call_spans:

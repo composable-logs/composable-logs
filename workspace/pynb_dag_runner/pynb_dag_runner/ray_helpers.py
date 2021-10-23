@@ -41,58 +41,50 @@ class Future(Generic[A]):
         return lambda future: Future.map(future, f)
 
 
-@ray.remote(num_cpus=0)
-class LiftedFunctionActor:
-    def __init__(self, f, success_handler, error_handler):
-        self.f = f
-        self.success_handler = success_handler
-        self.error_handler = error_handler
+def try_eval_f_async_wrapper(
+    f: Callable[[A], B],
+    timeout_s: Optional[float],
+    success_handler: Callable[[B], C],
+    error_handler: Callable[[Exception], C],
+) -> Callable[[Future[A]], Future[C]]:
+    """
+    Lift a function f: A -> B and result/error handlers into a function operating
+    on futures Future[A] -> Future[C].
 
-    def call(self, *args, **kwargs):
-        tracer = otel.trace.get_tracer(__name__)
+    The lifted function logs to OpenTelemetry
+    """
 
-        # Execute function in new OpenTelemetry span.
-        # Note that arguments to function are not logged.
-        with tracer.start_as_current_span("call-python-function") as span:
-            try:
-                result = self.success_handler(self.f(*args, **kwargs))
-                span.set_status(Status(StatusCode.OK))
+    @ray.remote(num_cpus=0)
+    class ExecActor:
+        def call(self, *args, **kwargs):
+            tracer = otel.trace.get_tracer(__name__)
 
-            except Exception as e:
-                result = self.error_handler(e)
-                span.record_exception(e)
-                span.set_status(Status(StatusCode.ERROR, "Failure"))
+            # Execute function in separate OpenTelemetry span.
+            with tracer.start_as_current_span("call-python-function") as span:
+                try:
+                    result = success_handler(f(*args, **kwargs))
+                    span.set_status(Status(StatusCode.OK))
 
-            span.set_attribute("return_value", str(result))
+                except Exception as e:
+                    result = error_handler(e)
+                    span.record_exception(e)
+                    span.set_status(Status(StatusCode.ERROR, "Failure"))
 
             return result
 
-
-def timeout_guard(
-    make_actor,
-    timeout_result: C,
-    timeout_s: Optional[float],
-) -> Callable[[Future[A]], Future[C]]:
-    """
-    Note we are passing in a lambda for creating actor; not the actor itself. Otherwise
-    we get errors in unit tests like: "ray.exceptions.RayActorError: The actor died
-    unexpectedly before finishing this task".
-
-    Maybe this ensures the correct hierarchy between actors (relevant when killing
-    actors)?
-
-    See also Ray issues:
-     - "Support timeout option in Ray tasks",
-       https://github.com/ray-project/ray/issues/17451
-     - "Set time-out on individual ray task"
-       https://github.com/ray-project/ray/issues/15672
-    """
-
-    def compute_after_dependency_ready(a: A) -> C:
+    def timeout_guard(a: A) -> C:
+        """
+        See also Ray issues:
+         - "Support timeout option in Ray tasks",
+           https://github.com/ray-project/ray/issues/17451
+         - "Set time-out on individual ray task"
+           https://github.com/ray-project/ray/issues/15672
+        """
         tracer = otel.trace.get_tracer(__name__)
-        with tracer.start_as_current_span("call-python-function-x") as span:
+        with tracer.start_as_current_span("timeout-guard") as span:
             span.set_attribute("timeout_s", timeout_s)
-            work_actor = make_actor()
+
+            work_actor = ExecActor.remote()  # type: ignore
             future = work_actor.call.remote(a)
 
             refs_done, refs_not_done = ray.wait(
@@ -110,26 +102,13 @@ def timeout_guard(
                 # https://docs.ray.io/en/latest/actors.html#terminating-actors
                 ray.kill(work_actor)
 
-                return timeout_result
+                return error_handler(
+                    Exception(
+                        "Timeout error: execution did not finish within timeout limit"
+                    )
+                )
 
-    return Future.lift(compute_after_dependency_ready)
-
-
-def try_eval_f_async_wrapper(
-    f: Callable[[A], B],
-    timeout_s: Optional[float],
-    success_handler: Callable[[B], C],
-    error_handler: Callable[[Exception], C],
-) -> Callable[[Future[A]], Future[C]]:
-    return timeout_guard(
-        make_actor=lambda: LiftedFunctionActor.remote(  # type: ignore
-            f, success_handler, error_handler  # type: ignore
-        ),  # type: ignore
-        timeout_result=error_handler(
-            Exception("Timeout error: execution did not finish within timeout limit")
-        ),
-        timeout_s=timeout_s,
-    )
+    return Future.lift(timeout_guard)
 
 
 RetryCount = int
