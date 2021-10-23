@@ -25,9 +25,12 @@ def read_key(nested_dict, keys: List[str]):
 
 
 def get_span_id(span):
-    result = read_key(span, ["context", "span_id"])
-    assert result is not None
-    return result
+    try:
+        result = read_key(span, ["context", "span_id"])
+        assert result is not None
+        return result
+    except:
+        raise Exception(f"Unable to read span_id from {str(span)}.")
 
 
 def get_duration_s(span) -> float:
@@ -54,11 +57,49 @@ class Spans:
     def filter(self, keys: List[str], value: Any):
         return Spans([span for span in self.spans if read_key(span, keys) == value])
 
+    def sort_by_start_time(self):
+        return Spans(
+            list(sorted(self, key=lambda s: dp.parse(s["start_time"]).timestamp()))
+        )
+
     def __len__(self):
         return len(self.spans)
 
     def __iter__(self):
         return iter(self.spans)
+
+    def contains(self, span):
+        return get_span_id(span) in map(get_span_id, self)
+
+    def contains_path(self, parent, child, recursive: bool) -> bool:
+        """
+        Return true/false depending on whether there is a parent-child relationship
+        between the provided spans: parent and child.
+
+        If recursive=False, the relation should be direct. Otherwise multiple
+        parent-child relationships/links are allowed.
+
+        Cycles are not detected.
+        """
+        assert self.contains(parent) and self.contains(child)
+
+        if is_parent_child(parent, child):
+            return True
+
+        if recursive:
+            child_subspans = [s for s in self if is_parent_child(parent, s)]
+            return any(self.contains_path(s, child, True) for s in child_subspans)
+        else:
+            return False
+
+    def restrict_by_top(self, top) -> "Spans":
+        """
+        Restrict this collection of Spans to spans that can be connected to
+        the parent-span using one or many parent-child relationship(s).
+
+        Note: the provided span `top` is not included in the result.
+        """
+        return Spans([s for s in self if self.contains_path(top, s, recursive=True)])
 
 
 def _get_all_spans():
@@ -69,12 +110,14 @@ class SpanRecorder:
     """
     Recorder for getting logged OpenTelemetry spans emitted from a code block. Eg.,
 
+    ```
     with SpanRecorder() as rec:
         # ...
         # code emitting OpenTelemetry spans
         # ...
 
     spans: Spans = rec.spans
+    ```
 
     This below implementation assumes that spans are written using Ray's default to-file
     span logger. See ray.init for details of how this is enabled during unit testing.
