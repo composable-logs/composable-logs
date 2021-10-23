@@ -25,9 +25,12 @@ def read_key(nested_dict, keys: List[str]):
 
 
 def get_span_id(span):
-    result = read_key(span, ["context", "span_id"])
-    assert result is not None
-    return result
+    try:
+        result = read_key(span, ["context", "span_id"])
+        assert result is not None
+        return result
+    except:
+        raise Exception(f"Unable to read span_id from {str(span)}.")
 
 
 def get_duration_s(span) -> float:
@@ -53,6 +56,11 @@ class Spans:
 
     def filter(self, keys: List[str], value: Any):
         return Spans([span for span in self.spans if read_key(span, keys) == value])
+
+    def sort_by_start_time(self):
+        return Spans(
+            list(sorted(self, key=lambda s: dp.parse(s["start_time"]).timestamp()))
+        )
 
     def __len__(self):
         return len(self.spans)
@@ -83,6 +91,15 @@ class Spans:
             return any(self.contains_path(s, child, True) for s in child_subspans)
         else:
             return False
+
+    def restrict_by_top(self, top) -> "Spans":
+        """
+        Restrict this collection of Spans to spans that can be connected to
+        the parent-span using one or many parent-child relationship(s).
+
+        Note: the provided span `top` is not included in the result.
+        """
+        return Spans([s for s in self if self.contains_path(top, s, recursive=True)])
 
 
 def _get_all_spans():
