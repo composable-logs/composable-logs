@@ -6,7 +6,11 @@ from typing import List
 import pytest
 
 #
-from pynb_dag_runner.tasks.tasks import PythonFunctionTask, get_task_dependencies
+from pynb_dag_runner.tasks.tasks import (
+    PythonFunctionTask,
+    PythonFunctionTask_OT,
+    get_task_dependencies,
+)
 
 #
 from pynb_dag_runner.helpers import (
@@ -69,10 +73,10 @@ def assert_compatibility(runlog_results: List[Runlog], task_id_dependencies):
 def test_get_task_dependencies():
     assert len(get_task_dependencies(TaskDependencies())) == 0
 
-    t0 = PythonFunctionTask(f=lambda: None, task_id="t0")
-    t1 = PythonFunctionTask(f=lambda: None, task_id="t1")
-    t2 = PythonFunctionTask(f=lambda: None, task_id="t2")
-    t3 = PythonFunctionTask(f=lambda: None, task_id="t3")
+    t0 = PythonFunctionTask_OT(f=lambda: None, task_id="t0")
+    t1 = PythonFunctionTask_OT(f=lambda: None, task_id="t1")
+    t2 = PythonFunctionTask_OT(f=lambda: None, task_id="t2")
+    t3 = PythonFunctionTask_OT(f=lambda: None, task_id="t3")
 
     assert get_task_dependencies((t0 >> t1 >> t2) + TaskDependencies(t1 >> t3)) == [
         {"from": "t0", "to": "t1"},
