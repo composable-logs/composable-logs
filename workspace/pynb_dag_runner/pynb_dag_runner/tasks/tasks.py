@@ -3,6 +3,10 @@ from pathlib import Path
 from typing import Callable, Dict, Mapping, Any, Optional
 
 #
+import ray
+import opentelemetry as otel
+
+#
 from pynb_dag_runner.core.dag_runner import Task, TaskDependencies
 from pynb_dag_runner.wrappers.runlog import Runlog
 from pynb_dag_runner.wrappers.compute_steps import (
@@ -31,7 +35,7 @@ class PythonFunctionTask_OT(Task[bool]):
         task_id: str,
         timeout_s: float = None,
         # n_max_retries: int = 1, TODO
-        parameters: RunParameters = {},
+        common_task_runparameters: RunParameters = {},
     ):
         """
         (to replace old PythonFunctionTask below)
@@ -43,28 +47,45 @@ class PythonFunctionTask_OT(Task[bool]):
         """
         self.task_id = task_id
 
-        def call_f(args: RunParameters) -> None:
-            f(
-                {
-                    **parameters,
-                    "task_id": task_id,
-                    "parameters.run.id": str(uuid.uuid4()),
-                    **args,
-                }
-            )
-
         f_remote: Callable[
             [Future[RunParameters]], Future[bool]
         ] = try_eval_f_async_wrapper(
-            f=call_f,
+            f=lambda runparameters: f(runparameters),
             timeout_s=timeout_s,
             success_handler=lambda _: True,
             error_handler=lambda _: False,
         )
-        super().__init__(f_remote=f_remote)
+
+        # Ray supports async methods in Actors, but that here generates error message:
+        #
+        # AttributeError: 'NoneType' object has no attribute '_ray_is_cross_language'
+        #
+        async def wrapped(invocation_runparameters: RunParameters) -> Any:
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
+            with tracer.start_as_current_span("python-task") as span:
+
+                span.set_attribute("task_id", task_id)
+
+                # determine runparameters for this task invocation
+                runparameters = {
+                    **invocation_runparameters,
+                    **common_task_runparameters,
+                    "task_id": task_id,
+                    "parameters.run.id": str(uuid.uuid4()),
+                }
+
+                # log runparameters to span
+                # ...
+
+                result = await f_remote(ray.put(runparameters))  # type: ignore
+
+            return result
+
+        super().__init__(f_remote=Future.lift_async(wrapped))
 
 
 class PythonFunctionTask(Task[Runlog]):
+    # -- to be deleted --
     def __init__(
         self,
         f,
@@ -88,7 +109,7 @@ class PythonFunctionTask(Task[Runlog]):
             AddParameters(**parameters),
         )
         super().__init__(
-            f_remote=lambda: (
+            f_remote=lambda _: (
                 compose(AddRetries(n_max_retries=n_max_retries), steps)(
                     lambda _runlog_future: _runlog_future
                 )

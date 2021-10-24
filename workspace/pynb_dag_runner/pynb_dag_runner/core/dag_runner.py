@@ -136,7 +136,7 @@ def run_tasks(all_tasks: List[Task[A]], task_dependencies: TaskDependencies) -> 
         # ensure that all tasks that can run are started
         for task in not_completed_tasks_that_can_run:
             if not task.has_started():
-                task.start()
+                task.start(ray.put({}))
 
         # wait for next task to complete
         next_completed_task: Task[A] = _get_next_completed_task(

@@ -29,7 +29,7 @@ from tests.test_ray_helpers import StateActor
 def test_all_tasks_are_run(task_dependencies):
     def make_task(sleep_secs: float, return_value: int) -> Task[int]:
         @ray.remote(num_cpus=0)
-        def f():
+        def f(_):
             time.sleep(sleep_secs)
             return return_value
 
@@ -51,7 +51,7 @@ def test_task_run_order(dummy_loop_parameter):
 
     def make_task(i: int) -> Task[int]:
         @ray.remote(num_cpus=0)
-        def f():
+        def f(_):
             time.sleep(random.random() * 0.10)
             state_actor.add.remote(i)
 
