@@ -22,7 +22,7 @@ def has_keys(nested_dict, keys: List[str]) -> bool:
         return first_key in nested_dict and has_keys(nested_dict[first_key], rest_keys)
 
 
-def read_key(nested_dict, keys: List[str]):
+def read_key(nested_dict, keys: List[str]) -> Any:
     assert len(keys) > 0
     first_key, *rest_keys = keys
 
@@ -35,7 +35,7 @@ def read_key(nested_dict, keys: List[str]):
         return read_key(nested_dict[first_key], rest_keys)
 
 
-def get_span_id(span):
+def get_span_id(span) -> str:
     try:
         result = read_key(span, ["context", "span_id"])
         assert result is not None
@@ -44,10 +44,10 @@ def get_span_id(span):
         raise Exception(f"Unable to read span_id from {str(span)}.")
 
 
-def iso8601_to_epoch_s(s: str) -> float:
-    # This may not correctly handly timezones:
+def iso8601_to_epoch_s(iso8601_datetime: str) -> float:
+    # This may not correctly handle timezones correctly:
     # https://docs.python.org/3/library/datetime.html#datetime.datetime.timestamp
-    return dp.parse(s).timestamp()
+    return dp.parse(iso8601_datetime).timestamp()
 
 
 def get_duration_range_us(span):
@@ -57,13 +57,18 @@ def get_duration_range_us(span):
 
 
 def get_duration_s(span) -> float:
-    # seconds in float after epoch
+    """
+    Return time duration for span in seconds (as float)
+    """
     start_epoch_s: float = iso8601_to_epoch_s(span["start_time"])
     end_epoch_s: float = iso8601_to_epoch_s(span["end_time"])
     return end_epoch_s - start_epoch_s
 
 
-def is_parent_child(span_parent, span_child):
+def is_parent_child(span_parent, span_child) -> bool:
+    """
+    Return True/False if span_parent is direct parent of span_child.
+    """
     child_parent_id = read_key(span_child, ["parent_id"])
     return (child_parent_id is not None) and (
         child_parent_id == get_span_id(span_parent)
