@@ -198,90 +198,6 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
     validate_spans(get_test_spans())
 
 
-def test_retry_logic_in_python_function_task():
-    timeout_s = 5.0
-
-    def f(runlog):
-        if runlog["parameters.run.retry_nr"] == 0:
-            time.sleep(1e6)  # hang execution to generate a timeout error
-        elif runlog["parameters.run.retry_nr"] == 1:
-            raise Exception("BOOM!")
-        elif runlog["parameters.run.retry_nr"] == 2:
-            return 123
-
-    t0 = PythonFunctionTask(f, task_id="t0", timeout_s=timeout_s, n_max_retries=3)
-    t1 = PythonFunctionTask(lambda _: 42, task_id="t1")
-    dependencies = TaskDependencies(t0 >> t1)
-
-    runlog_results = flatten(run_tasks([t0, t1], dependencies))
-    assert len(runlog_results) == 4
-
-    # All retries should have a distinct run-id:s
-    assert len(set([r["parameters.run.id"] for r in runlog_results])) == 4
-
-    # t0 should be run 3 times, t1 once
-    assert [r["task_id"] for r in runlog_results] == ["t0", "t0", "t0", "t1"]
-
-    # remove non-deterministic runlog keys, and assert remaining keys are as expected
-    def del_keys(a_dict, keys_to_delete):
-        return {k: v for k, v in a_dict.items() if k not in keys_to_delete}
-
-    deterministic_runlog = [
-        del_keys(
-            r.as_dict(),
-            keys_to_delete=[
-                "parameters.run.id",
-                "out.timing.duration_ms",
-                "out.timing.start_ts",
-                "out.timing.end_ts",
-            ],
-        )
-        for r in runlog_results
-    ]
-
-    expected_det_runlog = [
-        {
-            "task_id": "t0",
-            "parameters.task.timeout_s": timeout_s,
-            "parameters.task.n_max_retries": 3,
-            "parameters.run.retry_nr": 0,
-            "out.status": "FAILURE",
-            "out.result": None,
-            "out.error": "Timeout error: execution did not finish within timeout limit",
-        },
-        {
-            "task_id": "t0",
-            "parameters.task.timeout_s": timeout_s,
-            "parameters.task.n_max_retries": 3,
-            "parameters.run.retry_nr": 1,
-            "out.status": "FAILURE",
-            "out.result": None,
-            "out.error": "BOOM!",
-        },
-        {
-            "task_id": "t0",
-            "parameters.task.timeout_s": timeout_s,
-            "parameters.task.n_max_retries": 3,
-            "parameters.run.retry_nr": 2,
-            "out.status": "SUCCESS",
-            "out.result": 123,
-            "out.error": None,
-        },
-        {
-            "task_id": "t1",
-            "parameters.task.timeout_s": None,
-            "parameters.task.n_max_retries": 1,
-            "parameters.run.retry_nr": 0,
-            "out.status": "SUCCESS",
-            "out.result": 42,
-            "out.error": None,
-        },
-    ]
-
-    assert deterministic_runlog == expected_det_runlog
-    assert_compatibility(runlog_results, get_task_dependencies(dependencies))
-
-
 ### ---- test order dependence for PythonFunctionTask:s ----
 
 
@@ -371,4 +287,88 @@ def test_random_sleep_tasks_with_order_dependencies(dependencies_list):
     runlog_results = flatten(run_tasks([t0, t1, t2, t3, t4], dependencies))
     assert len(runlog_results) == 5
 
+    assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+
+
+def test_retry_logic_in_python_function_task():
+    timeout_s = 5.0
+
+    def f(runlog):
+        if runlog["parameters.run.retry_nr"] == 0:
+            time.sleep(1e6)  # hang execution to generate a timeout error
+        elif runlog["parameters.run.retry_nr"] == 1:
+            raise Exception("BOOM!")
+        elif runlog["parameters.run.retry_nr"] == 2:
+            return 123
+
+    t0 = PythonFunctionTask(f, task_id="t0", timeout_s=timeout_s, n_max_retries=3)
+    t1 = PythonFunctionTask(lambda _: 42, task_id="t1")
+    dependencies = TaskDependencies(t0 >> t1)
+
+    runlog_results = flatten(run_tasks([t0, t1], dependencies))
+    assert len(runlog_results) == 4
+
+    # All retries should have a distinct run-id:s
+    assert len(set([r["parameters.run.id"] for r in runlog_results])) == 4
+
+    # t0 should be run 3 times, t1 once
+    assert [r["task_id"] for r in runlog_results] == ["t0", "t0", "t0", "t1"]
+
+    # remove non-deterministic runlog keys, and assert remaining keys are as expected
+    def del_keys(a_dict, keys_to_delete):
+        return {k: v for k, v in a_dict.items() if k not in keys_to_delete}
+
+    deterministic_runlog = [
+        del_keys(
+            r.as_dict(),
+            keys_to_delete=[
+                "parameters.run.id",
+                "out.timing.duration_ms",
+                "out.timing.start_ts",
+                "out.timing.end_ts",
+            ],
+        )
+        for r in runlog_results
+    ]
+
+    expected_det_runlog = [
+        {
+            "task_id": "t0",
+            "parameters.task.timeout_s": timeout_s,
+            "parameters.task.n_max_retries": 3,
+            "parameters.run.retry_nr": 0,
+            "out.status": "FAILURE",
+            "out.result": None,
+            "out.error": "Timeout error: execution did not finish within timeout limit",
+        },
+        {
+            "task_id": "t0",
+            "parameters.task.timeout_s": timeout_s,
+            "parameters.task.n_max_retries": 3,
+            "parameters.run.retry_nr": 1,
+            "out.status": "FAILURE",
+            "out.result": None,
+            "out.error": "BOOM!",
+        },
+        {
+            "task_id": "t0",
+            "parameters.task.timeout_s": timeout_s,
+            "parameters.task.n_max_retries": 3,
+            "parameters.run.retry_nr": 2,
+            "out.status": "SUCCESS",
+            "out.result": 123,
+            "out.error": None,
+        },
+        {
+            "task_id": "t1",
+            "parameters.task.timeout_s": None,
+            "parameters.task.n_max_retries": 1,
+            "parameters.run.retry_nr": 0,
+            "out.status": "SUCCESS",
+            "out.result": 42,
+            "out.error": None,
+        },
+    ]
+
+    assert deterministic_runlog == expected_det_runlog
     assert_compatibility(runlog_results, get_task_dependencies(dependencies))
