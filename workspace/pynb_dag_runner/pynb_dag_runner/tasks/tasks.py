@@ -80,7 +80,7 @@ class PythonFunctionTask_OT(Task[bool]):
 
             return result
 
-        super().__init__(f_remote=Future.lift_async(wrapped))
+        super().__init__(f_remote=Future.lift_async(wrapped, num_cpus=1))
 
 
 class PythonFunctionTask(Task[Runlog]):

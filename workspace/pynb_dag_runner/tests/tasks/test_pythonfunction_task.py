@@ -120,6 +120,16 @@ def test_tasks_runlog_output():
     validate_spans(get_test_spans())
 
 
+def _get_time_range(spans, span_id: str):
+    span = one(
+        spans.filter(["name"], "python-task")
+        # -
+        .filter(["attributes", "task_id"], span_id)
+    )
+
+    return get_duration_range_us(span)
+
+
 def test_tasks_run_in_parallel():
     def get_test_spans():
         with SpanRecorder() as rec:
@@ -136,17 +146,8 @@ def test_tasks_run_in_parallel():
         return rec.spans
 
     def validate_spans(spans: Spans):
-        def get_range(span_id: str):
-            span = one(
-                spans.filter(["name"], "python-task")
-                # -
-                .filter(["attributes", "task_id"], span_id)
-            )
-
-            return get_duration_range_us(span)
-
-        t0_us_range = get_range("t0")
-        t1_us_range = get_range("t1")
+        t0_us_range = _get_time_range(spans, "t0")
+        t1_us_range = _get_time_range(spans, "t1")
 
         # Check: since there are no order constraints, the time ranges should
         # overlap provided tests are run on 2+ CPUs
@@ -158,40 +159,43 @@ def test_tasks_run_in_parallel():
 
 
 def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
-    start_ts = time.time_ns()
+    def get_test_spans():
+        with SpanRecorder() as rec:
+            start_ts = time.time_ns()
 
-    dependencies = TaskDependencies()
-    runlog_results = flatten(
-        run_tasks(
-            [
-                PythonFunctionTask(lambda _: time.sleep(0.5), task_id="t0"),
-                PythonFunctionTask(lambda _: time.sleep(0.5), task_id="t1"),
-                PythonFunctionTask(lambda _: time.sleep(0.5), task_id="t2"),
-                PythonFunctionTask(lambda _: time.sleep(0.5), task_id="t3"),
-            ],
-            dependencies,
-        )
-    )
-    assert len(runlog_results) == 4
+            dependencies = TaskDependencies()
+            run_tasks(
+                [
+                    PythonFunctionTask_OT(lambda _: time.sleep(0.5), task_id="t0"),
+                    PythonFunctionTask_OT(lambda _: time.sleep(0.5), task_id="t1"),
+                    PythonFunctionTask_OT(lambda _: time.sleep(0.5), task_id="t2"),
+                    PythonFunctionTask_OT(lambda _: time.sleep(0.5), task_id="t3"),
+                ],
+                dependencies,
+            )
 
-    end_ts = time.time_ns()
+            end_ts = time.time_ns()
 
-    # Check 1: with only 2 CPU:s running the above tasks with no constraints should
-    # take > 1 secs.
-    duration_ms = (end_ts - start_ts) // 1000000
-    assert duration_ms >= 1000, duration_ms
+            # Check 1: with only 2 CPU:s running the above tasks with no constraints
+            # should take > 1 secs.
+            duration_ms = (end_ts - start_ts) // 1000000
+            assert duration_ms >= 1000, duration_ms
 
-    task_runtime_ranges = [
-        range(runlog["out.timing.start_ts"], runlog["out.timing.end_ts"])
-        for runlog in runlog_results
-    ]
+        return rec.spans
 
-    # Check 2: if tasks are run on 2 CPU:s the intersection of three runtime ranges
-    # should always be empty.
-    for r1, r2, r3 in itertools.combinations(task_runtime_ranges, 3):
-        assert range_is_empty(range_intersection(r1, range_intersection(r2, r3)))
+    def validate_spans(spans: Spans):
+        task_runtime_ranges = [
+            _get_time_range(spans, span_id) for span_id in ["t0", "t1", "t2", "t3"]
+        ]
 
-    assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+        # Check 2: if tasks are run on 2 CPU:s the intersection of three runtime ranges
+        # should always be empty.
+        for r1, r2, r3 in itertools.combinations(task_runtime_ranges, 3):
+            assert range_is_empty(range_intersection(r1, range_intersection(r2, r3)))
+
+        # TODO assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+
+    validate_spans(get_test_spans())
 
 
 def test_retry_logic_in_python_function_task():

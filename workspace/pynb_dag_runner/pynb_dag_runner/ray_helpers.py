@@ -40,7 +40,7 @@ class Future(Generic[A]):
 
     @staticmethod
     def lift_async(
-        f: Callable[[B], Awaitable[C]]
+        f: Callable[[B], Awaitable[C]], num_cpus: int = 0
     ) -> "Callable[[Future[B]], Future[C]]":
         """
         Lift an async Python function f as below
@@ -55,7 +55,7 @@ class Future(Generic[A]):
         See: https://docs.ray.io/en/latest/async_api.html
         """
 
-        @ray.remote(num_cpus=0)
+        @ray.remote(num_cpus=num_cpus)
         def wrapped_f(b: B) -> C:
             return asyncio.get_event_loop().run_until_complete(f(b))
 
