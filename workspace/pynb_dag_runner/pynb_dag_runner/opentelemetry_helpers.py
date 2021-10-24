@@ -12,7 +12,18 @@ from pynb_dag_runner.helpers import pairs, flatten, read_jsonl
 # ---- helper functions to read OpenTelemetry span dictionaries ----
 
 
+def has_keys(nested_dict, keys: List[str]) -> bool:
+    assert len(keys) > 0
+
+    first_key, *rest_keys = keys
+    if len(rest_keys) == 0:
+        return first_key in nested_dict
+    else:
+        return first_key in nested_dict and has_keys(nested_dict[first_key], rest_keys)
+
+
 def read_key(nested_dict, keys: List[str]):
+    assert len(keys) > 0
     first_key, *rest_keys = keys
 
     if first_key not in nested_dict:
@@ -68,7 +79,14 @@ class Spans:
         self.spans = spans
 
     def filter(self, keys: List[str], value: Any):
-        return Spans([span for span in self.spans if read_key(span, keys) == value])
+        def match(span, keys, value):
+            try:
+                return read_key(span, keys) == value
+            except:
+                # keys not found
+                return False
+
+        return Spans([span for span in self.spans if match(span, keys, value)])
 
     def sort_by_start_time(self):
         return Spans(

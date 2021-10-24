@@ -9,6 +9,7 @@ import opentelemetry as ot
 #
 from pynb_dag_runner.opentelemetry_helpers import (
     get_span_id,
+    has_keys,
     read_key,
     is_parent_child,
     get_duration_s,
@@ -18,6 +19,24 @@ from pynb_dag_runner.opentelemetry_helpers import (
     SpanRecorder,
 )
 from pynb_dag_runner.helpers import one
+
+
+def test_nested_dict_helpers():
+    a_dict = {
+        "a": {
+            "b": 123,
+            "foo": "bar",
+            "bar": "baz",
+            "c": {"e": 1, "f": 2, "g": "hello", "h": None},
+        }
+    }
+    assert has_keys(a_dict, ["a"])
+    assert has_keys(a_dict, ["a", "b"])
+    assert not has_keys(a_dict, ["key-does-not-exist"])
+    assert not has_keys(a_dict, ["key-does-not-exist", "key-does-not-exist"])
+    assert not has_keys(a_dict, ["a", "key-does-not-exist"])
+
+    assert read_key(a_dict, ["a", "b"]) == 123
 
 
 def test_iso8601_to_epoch_s():

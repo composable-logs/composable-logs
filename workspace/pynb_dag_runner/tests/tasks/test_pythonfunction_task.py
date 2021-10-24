@@ -25,16 +25,14 @@ from pynb_dag_runner.core.dag_runner import TaskDependencies, run_tasks
 from pynb_dag_runner.wrappers.runlog import Runlog
 from pynb_dag_runner.opentelemetry_helpers import (
     read_key,
+    has_keys,
     Spans,
     SpanRecorder,
     get_duration_range_us,
 )
 
-# TODO: all the below tests should run multiple times in stress tests
-# See, https://github.com/pynb-dag-runner/pynb-dag-runner/pull/5
 
-
-def assert_compatibility(runlog_results: List[Runlog], task_id_dependencies):
+def assert_compatibility(spans: Spans, task_id_dependencies):
     """
     Test:
      - generic invariances for runlog timings (Steps 1, 2)
@@ -43,31 +41,40 @@ def assert_compatibility(runlog_results: List[Runlog], task_id_dependencies):
 
     # Step 1: all task-id:s in order dependencies must have at least one runlog
     # entry. (The converse need not hold.)
-    task_ids_in_runlog: List[str] = [runlog["task_id"] for runlog in runlog_results]
-    task_ids_in_dependencies: List[str] = [d["from"] for d in task_id_dependencies] + [
-        d["to"] for d in task_id_dependencies
-    ]
-    assert set(task_ids_in_dependencies) <= set(task_ids_in_runlog)
+    task_ids_in_spans: List[str] = []
+    for span in spans:
+        if has_keys(span, ["attributes", "task_id"]):
+            task_ids_in_spans.append(read_key(span, ["attributes", "task_id"]))
+
+    task_ids_in_dependencies: List[str] = flatten(
+        [[d["from"], d["to"]] for d in task_id_dependencies]
+    )
+    assert set(task_ids_in_dependencies) <= set(task_ids_in_spans)
 
     # Step 2: A task retry should not start before previous attempt for running task
     # has finished.
-    def get_runlogs(task_id):
-        return [runlog for runlog in runlog_results if runlog["task_id"] == task_id]
-
-    for task_id in task_ids_in_runlog:
-        task_id_retries = get_runlogs(task_id)
-        for idx, _ in enumerate(task_id_retries):
-            if idx > 0:
-                assert (
-                    task_id_retries[idx - 1]["out.timing.end_ts"]
-                    < task_id_retries[idx]["out.timing.start_ts"]
-                )
+    #
+    # def get_runlogs(task_id):
+    #    return [runlog for runlog in runlog_results if runlog["task_id"] == task_id]
+    #
+    # check retry timings
+    # for task_id in task_ids_in_spans:
+    #    task_id_retries = get_runlogs(task_id)
+    #    for idx, _ in enumerate(task_id_retries):
+    #        if idx > 0:
+    #            assert (
+    #                task_id_retries[idx - 1]["out.timing.end_ts"]
+    #                < task_id_retries[idx]["out.timing.start_ts"]
+    #            )
 
     # Step 3: Runlog timings satisfy the same order constraints as in DAG run order
     # dependencies.
     for rule in task_id_dependencies:
-        ts0 = max([runlog["out.timing.end_ts"] for runlog in get_runlogs(rule["from"])])
-        ts1 = min([runlog["out.timing.start_ts"] for runlog in get_runlogs(rule["to"])])
+        spans_from = spans.filter(["attributes", "task_id"], rule["from"])
+        spans_to = spans.filter(["attributes", "task_id"], rule["to"])
+
+        ts0 = max([get_duration_range_us(s).stop for s in spans_from])
+        ts1 = min([get_duration_range_us(s).start for s in spans_to])
         assert ts0 < ts1
 
 
@@ -102,9 +109,9 @@ def test_tasks_runlog_output():
                 ],
                 dependencies,
             )
-        return rec.spans
+        return rec.spans, get_task_dependencies(dependencies)
 
-    def validate_spans(spans: Spans):
+    def validate_spans(spans: Spans, task_dependencies):
         task_span = one(spans.filter(["name"], "python-task"))
 
         assert read_key(task_span, ["attributes", "task_id"]) == "my_task_id"
@@ -115,9 +122,9 @@ def test_tasks_runlog_output():
 
         assert task_span["attributes"].keys() == set(["run_id", "task_id"])
 
-        # TODO: assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+        assert_compatibility(spans, task_dependencies)
 
-    validate_spans(get_test_spans())
+    validate_spans(*get_test_spans())
 
 
 def _get_time_range(spans, span_id: str):
@@ -143,9 +150,11 @@ def test_tasks_run_in_parallel():
                 dependencies,
             )
 
-        return rec.spans
+        return rec.spans, get_task_dependencies(dependencies)
 
-    def validate_spans(spans: Spans):
+    def validate_spans(spans: Spans, task_dependencies):
+        assert len(spans.filter(["name"], "python-task")) == 2
+
         t0_us_range = _get_time_range(spans, "t0")
         t1_us_range = _get_time_range(spans, "t1")
 
@@ -153,9 +162,9 @@ def test_tasks_run_in_parallel():
         # overlap provided tests are run on 2+ CPUs
         assert range_intersect(t0_us_range, t1_us_range)
 
-        # TODO assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+        assert_compatibility(spans, task_dependencies)
 
-    validate_spans(get_test_spans())
+    validate_spans(*get_test_spans())
 
 
 def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
@@ -181,9 +190,11 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
             duration_ms = (end_ts - start_ts) // 1000000
             assert duration_ms >= 1000, duration_ms
 
-        return rec.spans
+        return rec.spans, get_task_dependencies(dependencies)
 
-    def validate_spans(spans: Spans):
+    def validate_spans(spans: Spans, task_dependencies):
+        assert len(spans.filter(["name"], "python-task")) == 4
+
         task_runtime_ranges = [
             _get_time_range(spans, span_id) for span_id in ["t0", "t1", "t2", "t3"]
         ]
@@ -193,9 +204,9 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
         for r1, r2, r3 in itertools.combinations(task_runtime_ranges, 3):
             assert range_is_empty(range_intersection(r1, range_intersection(r2, r3)))
 
-        # TODO assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+        assert_compatibility(spans, task_dependencies)
 
-    validate_spans(get_test_spans())
+    validate_spans(*get_test_spans())
 
 
 ### ---- test order dependence for PythonFunctionTask:s ----
@@ -271,23 +282,35 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
     ],
 )
 def test_random_sleep_tasks_with_order_dependencies(dependencies_list):
-    def sleep_f():
-        sleep_ms = random.randint(10, 100)
-        return lambda _: time.sleep(sleep_ms / 1000)
+    def get_test_spans():
+        with SpanRecorder() as rec:
 
-    t0 = PythonFunctionTask(sleep_f(), task_id="t0")
-    t1 = PythonFunctionTask(sleep_f(), task_id="t1")
-    t2 = PythonFunctionTask(sleep_f(), task_id="t2")
-    t3 = PythonFunctionTask(sleep_f(), task_id="t3")
-    t4 = PythonFunctionTask(sleep_f(), task_id="t4")
+            def sleep_f():
+                sleep_ms = random.randint(10, 100)
+                return lambda _: time.sleep(sleep_ms / 1000)
 
-    # See https://stackoverflow.com/questions/55084171
-    f_locals = locals()
-    dependencies = TaskDependencies(*[eval(d, f_locals) for d in dependencies_list])
-    runlog_results = flatten(run_tasks([t0, t1, t2, t3, t4], dependencies))
-    assert len(runlog_results) == 5
+            # local variables t0, .., t4 need to be defined for dependencies
+            t0 = PythonFunctionTask_OT(sleep_f(), task_id="t0")
+            t1 = PythonFunctionTask_OT(sleep_f(), task_id="t1")
+            t2 = PythonFunctionTask_OT(sleep_f(), task_id="t2")
+            t3 = PythonFunctionTask_OT(sleep_f(), task_id="t3")
+            t4 = PythonFunctionTask_OT(sleep_f(), task_id="t4")
 
-    assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+            # See https://stackoverflow.com/questions/55084171
+            f_locals = locals()
+            dependencies = TaskDependencies(
+                *[eval(d, f_locals) for d in dependencies_list]
+            )
+            run_tasks([t0, t1, t2, t3, t4], dependencies)
+
+        return rec.spans, get_task_dependencies(dependencies)
+
+    def validate_spans(spans: Spans, task_dependencies):
+        assert len(spans.filter(["name"], "python-task")) == 5
+
+        assert_compatibility(spans, task_dependencies)
+
+    validate_spans(*get_test_spans())
 
 
 def test_retry_logic_in_python_function_task():
@@ -371,4 +394,6 @@ def test_retry_logic_in_python_function_task():
     ]
 
     assert deterministic_runlog == expected_det_runlog
-    assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+
+    # rewrite after retry-task logs to OpenTelemetry
+    # assert_compatibility(runlog_results, get_task_dependencies(dependencies))
