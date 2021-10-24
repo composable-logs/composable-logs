@@ -33,9 +33,22 @@ def get_span_id(span):
         raise Exception(f"Unable to read span_id from {str(span)}.")
 
 
+def iso8601_to_epoch_s(s: str) -> float:
+    # This may not correctly handly timezones:
+    # https://docs.python.org/3/library/datetime.html#datetime.datetime.timestamp
+    return dp.parse(s).timestamp()
+
+
+def get_duration_range_us(span):
+    start_epoch_us: int = int(iso8601_to_epoch_s(span["start_time"]) * 1e6)
+    end_epoch_us: int = int(iso8601_to_epoch_s(span["end_time"]) * 1e6)
+    return range(start_epoch_us, end_epoch_us)
+
+
 def get_duration_s(span) -> float:
-    start_epoch_s: float = dp.parse(span["start_time"]).timestamp()
-    end_epoch_s: float = dp.parse(span["end_time"]).timestamp()
+    # seconds in float after epoch
+    start_epoch_s: float = iso8601_to_epoch_s(span["start_time"])
+    end_epoch_s: float = iso8601_to_epoch_s(span["end_time"])
     return end_epoch_s - start_epoch_s
 
 

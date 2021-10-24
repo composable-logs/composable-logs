@@ -23,7 +23,12 @@ from pynb_dag_runner.helpers import (
 )
 from pynb_dag_runner.core.dag_runner import TaskDependencies, run_tasks
 from pynb_dag_runner.wrappers.runlog import Runlog
-from pynb_dag_runner.opentelemetry_helpers import read_key, Spans, SpanRecorder
+from pynb_dag_runner.opentelemetry_helpers import (
+    read_key,
+    Spans,
+    SpanRecorder,
+    get_duration_range_us,
+)
 
 # TODO: all the below tests should run multiple times in stress tests
 # See, https://github.com/pynb-dag-runner/pynb-dag-runner/pull/5
@@ -116,28 +121,40 @@ def test_tasks_runlog_output():
 
 
 def test_tasks_run_in_parallel():
-    dependencies = TaskDependencies()
+    def get_test_spans():
+        with SpanRecorder() as rec:
+            dependencies = TaskDependencies()
 
-    runlog_results = flatten(
-        run_tasks(
-            [
-                PythonFunctionTask(lambda _: time.sleep(1.0), task_id="t0"),
-                PythonFunctionTask(lambda _: time.sleep(1.0), task_id="t1"),
-            ],
-            dependencies,
-        )
-    )
-    assert len(runlog_results) == 2
+            run_tasks(
+                [
+                    PythonFunctionTask_OT(lambda _: time.sleep(1.0), task_id="t0"),
+                    PythonFunctionTask_OT(lambda _: time.sleep(1.0), task_id="t1"),
+                ],
+                dependencies,
+            )
 
-    # Check: since there are no order constraints, the time ranges should
-    # overlap provided tests are run on 2+ CPUs
-    range1, range2 = [
-        range(runlog["out.timing.start_ts"], runlog["out.timing.end_ts"])
-        for runlog in runlog_results
-    ]
-    assert range_intersect(range1, range2)
+        return rec.spans
 
-    assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+    def validate_spans(spans: Spans):
+        def get_range(span_id: str):
+            span = one(
+                spans.filter(["name"], "python-task")
+                # -
+                .filter(["attributes", "task_id"], span_id)
+            )
+
+            return get_duration_range_us(span)
+
+        t0_us_range = get_range("t0")
+        t1_us_range = get_range("t1")
+
+        # Check: since there are no order constraints, the time ranges should
+        # overlap provided tests are run on 2+ CPUs
+        assert range_intersect(t0_us_range, t1_us_range)
+
+        # TODO assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+
+    validate_spans(get_test_spans())
 
 
 def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():

@@ -12,10 +12,16 @@ from pynb_dag_runner.opentelemetry_helpers import (
     read_key,
     is_parent_child,
     get_duration_s,
+    iso8601_to_epoch_s,
+    get_duration_range_us,
     Spans,
     SpanRecorder,
 )
 from pynb_dag_runner.helpers import one
+
+
+def test_iso8601_to_epoch_s():
+    assert iso8601_to_epoch_s("2021-10-10T10:25:35.173367Z") == 1633861535173367 / 1e6
 
 
 def test_tracing_get_span_id_and_duration():
@@ -55,6 +61,7 @@ def test_tracing_get_span_id_and_duration():
 
     assert get_span_id(test_span) == "<hex-span-id>"
     assert get_duration_s(test_span) == 86411.0000140667
+    assert get_duration_range_us(test_span) == range(1633861535173367, 1633947946173381)
 
 
 @pytest.mark.parametrize("dummy_loop_parameter", range(3))
