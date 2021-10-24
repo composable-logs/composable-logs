@@ -48,6 +48,13 @@ def test_future_lift():
     assert ray.get(Future.lift(lambda x: x + 1)(Future.value(1))) == 2
 
 
+def test_future_async_lift():
+    async def f(x):
+        return x + 1
+
+    assert ray.get(Future.lift_async(f)(ray.put(1))) == 2
+
+
 ### tests for try_eval_f_async_wrapper wrapper
 
 
