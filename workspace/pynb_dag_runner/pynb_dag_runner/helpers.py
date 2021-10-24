@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, TypeVar, List
+from typing import Any, TypeVar, List, Sequence, Tuple
 
 A = TypeVar("A")
 
@@ -65,6 +65,18 @@ def compose(*fs):
         return lambda *xs: compose(*fs_outers)(f_innermost(*xs))
     else:
         return f_innermost
+
+
+def pairs(xs: Sequence[A]) -> Sequence[Tuple[A, A]]:
+    """
+    From a list of entries return list of subsequent entries.
+
+    The function assumes the input list has at least 2 entries.
+
+    Eg. [1, 2, 3, 4] -> [(1, 2), (2, 3), (3, 4)]
+    """
+    assert len(xs) >= 2
+    return list(zip(xs[:-1], xs[1:]))
 
 
 def read_json(filepath: Path) -> Any:

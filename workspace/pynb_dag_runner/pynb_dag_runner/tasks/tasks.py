@@ -64,18 +64,17 @@ class PythonFunctionTask_OT(Task[bool]):
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("python-task") as span:
 
-                span.set_attribute("task_id", task_id)
-
                 # determine runparameters for this task invocation
                 runparameters = {
                     **invocation_runparameters,
                     **common_task_runparameters,
                     "task_id": task_id,
-                    "parameters.run.id": str(uuid.uuid4()),
+                    "run_id": str(uuid.uuid4()),
                 }
 
                 # log runparameters to span
-                # ...
+                for k, v in runparameters.items():
+                    span.set_attribute(k, v)
 
                 result = await f_remote(ray.put(runparameters))  # type: ignore
 

@@ -14,6 +14,7 @@ from pynb_dag_runner.helpers import (
     write_json,
     read_json,
     one,
+    pairs,
 )
 
 
@@ -82,6 +83,12 @@ def test_compose():
     assert compose(f, g, h1)("z") == "f(g(h1(z)))" == f(g(h1("z")))
     assert compose(f, g, h2)("u", "v") == "f(g(h2(u, v)))" == f(g(h2("u", "v")))
     assert compose(h2)("u", "v") == "h2(u, v)" == h2("u", "v")
+
+
+def test_pairs():
+    assert pairs([1, 2]) == [(1, 2)]
+    assert pairs([1, 2, 3]) == [(1, 2), (2, 3)]
+    assert pairs([1, 2, 3, 4]) == [(1, 2), (2, 3), (3, 4)]
 
 
 def test_write_read_json(tmp_path: Path):

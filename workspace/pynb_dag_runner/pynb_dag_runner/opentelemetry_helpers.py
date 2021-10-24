@@ -7,7 +7,7 @@ import opentelemetry as ot
 import dateutil.parser as dp  # type: ignore
 
 #
-from pynb_dag_runner.helpers import flatten, read_jsonl
+from pynb_dag_runner.helpers import pairs, flatten, read_jsonl
 
 # ---- helper functions to read OpenTelemetry span dictionaries ----
 
@@ -71,26 +71,36 @@ class Spans:
     def contains(self, span):
         return get_span_id(span) in map(get_span_id, self)
 
-    def contains_path(self, parent, child, recursive: bool) -> bool:
+    def contains_path(self, *span_chain, recursive: bool = True) -> bool:
         """
         Return true/false depending on whether there is a parent-child relationship
-        between the provided spans: parent and child.
+        link between the spans in span_chain.
 
         If recursive=False, the relation should be direct. Otherwise multiple
         parent-child relationships/links are allowed.
 
-        Cycles are not detected.
+        Cycles in self are not detected.
         """
-        assert self.contains(parent) and self.contains(child)
+        assert len(span_chain) >= 2
 
-        if is_parent_child(parent, child):
-            return True
+        if len(span_chain) == 2:
+            parent, child = span_chain
+            assert self.contains(parent) and self.contains(child)
 
-        if recursive:
-            child_subspans = [s for s in self if is_parent_child(parent, s)]
-            return any(self.contains_path(s, child, True) for s in child_subspans)
+            if is_parent_child(parent, child):
+                return True
+
+            if recursive:
+                child_subspans = [s for s in self if is_parent_child(parent, s)]
+                return any(
+                    self.contains_path(s, child, recursive=True) for s in child_subspans
+                )
+            else:
+                return False
         else:
-            return False
+            return all(
+                self.contains_path(*ps, recursive=recursive) for ps in pairs(span_chain)
+            )
 
     def restrict_by_top(self, top) -> "Spans":
         """

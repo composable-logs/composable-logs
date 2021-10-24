@@ -14,17 +14,16 @@ from pynb_dag_runner.tasks.tasks import (
 
 #
 from pynb_dag_runner.helpers import (
+    one,
     flatten,
     range_intersect,
     range_intersection,
     range_is_empty,
     read_json,
 )
-from pynb_dag_runner.core.dag_runner import (
-    TaskDependencies,
-    run_tasks,
-)
+from pynb_dag_runner.core.dag_runner import TaskDependencies, run_tasks
 from pynb_dag_runner.wrappers.runlog import Runlog
+from pynb_dag_runner.opentelemetry_helpers import read_key, Spans, SpanRecorder
 
 # TODO: all the below tests should run multiple times in stress tests
 # See, https://github.com/pynb-dag-runner/pynb-dag-runner/pull/5
@@ -86,7 +85,6 @@ def test_get_task_dependencies():
 
 
 ### ---- Test PythonFunctionTask evaluation ----
-from pynb_dag_runner.opentelemetry_helpers import read_key, Spans, SpanRecorder
 
 
 def test_tasks_runlog_output():
@@ -95,47 +93,26 @@ def test_tasks_runlog_output():
             dependencies = TaskDependencies()
             run_tasks(
                 [
-                    PythonFunctionTask_OT(lambda _: 123, task_id="t1"),
+                    PythonFunctionTask_OT(lambda _: 123, task_id="my_task_id"),
                 ],
                 dependencies,
             )
         return rec.spans
 
     def validate_spans(spans: Spans):
-        # func_call_spans: Spans = spans.filter(["name"], "call-python-function")
-        # assert len(func_call_spans) == N_calls
+        task_span = one(spans.filter(["name"], "python-task"))
 
-        # for span in func_call_spans:
-        #    assert read_key(span, ["status", "status_code"]) == "OK"
+        assert read_key(task_span, ["attributes", "task_id"]) == "my_task_id"
 
-        pass
+        timeout_span = one(spans.filter(["name"], "timeout-guard"))
+        call_span = one(spans.filter(["name"], "call-python-function"))
+        assert spans.contains_path(task_span, timeout_span, call_span)
+
+        assert task_span["attributes"].keys() == set(["run_id", "task_id"])
+
+        # TODO: assert_compatibility(runlog_results, get_task_dependencies(dependencies))
 
     validate_spans(get_test_spans())
-
-    """
-    assert len(runlog_results) == 1
-
-    assert runlog_results[0]["task_id"] == "t1"
-    assert runlog_results[0]["out.result"] == 123
-    assert runlog_results[0].keys() == set(
-        [
-            "task_id",
-            "parameters.task.n_max_retries",
-            "parameters.task.timeout_s",
-            "parameters.run.retry_nr",
-            "parameters.run.id",
-            "parameters.run.run_directory",
-            "out.timing.start_ts",
-            "out.timing.end_ts",
-            "out.timing.duration_ms",
-            "out.status",
-            "out.error",
-            "out.result",
-        ]
-    )
-    """
-
-    # TODO: assert_compatibility(runlog_results, get_task_dependencies(dependencies))
 
 
 def test_tasks_run_in_parallel():
