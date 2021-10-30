@@ -9,7 +9,12 @@ import pytest, ray
 
 #
 from pynb_dag_runner.helpers import flatten, range_intersect, one
-from pynb_dag_runner.ray_helpers import try_eval_f_async_wrapper, retry_wrapper, Future
+from pynb_dag_runner.ray_helpers import (
+    try_eval_f_async_wrapper,
+    retry_wrapper,
+    retry_wrapper_ot,
+    Future,
+)
 from pynb_dag_runner.opentelemetry_helpers import read_key, Spans, SpanRecorder
 
 
@@ -287,38 +292,42 @@ def test_timeout_w_timeout(
 
 ### tests for retry_wrapper
 
+"""
+def retry_wrapper_ot(
+    f_task_remote: Callable[[RetryCount], Future[bool]],
+    max_retries: RetryCount,
+) -> Future[bool]:
+"""
+
 
 def test_retry_all_fail():
-    results = ray.get(
-        retry_wrapper(
-            f_task_remote=ray.remote(num_cpus=0)(lambda _: "foo").remote,
+    result = ray.get(
+        retry_wrapper_ot(
+            f_task_remote=ray.remote(num_cpus=0)(lambda _: False).remote,
             max_retries=10,
-            is_success=lambda _: False,
         )
     )
-    assert results == ["foo"] * 10
+    assert result == False
 
 
 def test_retry_all_success():
-    results = ray.get(
-        retry_wrapper(
-            f_task_remote=ray.remote(num_cpus=0)(lambda _: "foo").remote,
+    result = ray.get(
+        retry_wrapper_ot(
+            f_task_remote=ray.remote(num_cpus=0)(lambda _: True).remote,
             max_retries=10,
-            is_success=lambda _: True,
         )
     )
-    assert results == ["foo"]
+    assert result == True
 
 
 def test_retry_deterministic_success():
-    results = ray.get(
-        retry_wrapper(
-            f_task_remote=ray.remote(num_cpus=0)(lambda retry_nr: retry_nr).remote,
+    result = ray.get(
+        retry_wrapper_ot(
+            f_task_remote=ray.remote(num_cpus=0)(lambda retry_nr: retry_nr >= 4).remote,
             max_retries=10,
-            is_success=lambda x: x >= 4,
         )
     )
-    assert results == [0, 1, 2, 3, 4]
+    assert result == True
 
 
 def test_retry_random():

@@ -159,3 +159,20 @@ def retry_wrapper(
 
     retry_actor = RetryActor.remote()  # type: ignore
     return retry_actor.make_retry_calls.remote()
+
+
+def retry_wrapper_ot(
+    f_task_remote: Callable[[RetryCount], Future[bool]],
+    max_retries: RetryCount,
+) -> Future[bool]:
+    @ray.remote(num_cpus=0)
+    class RetryActor:
+        async def make_retry_calls(self):
+            for attempt_nr in range(max_retries):
+                if await f_task_remote(attempt_nr):
+                    return True  # task run successfully
+
+            return False  # task failed
+
+    retry_actor = RetryActor.remote()  # type: ignore
+    return retry_actor.make_retry_calls.remote()
