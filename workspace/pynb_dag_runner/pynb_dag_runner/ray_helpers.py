@@ -168,11 +168,21 @@ def retry_wrapper_ot(
     @ray.remote(num_cpus=0)
     class RetryActor:
         async def make_retry_calls(self):
-            for attempt_nr in range(max_retries):
-                if await f_task_remote(attempt_nr):
-                    return True  # task run successfully
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
+            with tracer.start_as_current_span("retry-wrapper") as span:
 
-            return False  # task failed
+                for attempt_nr in range(max_retries):
+                    if await f_task_remote(attempt_nr):
+                        span.set_status(Status(StatusCode.OK))
+                        return True
+
+                span.set_status(
+                    Status(
+                        StatusCode.ERROR,
+                        f"Task retried {max_retries} times; all failed",
+                    )
+                )
+                return False
 
     retry_actor = RetryActor.remote()  # type: ignore
     return retry_actor.make_retry_calls.remote()

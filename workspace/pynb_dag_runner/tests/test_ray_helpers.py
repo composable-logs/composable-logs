@@ -290,64 +290,38 @@ def test_timeout_w_timeout(
         assert result == "RUN OK"
 
 
-### tests for retry_wrapper
-
-"""
-def retry_wrapper_ot(
-    f_task_remote: Callable[[RetryCount], Future[bool]],
-    max_retries: RetryCount,
-) -> Future[bool]:
-"""
+### ---- tests for retry_wrapper ----
 
 
-def test_retry_all_fail():
-    result = ray.get(
-        retry_wrapper_ot(
-            f_task_remote=ray.remote(num_cpus=0)(lambda _: False).remote,
-            max_retries=10,
-        )
-    )
-    assert result == False
+@pytest.mark.parametrize(
+    "is_success", [lambda _: True, lambda _: False, lambda retry_nr: retry_nr >= 4]
+)
+def test_retry_constant_should_succeed(is_success):
+    N_max_retries = 10
+    any_success = any(map(is_success, range(N_max_retries)))
 
-
-def test_retry_all_success():
-    result = ray.get(
-        retry_wrapper_ot(
-            f_task_remote=ray.remote(num_cpus=0)(lambda _: True).remote,
-            max_retries=10,
-        )
-    )
-    assert result == True
-
-
-def test_retry_deterministic_success():
-    result = ray.get(
-        retry_wrapper_ot(
-            f_task_remote=ray.remote(num_cpus=0)(lambda retry_nr: retry_nr >= 4).remote,
-            max_retries=10,
-        )
-    )
-    assert result == True
-
-
-def test_retry_random():
-    for _ in range(10):
-        results = ray.get(
-            retry_wrapper(
-                f_task_remote=ray.remote(num_cpus=0)(
-                    lambda _: random.randint(1, 10)
-                ).remote,
-                max_retries=5,
-                is_success=lambda x: x >= 5,
+    def get_test_spans():
+        with SpanRecorder() as rec:
+            f_result = retry_wrapper_ot(
+                f_task_remote=ray.remote(num_cpus=0)(is_success).remote,
+                max_retries=N_max_retries,
             )
-        )
+            assert ray.get(f_result) == any_success
 
-        assert all(isinstance(r, int) for r in results)
-        assert 0 < len(results) <= 5
+        return rec.spans
 
-        if len(results) < 5:
-            assert results[-1] >= 5  # last is success
-            assert all(r < 5 for r in results[:-1])  # other is failures
+    def validate_spans(spans: Spans):
+        retry_span = one(spans.filter(["name"], "retry-wrapper"))
+
+        if any_success:
+            assert read_key(retry_span, ["status", "status_code"]) == "OK"
+        else:
+            assert retry_span["status"] == {
+                "description": f"Task retried {N_max_retries} times; all failed",
+                "status_code": "ERROR",
+            }
+
+    validate_spans(get_test_spans())
 
 
 def test_multiple_retrys_should_run_in_parallel():
