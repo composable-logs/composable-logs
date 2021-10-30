@@ -144,6 +144,7 @@ def retry_wrapper(
     max_retries: RetryCount,
     is_success: Callable[[A], bool],
 ) -> Future[List[A]]:
+    # -- deprecated --
     # Note: this is currently the only place where cpu-resources are allocated for Ray
     @ray.remote(num_cpus=1)
     class RetryActor:
@@ -162,24 +163,23 @@ def retry_wrapper(
 
 
 def retry_wrapper_ot(
-    f_task_remote: Callable[[RetryCount], Future[bool]],
-    max_retries: RetryCount,
+    f_task_remote: Callable[[A], Future[bool]],
+    retry_arguments: List[A],
 ) -> Future[bool]:
     @ray.remote(num_cpus=0)
     class RetryActor:
         async def make_retry_calls(self):
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("retry-wrapper") as span:
-
-                for attempt_nr in range(max_retries):
-                    if await f_task_remote(attempt_nr):
+                for arg in retry_arguments:
+                    if await f_task_remote(arg):
                         span.set_status(Status(StatusCode.OK))
                         return True
 
                 span.set_status(
                     Status(
                         StatusCode.ERROR,
-                        f"Task retried {max_retries} times; all failed",
+                        f"Task retried {len(retry_arguments)} times; all failed!",
                     )
                 )
                 return False

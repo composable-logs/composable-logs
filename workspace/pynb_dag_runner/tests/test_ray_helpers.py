@@ -298,13 +298,14 @@ def test_timeout_w_timeout(
 )
 def test_retry_constant_should_succeed(is_success):
     N_max_retries = 10
-    any_success = any(map(is_success, range(N_max_retries)))
+    retry_arguments = list(range(N_max_retries))
+    any_success = any(map(is_success, retry_arguments))
 
     def get_test_spans():
         with SpanRecorder() as rec:
             f_result = retry_wrapper_ot(
                 f_task_remote=ray.remote(num_cpus=0)(is_success).remote,
-                max_retries=N_max_retries,
+                retry_arguments=retry_arguments,
             )
             assert ray.get(f_result) == any_success
 
@@ -317,7 +318,7 @@ def test_retry_constant_should_succeed(is_success):
             assert read_key(retry_span, ["status", "status_code"]) == "OK"
         else:
             assert retry_span["status"] == {
-                "description": f"Task retried {N_max_retries} times; all failed",
+                "description": f"Task retried {N_max_retries} times; all failed!",
                 "status_code": "ERROR",
             }
 
