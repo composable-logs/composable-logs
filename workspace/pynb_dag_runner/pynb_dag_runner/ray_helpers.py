@@ -1,5 +1,7 @@
-from typing import TypeVar, Generic, Callable, List, Optional
+import asyncio, inspect
+from typing import TypeVar, Generic, Callable, List, Optional, Awaitable
 
+#
 import ray
 import opentelemetry as otel
 from opentelemetry.trace import StatusCode, Status  # type: ignore
@@ -37,6 +39,29 @@ class Future(Generic[A]):
         return do_map.remote(future)
 
     @staticmethod
+    def lift_async(
+        f: Callable[[B], Awaitable[C]], num_cpus: int = 0
+    ) -> "Callable[[Future[B]], Future[C]]":
+        """
+        Lift an async Python function f as below
+
+        ```
+        async def f(b: B) -> C:
+            ...
+        ```
+
+        into a Ray remote function operating on Ray object ref:s.
+
+        See: https://docs.ray.io/en/latest/async_api.html
+        """
+
+        @ray.remote(num_cpus=num_cpus)
+        def wrapped_f(b: B) -> C:
+            return asyncio.get_event_loop().run_until_complete(f(b))
+
+        return wrapped_f.remote
+
+    @staticmethod
     def lift(f: Callable[[B], C]) -> "Callable[[Future[B]], Future[C]]":
         return lambda future: Future.map(future, f)
 
@@ -56,13 +81,13 @@ def try_eval_f_async_wrapper(
 
     @ray.remote(num_cpus=0)
     class ExecActor:
-        def call(self, *args, **kwargs):
+        def call(self, *args):
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
 
             # Execute function in separate OpenTelemetry span.
             with tracer.start_as_current_span("call-python-function") as span:
                 try:
-                    result = success_handler(f(*args, **kwargs))
+                    result = success_handler(f(*args))
                     span.set_status(Status(StatusCode.OK))
 
                 except Exception as e:

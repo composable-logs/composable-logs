@@ -48,6 +48,13 @@ def test_future_lift():
     assert ray.get(Future.lift(lambda x: x + 1)(Future.value(1))) == 2
 
 
+def test_future_async_lift():
+    async def f(x):
+        return x + 1
+
+    assert ray.get(Future.lift_async(f)(ray.put(1))) == 2
+
+
 ### tests for try_eval_f_async_wrapper wrapper
 
 
@@ -210,10 +217,7 @@ def test_logging_for_nested_lift_functions():
             assert len(spans_under_top_x) > 4
 
             # Check span inclusions: g1 <- c1 <- g2 <- c2:
-            for a, b in [(g1, c1), (c1, g2), (g2, c2)]:
-                assert spans_under_top_x.contains_path(
-                    parent=a, child=b, recursive=True
-                )
+            assert spans_under_top_x.contains_path(g1, c1, g2, c2)
 
     validate_spans(get_test_spans())
 

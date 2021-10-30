@@ -9,13 +9,38 @@ import opentelemetry as ot
 #
 from pynb_dag_runner.opentelemetry_helpers import (
     get_span_id,
+    has_keys,
     read_key,
     is_parent_child,
     get_duration_s,
+    iso8601_to_epoch_s,
+    get_duration_range_us,
     Spans,
     SpanRecorder,
 )
 from pynb_dag_runner.helpers import one
+
+
+def test_nested_dict_helpers():
+    a_dict = {
+        "a": {
+            "b": 123,
+            "foo": "bar",
+            "bar": "baz",
+            "c": {"e": 1, "f": 2, "g": "hello", "h": None},
+        }
+    }
+    assert has_keys(a_dict, ["a"])
+    assert has_keys(a_dict, ["a", "b"])
+    assert not has_keys(a_dict, ["key-does-not-exist"])
+    assert not has_keys(a_dict, ["key-does-not-exist", "key-does-not-exist"])
+    assert not has_keys(a_dict, ["a", "key-does-not-exist"])
+
+    assert read_key(a_dict, ["a", "b"]) == 123
+
+
+def test_iso8601_to_epoch_s():
+    assert iso8601_to_epoch_s("2021-10-10T10:25:35.173367Z") == 1633861535173367 / 1e6
 
 
 def test_tracing_get_span_id_and_duration():
@@ -55,6 +80,7 @@ def test_tracing_get_span_id_and_duration():
 
     assert get_span_id(test_span) == "<hex-span-id>"
     assert get_duration_s(test_span) == 86411.0000140667
+    assert get_duration_range_us(test_span) == range(1633861535173367, 1633947946173381)
 
 
 @pytest.mark.parametrize("dummy_loop_parameter", range(3))
@@ -114,8 +140,8 @@ def test_tracing_nested_native_python(dummy_loop_parameter):
     assert not is_parent_child(sub1, top)
 
     # Check that we can find "top -> sub11" relationship in "top -> sub1 -> sub11"
-    assert spans.contains_path(parent=top, child=sub11, recursive=True)
-    assert not spans.contains_path(parent=top, child=sub11, recursive=False)
+    assert spans.contains_path(top, sub11, recursive=True)
+    assert not spans.contains_path(top, sub11, recursive=False)
 
     def check_duration(span, expected_duration_s: float) -> bool:
         return abs(get_duration_s(span) - expected_duration_s) < 0.05

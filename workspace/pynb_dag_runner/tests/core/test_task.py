@@ -1,17 +1,15 @@
 import time
 
+#
 import ray, pytest
 
-from pynb_dag_runner.core.dag_runner import (
-    Task,
-    TaskDependence,
-    TaskDependencies,
-)
+#
+from pynb_dag_runner.core.dag_runner import Task
 
 
 def test_task_execute_states():
     @ray.remote(num_cpus=0)
-    def f():
+    def f(*args):
         time.sleep(0.1)
         return 1234
 
@@ -39,7 +37,7 @@ def test_task_execute_states():
 
 def test_task_exceptions_should_propagate():
     @ray.remote(num_cpus=0)
-    def f():
+    def f(*args):
         raise Exception("BOOM123!")
 
     task = Task(f.remote)

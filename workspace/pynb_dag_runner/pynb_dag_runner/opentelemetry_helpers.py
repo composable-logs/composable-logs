@@ -7,12 +7,23 @@ import opentelemetry as ot
 import dateutil.parser as dp  # type: ignore
 
 #
-from pynb_dag_runner.helpers import flatten, read_jsonl
+from pynb_dag_runner.helpers import pairs, flatten, read_jsonl
 
 # ---- helper functions to read OpenTelemetry span dictionaries ----
 
 
-def read_key(nested_dict, keys: List[str]):
+def has_keys(nested_dict, keys: List[str]) -> bool:
+    assert len(keys) > 0
+
+    first_key, *rest_keys = keys
+    if len(rest_keys) == 0:
+        return first_key in nested_dict
+    else:
+        return first_key in nested_dict and has_keys(nested_dict[first_key], rest_keys)
+
+
+def read_key(nested_dict, keys: List[str]) -> Any:
+    assert len(keys) > 0
     first_key, *rest_keys = keys
 
     if first_key not in nested_dict:
@@ -24,7 +35,7 @@ def read_key(nested_dict, keys: List[str]):
         return read_key(nested_dict[first_key], rest_keys)
 
 
-def get_span_id(span):
+def get_span_id(span) -> str:
     try:
         result = read_key(span, ["context", "span_id"])
         assert result is not None
@@ -33,13 +44,31 @@ def get_span_id(span):
         raise Exception(f"Unable to read span_id from {str(span)}.")
 
 
+def iso8601_to_epoch_s(iso8601_datetime: str) -> float:
+    # This may not correctly handle timezones correctly:
+    # https://docs.python.org/3/library/datetime.html#datetime.datetime.timestamp
+    return dp.parse(iso8601_datetime).timestamp()
+
+
+def get_duration_range_us(span):
+    start_epoch_us: int = int(iso8601_to_epoch_s(span["start_time"]) * 1e6)
+    end_epoch_us: int = int(iso8601_to_epoch_s(span["end_time"]) * 1e6)
+    return range(start_epoch_us, end_epoch_us)
+
+
 def get_duration_s(span) -> float:
-    start_epoch_s: float = dp.parse(span["start_time"]).timestamp()
-    end_epoch_s: float = dp.parse(span["end_time"]).timestamp()
+    """
+    Return time duration for span in seconds (as float)
+    """
+    start_epoch_s: float = iso8601_to_epoch_s(span["start_time"])
+    end_epoch_s: float = iso8601_to_epoch_s(span["end_time"])
     return end_epoch_s - start_epoch_s
 
 
-def is_parent_child(span_parent, span_child):
+def is_parent_child(span_parent, span_child) -> bool:
+    """
+    Return True/False if span_parent is direct parent of span_child.
+    """
     child_parent_id = read_key(span_child, ["parent_id"])
     return (child_parent_id is not None) and (
         child_parent_id == get_span_id(span_parent)
@@ -55,7 +84,14 @@ class Spans:
         self.spans = spans
 
     def filter(self, keys: List[str], value: Any):
-        return Spans([span for span in self.spans if read_key(span, keys) == value])
+        def match(span, keys, value):
+            try:
+                return read_key(span, keys) == value
+            except:
+                # keys not found
+                return False
+
+        return Spans([span for span in self.spans if match(span, keys, value)])
 
     def sort_by_start_time(self):
         return Spans(
@@ -71,26 +107,36 @@ class Spans:
     def contains(self, span):
         return get_span_id(span) in map(get_span_id, self)
 
-    def contains_path(self, parent, child, recursive: bool) -> bool:
+    def contains_path(self, *span_chain, recursive: bool = True) -> bool:
         """
         Return true/false depending on whether there is a parent-child relationship
-        between the provided spans: parent and child.
+        link between the spans in span_chain.
 
         If recursive=False, the relation should be direct. Otherwise multiple
         parent-child relationships/links are allowed.
 
-        Cycles are not detected.
+        Cycles in self are not detected.
         """
-        assert self.contains(parent) and self.contains(child)
+        assert len(span_chain) >= 2
 
-        if is_parent_child(parent, child):
-            return True
+        if len(span_chain) == 2:
+            parent, child = span_chain
+            assert self.contains(parent) and self.contains(child)
 
-        if recursive:
-            child_subspans = [s for s in self if is_parent_child(parent, s)]
-            return any(self.contains_path(s, child, True) for s in child_subspans)
+            if is_parent_child(parent, child):
+                return True
+
+            if recursive:
+                child_subspans = [s for s in self if is_parent_child(parent, s)]
+                return any(
+                    self.contains_path(s, child, recursive=True) for s in child_subspans
+                )
+            else:
+                return False
         else:
-            return False
+            return all(
+                self.contains_path(*ps, recursive=recursive) for ps in pairs(span_chain)
+            )
 
     def restrict_by_top(self, top) -> "Spans":
         """
