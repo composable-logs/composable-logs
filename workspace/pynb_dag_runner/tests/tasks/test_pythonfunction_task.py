@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List
 
 #
-import pytest
+import pytest, ray
 
 #
 from pynb_dag_runner.tasks.tasks import (
@@ -399,3 +399,79 @@ def test_retry_logic_in_python_function_task():
 
     # rewrite after retry-task logs to OpenTelemetry
     # assert_compatibility(runlog_results, get_task_dependencies(dependencies))
+
+
+def skip_test_task_retries__multiple_retrys_should_run_in_parallel():
+    def make_f(task_label: str):
+        def f(retry_count):
+            start_ts = time.time_ns()
+            time.sleep(2)
+            return {
+                "task_label": task_label,
+                "retry_count": retry_count,
+                "start_ts": start_ts,
+                "stop_ts": time.time_ns(),
+            }
+
+        return f
+
+    f_a = retry_wrapper(
+        ray.remote(num_cpus=0)(make_f("task-a")).remote,
+        10,
+        is_success=lambda result: result["retry_count"] >= 2,
+    )
+    f_b = retry_wrapper(
+        ray.remote(num_cpus=0)(make_f("task-b")).remote,
+        10,
+        is_success=lambda result: result["retry_count"] >= 2,
+    )
+
+    results = flatten(ray.get([f_a, f_b]))
+    assert len(results) == 2 * 3
+
+    # On fast multi-core computers we can check that ray.get takes less than 2x the
+    # sleep delay in f. However, on slower VMs with only two cores (and possibly other
+    # processes?, like github's defaults runners) there may be so much overhead this
+    # is not true. Instead we check that that there is some overlap between run times
+    # for the two tasks. This seems like a more stable condition.
+
+    def get_range(task_label: str):
+        task_results = [r for r in results if r["task_label"] == task_label]
+
+        return range(
+            min(r["start_ts"] for r in task_results),
+            max(r["stop_ts"] for r in task_results),
+        )
+
+    assert range_intersect(get_range("task-a"), get_range("task-b"))
+
+
+@pytest.mark.parametrize("dummy_loop_parameter", range(1))
+def skip_test_task_retries__retry_and_timeout_composition(dummy_loop_parameter):
+    """
+    Test composition of both retry and timeout wrappers
+    """
+
+    def f(retry_count):
+        if retry_count < 5:
+            time.sleep(1e6)  # hang computation
+
+    f_timeout = try_eval_f_async_wrapper(
+        f,
+        timeout_s=1,
+        success_handler=lambda _: "SUCCESS",
+        error_handler=lambda e: f"FAIL:{e}",
+    )
+
+    f_retry_timeout = retry_wrapper(
+        lambda retry_count: f_timeout(ray.put(retry_count)),
+        10,
+        is_success=lambda result: result == "SUCCESS",
+    )
+
+    results = flatten(ray.get([f_retry_timeout]))
+
+    assert len(results) == 6
+    for result in results[:-1]:
+        assert result.startswith("FAIL:Timeout error:")
+    assert results[-1] == "SUCCESS"
