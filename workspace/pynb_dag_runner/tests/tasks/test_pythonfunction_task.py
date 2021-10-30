@@ -9,6 +9,7 @@ import pytest, ray
 from pynb_dag_runner.tasks.tasks import (
     PythonFunctionTask,
     PythonFunctionTask_OT,
+    RunParameters,
     get_task_dependencies,
 )
 
@@ -401,49 +402,41 @@ def test_retry_logic_in_python_function_task():
     # assert_compatibility(runlog_results, get_task_dependencies(dependencies))
 
 
-def skip_test_task_retries__multiple_retrys_should_run_in_parallel():
-    def make_f(task_label: str):
-        def f(retry_count):
-            start_ts = time.time_ns()
-            time.sleep(2)
-            return {
-                "task_label": task_label,
-                "retry_count": retry_count,
-                "start_ts": start_ts,
-                "stop_ts": time.time_ns(),
-            }
+def test_task_retries__multiple_retrys_should_run_in_parallel():
+    def get_test_spans():
+        with SpanRecorder() as rec:
 
-        return f
+            def sleep_f(runparameters: RunParameters):
+                if runparameters["retry_nr"] <= 2:
+                    time.sleep(1e6)
 
-    f_a = retry_wrapper(
-        ray.remote(num_cpus=0)(make_f("task-a")).remote,
-        10,
-        is_success=lambda result: result["retry_count"] >= 2,
-    )
-    f_b = retry_wrapper(
-        ray.remote(num_cpus=0)(make_f("task-b")).remote,
-        10,
-        is_success=lambda result: result["retry_count"] >= 2,
-    )
+            t0 = PythonFunctionTask_OT(
+                sleep_f, task_id="t0", timeout_s=1, n_max_retries=10
+            )
+            t1 = PythonFunctionTask_OT(
+                sleep_f, task_id="t1", timeout_s=1, n_max_retries=10
+            )
 
-    results = flatten(ray.get([f_a, f_b]))
-    assert len(results) == 2 * 3
+            dependencies = TaskDependencies()
+            run_tasks([t0, t1], dependencies)
 
-    # On fast multi-core computers we can check that ray.get takes less than 2x the
-    # sleep delay in f. However, on slower VMs with only two cores (and possibly other
-    # processes?, like github's defaults runners) there may be so much overhead this
-    # is not true. Instead we check that that there is some overlap between run times
-    # for the two tasks. This seems like a more stable condition.
+        return rec.spans, get_task_dependencies(dependencies)
 
-    def get_range(task_label: str):
-        task_results = [r for r in results if r["task_label"] == task_label]
+    def validate_spans(spans: Spans, task_dependencies):
+        assert_compatibility(spans, task_dependencies)
 
-        return range(
-            min(r["start_ts"] for r in task_results),
-            max(r["stop_ts"] for r in task_results),
+        # On fast multi-core computers we can check that ray.get takes less than 2x the
+        # sleep delay in f. However, on slower VMs with only two cores (and possibly other
+        # processes?, like github's defaults runners) there may be so much overhead this
+        # is not true. Instead we check that that there is some overlap between run times
+        # for the two tasks. This seems like a more stable condition.
+        top_span_1, top_span_2 = list(spans.filter(["name"], "invoke-task"))
+
+        assert range_intersect(
+            get_duration_range_us(top_span_1), get_duration_range_us(top_span_2)
         )
 
-    assert range_intersect(get_range("task-a"), get_range("task-b"))
+    validate_spans(*get_test_spans())
 
 
 @pytest.mark.parametrize("dummy_loop_parameter", range(1))

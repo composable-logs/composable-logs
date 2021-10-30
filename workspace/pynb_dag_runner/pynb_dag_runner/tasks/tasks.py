@@ -85,10 +85,10 @@ class PythonFunctionTask_OT(Task[bool]):
 
             return result
 
-        async def retry_wrapper(runparametrs: RunParameters) -> bool:
+        async def retry_wrapper(runparameters: RunParameters) -> bool:
             retry_arguments = [
                 {
-                    **runparametrs,
+                    **runparameters,
                     "retry.max_retries": n_max_retries,
                     "retry.nr": retry_nr,
                 }
@@ -98,7 +98,14 @@ class PythonFunctionTask_OT(Task[bool]):
             # TODO: retry_wrapper_ot logic could be moved here?
             return await retry_wrapper_ot(wrapped, retry_arguments)
 
-        super().__init__(f_remote=Future.lift_async(retry_wrapper, num_cpus=1))
+        async def invoke_task(runparameters: RunParameters) -> bool:
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
+            with tracer.start_as_current_span("invoke-task") as span:
+                span.set_attribute("task_type", "python-function-call")
+                span.set_attribute("task_id", task_id)
+                return await retry_wrapper(runparameters=runparameters)
+
+        super().__init__(f_remote=Future.lift_async(invoke_task, num_cpus=1))
 
 
 class PythonFunctionTask(Task[Runlog]):
