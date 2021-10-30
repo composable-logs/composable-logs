@@ -85,7 +85,7 @@ class PythonFunctionTask_OT(Task[bool]):
 
             return result
 
-        async def retry_wrapper(runparametrs: RunParameters) -> Any:
+        async def retry_wrapper(runparametrs: RunParameters) -> bool:
             retry_arguments = [
                 {
                     **runparametrs,
@@ -96,8 +96,7 @@ class PythonFunctionTask_OT(Task[bool]):
             ]
 
             # TODO: retry_wrapper_ot logic could be moved here?
-            wrapped_remote = Future.lift_async(wrapped, num_cpus=0)
-            return await retry_wrapper_ot(wrapped_remote, retry_arguments)
+            return await retry_wrapper_ot(wrapped, retry_arguments)
 
         super().__init__(f_remote=Future.lift_async(retry_wrapper, num_cpus=1))
 

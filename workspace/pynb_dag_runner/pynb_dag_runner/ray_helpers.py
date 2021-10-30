@@ -1,5 +1,5 @@
 import asyncio, inspect
-from typing import TypeVar, Generic, Callable, List, Optional, Awaitable
+from typing import Any, Coroutine, TypeVar, Generic, Callable, List, Optional, Awaitable
 
 #
 import ray
@@ -163,9 +163,9 @@ def retry_wrapper(
 
 
 def retry_wrapper_ot(
-    f_task_remote: Callable[[A], Future[bool]],
+    f_task_remote: Callable[[A], Coroutine[A, None, bool]],
     retry_arguments: List[A],
-) -> Future[bool]:
+) -> Awaitable[bool]:
     @ray.remote(num_cpus=0)
     class RetryActor:
         async def make_retry_calls(self):
