@@ -21,7 +21,11 @@ from pynb_dag_runner.wrappers.compute_steps import (
 )
 
 #
-from pynb_dag_runner.ray_helpers import Future, try_eval_f_async_wrapper
+from pynb_dag_runner.ray_helpers import (
+    Future,
+    try_eval_f_async_wrapper,
+    retry_wrapper_ot,
+)
 from pynb_dag_runner.helpers import compose
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook
 
@@ -34,7 +38,7 @@ class PythonFunctionTask_OT(Task[bool]):
         f: Callable[[RunParameters], Any],
         task_id: str,
         timeout_s: float = None,
-        # n_max_retries: int = 1, TODO
+        n_max_retries: int = 1,
         common_task_runparameters: RunParameters = {},
     ):
         """
@@ -45,6 +49,7 @@ class PythonFunctionTask_OT(Task[bool]):
         task_id:s should be 1-1 with the nodes in the dependency DAG, but one
         task_id may correspond to many run_id:s if there are retries.
         """
+        assert n_max_retries >= 1
         self.task_id = task_id
 
         f_remote: Callable[
@@ -80,7 +85,21 @@ class PythonFunctionTask_OT(Task[bool]):
 
             return result
 
-        super().__init__(f_remote=Future.lift_async(wrapped, num_cpus=1))
+        async def retry_wrapper(runparametrs: RunParameters) -> Any:
+            retry_arguments = [
+                {
+                    **runparametrs,
+                    "retry.max_retries": n_max_retries,
+                    "retry.nr": retry_nr,
+                }
+                for retry_nr in range(n_max_retries)
+            ]
+
+            # TODO: retry_wrapper_ot logic could be moved here?
+            wrapped_remote = Future.lift_async(wrapped, num_cpus=0)
+            return await retry_wrapper_ot(wrapped_remote, retry_arguments)
+
+        super().__init__(f_remote=Future.lift_async(retry_wrapper, num_cpus=1))
 
 
 class PythonFunctionTask(Task[Runlog]):

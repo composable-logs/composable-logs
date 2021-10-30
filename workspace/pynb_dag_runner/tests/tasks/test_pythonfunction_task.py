@@ -120,7 +120,9 @@ def test_tasks_runlog_output():
         call_span = one(spans.filter(["name"], "call-python-function"))
         assert spans.contains_path(task_span, timeout_span, call_span)
 
-        assert task_span["attributes"].keys() == set(["run_id", "task_id"])
+        assert task_span["attributes"].keys() == set(
+            ["run_id", "task_id", "retry.max_retries", "retry.nr"]
+        )
 
         assert_compatibility(spans, task_dependencies)
 
