@@ -86,6 +86,8 @@ def test_compose():
 
 
 def test_pairs():
+    assert pairs([]) == []
+    assert pairs([1]) == []
     assert pairs([1, 2]) == [(1, 2)]
     assert pairs([1, 2, 3]) == [(1, 2), (2, 3)]
     assert pairs([1, 2, 3, 4]) == [(1, 2), (2, 3), (3, 4)]

@@ -1,5 +1,5 @@
 import asyncio, inspect
-from typing import TypeVar, Generic, Callable, List, Optional, Awaitable
+from typing import Any, Coroutine, TypeVar, Generic, Callable, List, Optional, Awaitable
 
 #
 import ray
@@ -144,6 +144,7 @@ def retry_wrapper(
     max_retries: RetryCount,
     is_success: Callable[[A], bool],
 ) -> Future[List[A]]:
+    # -- deprecated --
     # Note: this is currently the only place where cpu-resources are allocated for Ray
     @ray.remote(num_cpus=1)
     class RetryActor:
@@ -156,6 +157,32 @@ def retry_wrapper(
                     break
 
             return results
+
+    retry_actor = RetryActor.remote()  # type: ignore
+    return retry_actor.make_retry_calls.remote()
+
+
+def retry_wrapper_ot(
+    f_task_remote: Callable[[A], Coroutine[A, None, bool]],
+    retry_arguments: List[A],
+) -> Awaitable[bool]:
+    @ray.remote(num_cpus=0)
+    class RetryActor:
+        async def make_retry_calls(self):
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
+            with tracer.start_as_current_span("retry-wrapper") as span:
+                for arg in retry_arguments:
+                    if await f_task_remote(arg):
+                        span.set_status(Status(StatusCode.OK))
+                        return True
+
+                span.set_status(
+                    Status(
+                        StatusCode.ERROR,
+                        f"Task retried {len(retry_arguments)} times; all failed!",
+                    )
+                )
+                return False
 
     retry_actor = RetryActor.remote()  # type: ignore
     return retry_actor.make_retry_calls.remote()
