@@ -66,9 +66,9 @@ class PythonFunctionTask_OT(Task[bool]):
         #
         # AttributeError: 'NoneType' object has no attribute '_ray_is_cross_language'
         #
-        async def wrapped(invocation_runparameters: RunParameters) -> Any:
+        async def task_run(invocation_runparameters: RunParameters) -> Any:
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
-            with tracer.start_as_current_span("python-task") as span:
+            with tracer.start_as_current_span("task-run") as span:
 
                 # determine runparameters for this task invocation
                 runparameters = {
@@ -97,7 +97,7 @@ class PythonFunctionTask_OT(Task[bool]):
             ]
 
             # TODO: retry_wrapper_ot logic could be moved here?
-            return await retry_wrapper_ot(wrapped, retry_arguments)
+            return await retry_wrapper_ot(task_run, retry_arguments)
 
         async def invoke_task(runparameters: RunParameters) -> bool:
             tracer = otel.trace.get_tracer(__name__)  # type: ignore

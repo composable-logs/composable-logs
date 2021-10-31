@@ -55,7 +55,7 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
         task_id = top_span["attributes"]["task_id"]
         run_spans = list(
             spans.restrict_by_top(top_span)
-            .filter(["name"], "python-task")
+            .filter(["name"], "task-run")
             .sort_by_start_time()
         )
 
@@ -110,7 +110,7 @@ def test_tasks_runlog_output():
         return rec.spans, get_task_dependencies(dependencies)
 
     def validate_spans(spans: Spans, task_dependencies):
-        task_span = one(spans.filter(["name"], "python-task"))
+        task_span = one(spans.filter(["name"], "task-run"))
 
         assert read_key(task_span, ["attributes", "task_id"]) == "my_task_id"
 
@@ -129,7 +129,7 @@ def test_tasks_runlog_output():
 
 def _get_time_range(spans, span_id: str):
     span = one(
-        spans.filter(["name"], "python-task")
+        spans.filter(["name"], "task-run")
         # -
         .filter(["attributes", "task_id"], span_id)
     )
@@ -153,7 +153,7 @@ def test_tasks_run_in_parallel():
         return rec.spans, get_task_dependencies(dependencies)
 
     def validate_spans(spans: Spans, task_dependencies):
-        assert len(spans.filter(["name"], "python-task")) == 2
+        assert len(spans.filter(["name"], "task-run")) == 2
 
         t0_us_range = _get_time_range(spans, "t0")
         t1_us_range = _get_time_range(spans, "t1")
@@ -193,7 +193,7 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
         return rec.spans, get_task_dependencies(dependencies)
 
     def validate_spans(spans: Spans, task_dependencies):
-        assert len(spans.filter(["name"], "python-task")) == 4
+        assert len(spans.filter(["name"], "task-run")) == 4
 
         task_runtime_ranges = [
             _get_time_range(spans, span_id) for span_id in ["t0", "t1", "t2", "t3"]
@@ -306,7 +306,7 @@ def test_random_sleep_tasks_with_order_dependencies(dependencies_list):
         return rec.spans, get_task_dependencies(dependencies)
 
     def validate_spans(spans: Spans, task_dependencies):
-        assert len(spans.filter(["name"], "python-task")) == 5
+        assert len(spans.filter(["name"], "task-run")) == 5
 
         assert_compatibility(spans, task_dependencies)
 
