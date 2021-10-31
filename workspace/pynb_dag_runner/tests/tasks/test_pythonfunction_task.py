@@ -485,34 +485,3 @@ def test_task_retries__multiple_retrys_should_run_in_parallel():
         )
 
     validate_spans(*get_test_spans())
-
-
-@pytest.mark.parametrize("dummy_loop_parameter", range(1))
-def skip_test_task_retries__retry_and_timeout_composition(dummy_loop_parameter):
-    """
-    Test composition of both retry and timeout wrappers
-    """
-
-    def f(retry_count):
-        if retry_count < 5:
-            time.sleep(1e6)  # hang computation
-
-    f_timeout = try_eval_f_async_wrapper(
-        f,
-        timeout_s=1,
-        success_handler=lambda _: "SUCCESS",
-        error_handler=lambda e: f"FAIL:{e}",
-    )
-
-    f_retry_timeout = retry_wrapper(
-        lambda retry_count: f_timeout(ray.put(retry_count)),
-        10,
-        is_success=lambda result: result == "SUCCESS",
-    )
-
-    results = flatten(ray.get([f_retry_timeout]))
-
-    assert len(results) == 6
-    for result in results[:-1]:
-        assert result.startswith("FAIL:Timeout error:")
-    assert results[-1] == "SUCCESS"
