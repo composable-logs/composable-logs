@@ -402,6 +402,54 @@ def test_retry_logic_in_python_function_task():
     # assert_compatibility(runlog_results, get_task_dependencies(dependencies))
 
 
+def test__task_retries__task_is_retried_until_success():
+    def get_test_spans():
+        with SpanRecorder() as rec:
+
+            def sleep_f(runparameters: RunParameters):
+                if runparameters["retry.nr"] <= 2:
+                    raise Exception("Failed to run")
+                if runparameters["retry.nr"] in [3, 4]:
+                    time.sleep(1e6)
+                return True
+
+            t0 = PythonFunctionTask_OT(
+                sleep_f, task_id="test_task", timeout_s=1, n_max_retries=10
+            )
+
+            dependencies = TaskDependencies()
+            run_tasks([t0], dependencies)
+
+        return rec.spans, get_task_dependencies(dependencies)
+
+    def validate_spans(spans: Spans, task_dependencies):
+        assert_compatibility(spans, task_dependencies)
+
+        # Top task span is success
+        top_span = one(spans.filter(["name"], "invoke-task"))
+        assert top_span["attributes"]["task_id"] == "test_task"
+        assert top_span["status"] == {"status_code": "OK"}
+
+        spans_under_top: Spans = spans.restrict_by_top(top_span).sort_by_start_time()
+
+        # Check statuses of timeout spans
+        statuses = [
+            span["status"]
+            for span in spans_under_top.filter(
+                ["name"], "timeout-guard"
+            ).sort_by_start_time()
+        ]
+
+        assert len(statuses) == 6
+        assert statuses == (
+            3 * [{"status_code": "OK"}]
+            + 2 * [{"status_code": "ERROR", "description": "Timeout"}]
+            + [{"status_code": "OK"}]
+        )
+
+    validate_spans(*get_test_spans())
+
+
 def test_task_retries__multiple_retrys_should_run_in_parallel():
     def get_test_spans():
         with SpanRecorder() as rec:

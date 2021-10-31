@@ -5,6 +5,7 @@ from typing import Callable, Dict, Mapping, Any, Optional
 #
 import ray
 import opentelemetry as otel
+from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
 from pynb_dag_runner.core.dag_runner import Task, TaskDependencies
@@ -103,7 +104,12 @@ class PythonFunctionTask_OT(Task[bool]):
             with tracer.start_as_current_span("invoke-task") as span:
                 span.set_attribute("task_type", "python-function-call")
                 span.set_attribute("task_id", task_id)
-                return await retry_wrapper(runparameters=runparameters)
+                is_success: bool = await retry_wrapper(runparameters=runparameters)
+                if is_success:
+                    span.set_status(Status(StatusCode.OK))
+                else:
+                    span.set_status(Status(StatusCode.ERROR, "Task failed"))
+                return is_success
 
         super().__init__(f_remote=Future.lift_async(invoke_task, num_cpus=1))
 
