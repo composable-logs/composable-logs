@@ -120,7 +120,7 @@ class PythonFunctionTask_OT(Task[bool]):
 
 
 class PythonFunctionTask(Task[Runlog]):
-    # -- to be deleted --
+    # -- deprecated, to be deleted --
     def __init__(
         self,
         f,
@@ -153,6 +153,7 @@ class PythonFunctionTask(Task[Runlog]):
 
 
 class JupytextNotebookTask(PythonFunctionTask):
+    # -- deprecated, to be deleted --
     def __init__(
         self,
         notebook: JupytextNotebook,
@@ -183,6 +184,48 @@ class JupytextNotebookTask(PythonFunctionTask):
             n_max_retries=n_max_retries,
             parameters=parameters,
         )
+
+
+from pathlib import Path
+
+
+def make_jupytext_task(
+    notebook: JupytextNotebook,
+    task_id: str,
+    tmp_dir: Path,
+    timeout_s: float = None,
+    n_max_retries: int = 1,
+    parameters: Dict[str, Any] = {},
+):
+    def f(runparameters: RunParameters):
+        return True
+
+    async def invoke_task(runparameters: RunParameters) -> bool:
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("invoke-task") as span:
+            span.set_attribute("task_type", "jupytext")
+            span.set_attribute("task_id", task_id)
+
+            run_notebook = PythonFunctionTask_OT(
+                f=f,
+                task_id="always_failing_task",
+                timeout_s=timeout_s,
+                n_max_retries=n_max_retries,
+            )
+            run_notebook.start(runparameters)
+
+            is_success: bool = await run_notebook.get_ref()  # type: ignore
+            if is_success:
+                span.set_status(Status(StatusCode.OK))
+                span.set_attribute("notebook_html", "**NA**")
+            else:
+                span.set_status(
+                    Status(StatusCode.ERROR, "Jupytext notebook task failed")
+                )
+
+        return is_success
+
+    return Task(f_remote=Future.lift_async(invoke_task))
 
 
 def get_task_dependencies(dependencies: TaskDependencies):

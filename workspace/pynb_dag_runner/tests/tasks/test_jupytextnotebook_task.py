@@ -3,12 +3,19 @@ from pathlib import Path
 from typing import Any, Dict
 
 #
-from pynb_dag_runner.tasks.tasks import JupytextNotebookTask
+from pynb_dag_runner.tasks.tasks import (
+    JupytextNotebookTask,
+    make_jupytext_task,
+    get_task_dependencies,
+)
 
-from pynb_dag_runner.core.dag_runner import run_tasks
-from pynb_dag_runner.core.dag_runner import TaskDependencies
-from pynb_dag_runner.helpers import flatten, read_json
+from pynb_dag_runner.core.dag_runner import run_tasks, TaskDependencies
+from pynb_dag_runner.helpers import one, flatten, read_json
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook
+from pynb_dag_runner.opentelemetry_helpers import (
+    Spans,
+    SpanRecorder,
+)
 
 # TODO: all the below tests should run multiple times in stress tests
 # See, https://github.com/pynb-dag-runner/pynb-dag-runner/pull/5
@@ -24,6 +31,41 @@ def isotimestamp_normalized():
     This is useful to generate output directories that are guaranteed to not exist.
     """
     return datetime.datetime.now(datetime.timezone.utc).isoformat().replace(":", "-")
+
+
+def test_jupytext_nested_spans():
+    def get_test_spans():
+        with SpanRecorder() as rec:
+            dependencies = TaskDependencies()
+            jupytext_task = make_jupytext_task(
+                notebook=None,
+                task_id="123",
+                tmp_dir=None,
+                timeout_s=5,
+                n_max_retries=1,
+                parameters={},
+            )
+
+            run_tasks([jupytext_task], dependencies)
+
+        return rec.spans, get_task_dependencies(dependencies)
+
+    def validate_spans(spans: Spans, task_dependencies):
+        jupytext_span = one(
+            spans.filter(["name"], "invoke-task").filter(
+                ["attributes", "task_type"], "jupytext"
+            )
+        )
+        py_span = one(
+            spans.filter(["name"], "invoke-task").filter(
+                ["attributes", "task_type"], "python"
+            )
+        )
+        spans.contains_path(jupytext_span, py_span)
+        assert jupytext_span["status"] == {"status_code": "OK"}
+        assert py_span["status"] == {"status_code": "OK"}
+
+    validate_spans(*get_test_spans())
 
 
 def test_mini_jupytext_pipeline(tmp_path: Path):
