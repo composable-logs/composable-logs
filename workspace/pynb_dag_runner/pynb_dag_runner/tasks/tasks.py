@@ -195,10 +195,20 @@ def make_jupytext_task(
     tmp_dir: Path,
     timeout_s: float = None,
     n_max_retries: int = 1,
-    parameters: Dict[str, Any] = {},
+    parameters: RunParameters = {},
 ):
     def f(runparameters: RunParameters):
-        return True
+        evaluated_notebook = JupyterIpynbNotebook(
+            (tmp_dir / notebook.filepath.name).with_suffix(".ipynb")
+        )
+
+        try:
+            notebook.evaluate(
+                output=evaluated_notebook, parameters={"P": runparameters}
+            )
+        finally:
+            evaluated_notebook.to_html()
+            return True
 
     async def invoke_task(runparameters: RunParameters) -> bool:
         tracer = otel.trace.get_tracer(__name__)  # type: ignore

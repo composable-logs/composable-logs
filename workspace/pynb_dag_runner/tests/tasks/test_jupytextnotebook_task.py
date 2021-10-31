@@ -37,10 +37,12 @@ def test_jupytext_nested_spans():
     def get_test_spans():
         with SpanRecorder() as rec:
             dependencies = TaskDependencies()
+
+            nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
             jupytext_task = make_jupytext_task(
-                notebook=None,
+                notebook=JupytextNotebook(nb_path / "notebook_ok.py"),
                 task_id="123",
-                tmp_dir=None,
+                tmp_dir=nb_path,
                 timeout_s=5,
                 n_max_retries=1,
                 parameters={},

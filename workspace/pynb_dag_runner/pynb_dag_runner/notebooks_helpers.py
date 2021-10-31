@@ -7,6 +7,20 @@ import jupytext, papermill
 from nbconvert import HTMLExporter
 
 
+"""
+On the command line (bash), a Jupytext notebooks can be evaluated and converted into an
+html page as below.
+
+```bash
+jupytext --to notebook --output - jupytext_nb.py | \
+    papermill <notebook args> --kernel python3 --log-output --cwd $(pwd) - output.ipynb
+jupyter nbconvert --to html output.ipynb
+```
+
+The below classes allow us to do the same conversion with Python.
+"""
+
+
 class JupyterIpynbNotebook:
     # ipynb is the default file format used by Jupyter for storing notebooks.
     def __init__(self, filepath: Path):
