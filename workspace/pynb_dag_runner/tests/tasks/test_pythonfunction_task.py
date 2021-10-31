@@ -110,16 +110,26 @@ def test_tasks_runlog_output():
         return rec.spans, get_task_dependencies(dependencies)
 
     def validate_spans(spans: Spans, task_dependencies):
-        task_span = one(spans.filter(["name"], "task-run"))
-
+        task_span = one(spans.filter(["name"], "invoke-task"))
         assert read_key(task_span, ["attributes", "task_id"]) == "my_task_id"
+        assert read_key(task_span, ["attributes", "task_type"]) == "python"
+
+        retries_span = one(spans.filter(["name"], "retry-wrapper"))
+
+        run_span = one(spans.filter(["name"], "task-run"))
+        assert read_key(run_span, ["attributes", "task_id"]) == "my_task_id"
+        assert read_key(run_span, ["attributes", "retry.max_retries"]) == 1
+        assert read_key(run_span, ["attributes", "retry.nr"]) == 0
+        assert run_span["attributes"].keys() == set(
+            ["run_id", "task_id", "retry.max_retries", "retry.nr"]
+        )
 
         timeout_span = one(spans.filter(["name"], "timeout-guard"))
         call_span = one(spans.filter(["name"], "call-python-function"))
-        assert spans.contains_path(task_span, timeout_span, call_span)
 
-        assert task_span["attributes"].keys() == set(
-            ["run_id", "task_id", "retry.max_retries", "retry.nr"]
+        # check nesting of above spans
+        assert spans.contains_path(
+            task_span, retries_span, run_span, timeout_span, call_span
         )
 
         assert_compatibility(spans, task_dependencies)
@@ -127,14 +137,14 @@ def test_tasks_runlog_output():
     validate_spans(*get_test_spans())
 
 
-def _get_time_range(spans, span_id: str):
-    span = one(
-        spans.filter(["name"], "task-run")
+def _get_time_range(spans: Spans, span_id: str):
+    task_top_span = one(
+        spans.filter(["name"], "invoke-task")
         # -
         .filter(["attributes", "task_id"], span_id)
     )
 
-    return get_duration_range_us(span)
+    return get_duration_range_us(task_top_span)
 
 
 def test_tasks_run_in_parallel():
@@ -153,7 +163,7 @@ def test_tasks_run_in_parallel():
         return rec.spans, get_task_dependencies(dependencies)
 
     def validate_spans(spans: Spans, task_dependencies):
-        assert len(spans.filter(["name"], "task-run")) == 2
+        assert len(spans.filter(["name"], "invoke-task")) == 2
 
         t0_us_range = _get_time_range(spans, "t0")
         t1_us_range = _get_time_range(spans, "t1")
@@ -193,7 +203,7 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
         return rec.spans, get_task_dependencies(dependencies)
 
     def validate_spans(spans: Spans, task_dependencies):
-        assert len(spans.filter(["name"], "task-run")) == 4
+        assert len(spans.filter(["name"], "invoke-task")) == 4
 
         task_runtime_ranges = [
             _get_time_range(spans, span_id) for span_id in ["t0", "t1", "t2", "t3"]
@@ -306,7 +316,7 @@ def test_random_sleep_tasks_with_order_dependencies(dependencies_list):
         return rec.spans, get_task_dependencies(dependencies)
 
     def validate_spans(spans: Spans, task_dependencies):
-        assert len(spans.filter(["name"], "task-run")) == 5
+        assert len(spans.filter(["name"], "invoke-task")) == 5
 
         assert_compatibility(spans, task_dependencies)
 

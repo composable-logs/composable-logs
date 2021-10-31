@@ -102,7 +102,7 @@ class PythonFunctionTask_OT(Task[bool]):
         async def invoke_task(runparameters: RunParameters) -> bool:
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("invoke-task") as span:
-                span.set_attribute("task_type", "python-function-call")
+                span.set_attribute("task_type", "python")
                 span.set_attribute("task_id", task_id)
                 is_success: bool = await retry_wrapper(runparameters=runparameters)
                 if is_success:
