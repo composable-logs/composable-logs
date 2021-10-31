@@ -182,6 +182,40 @@ def test_tasks_run_in_parallel():
     validate_spans(*get_test_spans())
 
 
+def test_always_failing_task():
+    def get_test_spans():
+        with SpanRecorder() as rec:
+            dependencies = TaskDependencies()
+
+            def fail_f(runparameters: RunParameters):
+                if runparameters["retry.nr"] <= 2:
+                    time.sleep(1e6)
+                else:
+                    raise Exception("Failed to run")
+
+            t0 = PythonFunctionTask_OT(
+                fail_f, task_id="always_failing_task", timeout_s=5, n_max_retries=10
+            )
+
+            run_tasks([t0], dependencies)
+
+        return rec.spans, get_task_dependencies(dependencies)
+
+    def validate_spans(spans: Spans, task_dependencies):
+        top_span = one(spans.filter(["name"], "invoke-task"))
+        assert top_span["status"] == {
+            "description": "Task failed",
+            "status_code": "ERROR",
+        }
+
+        run_spans = spans.filter(["name"], "task-run")
+        assert len(run_spans) == 10
+
+        assert_compatibility(spans, task_dependencies)
+
+    validate_spans(*get_test_spans())
+
+
 def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
     def get_test_spans():
         with SpanRecorder() as rec:
