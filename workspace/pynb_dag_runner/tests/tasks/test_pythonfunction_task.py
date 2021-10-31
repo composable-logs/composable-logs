@@ -1,9 +1,8 @@
 import time, random, itertools
-from pathlib import Path
 from typing import List
 
 #
-import pytest, ray
+import pytest
 
 #
 from pynb_dag_runner.tasks.tasks import (
@@ -16,20 +15,18 @@ from pynb_dag_runner.tasks.tasks import (
 #
 from pynb_dag_runner.helpers import (
     one,
+    pairs,
     flatten,
     range_intersect,
     range_intersection,
     range_is_empty,
-    read_json,
 )
 from pynb_dag_runner.core.dag_runner import TaskDependencies, run_tasks
-from pynb_dag_runner.wrappers.runlog import Runlog
 from pynb_dag_runner.opentelemetry_helpers import (
+    get_duration_range_us,
     read_key,
-    has_keys,
     Spans,
     SpanRecorder,
-    get_duration_range_us,
 )
 
 
@@ -42,11 +39,8 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
 
     # Step 1: all task-id:s in order dependencies must have at least one runlog
     # entry. (The converse need not hold.)
-    task_ids_in_spans: List[str] = [
-        span["attributes"]["task_id"]
-        for top_spans in [spans.filter(["name"], "invoke-task")]
-        for span in top_spans
-    ]
+    top_spans: Spans = spans.filter(["name"], "invoke-task")
+    task_ids_in_spans: List[str] = [span["attributes"]["task_id"] for span in top_spans]
     # each top span should have unique span_id
     assert len(set(task_ids_in_spans)) == len(task_ids_in_spans)
 
@@ -57,19 +51,19 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
 
     # Step 2: A task retry should not start before previous attempt for running task
     # has finished.
+    for top_span in top_spans:
+        task_id = top_span["attributes"]["task_id"]
+        run_spans = list(
+            spans.restrict_by_top(top_span)
+            .filter(["name"], "python-task")
+            .sort_by_start_time()
+        )
 
-    # def get_runlogs(task_id):
-    #    return [runlog for runlog in runlog_results if runlog["task_id"] == task_id]
-    #
-    # check retry timings
-    # for task_id in task_ids_in_spans:
-    #    task_id_retries = get_runlogs(task_id)
-    #    for idx, _ in enumerate(task_id_retries):
-    #        if idx > 0:
-    #            assert (
-    #                task_id_retries[idx - 1]["out.timing.end_ts"]
-    #                < task_id_retries[idx]["out.timing.start_ts"]
-    #            )
+        for run_span in run_spans:
+            assert run_span["attributes"]["task_id"] == task_id
+
+        for s1, s2 in pairs(run_spans):
+            assert get_duration_range_us(s1).stop < get_duration_range_us(s2).start
 
     # Step 3: Runlog timings satisfy the same order constraints as in DAG run order
     # dependencies.

@@ -75,7 +75,8 @@ def pairs(xs: Sequence[A]) -> Sequence[Tuple[A, A]]:
 
     Eg. [1, 2, 3, 4] -> [(1, 2), (2, 3), (3, 4)]
     """
-    assert len(xs) >= 2
+    if len(xs) <= 1:
+        return []
     return list(zip(xs[:-1], xs[1:]))
 
 
