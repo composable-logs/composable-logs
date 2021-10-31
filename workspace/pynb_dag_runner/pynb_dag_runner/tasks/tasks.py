@@ -82,9 +82,13 @@ class PythonFunctionTask_OT(Task[bool]):
                 for k, v in runparameters.items():
                     span.set_attribute(k, v)
 
-                result = await f_remote(ray.put(runparameters))  # type: ignore
+                is_success: bool = await f_remote(ray.put(runparameters))  # type: ignore
+                if is_success:
+                    span.set_status(Status(StatusCode.OK))
+                else:
+                    span.set_status(Status(StatusCode.ERROR, "Run failed"))
 
-            return result
+            return is_success
 
         async def retry_wrapper(runparameters: RunParameters) -> bool:
             retry_arguments = [
@@ -109,7 +113,8 @@ class PythonFunctionTask_OT(Task[bool]):
                     span.set_status(Status(StatusCode.OK))
                 else:
                     span.set_status(Status(StatusCode.ERROR, "Task failed"))
-                return is_success
+
+            return is_success
 
         super().__init__(f_remote=Future.lift_async(invoke_task, num_cpus=1))
 
