@@ -218,7 +218,7 @@ def make_jupytext_task(
 
             run_notebook = PythonFunctionTask_OT(
                 f=f,
-                task_id="always_failing_task",
+                task_id=f"{task_id}-render-notebook",
                 timeout_s=timeout_s,
                 n_max_retries=n_max_retries,
             )
