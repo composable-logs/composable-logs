@@ -42,10 +42,13 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
 
     # Step 1: all task-id:s in order dependencies must have at least one runlog
     # entry. (The converse need not hold.)
-    task_ids_in_spans: List[str] = []
-    for span in spans:
-        if has_keys(span, ["attributes", "task_id"]):
-            task_ids_in_spans.append(read_key(span, ["attributes", "task_id"]))
+    task_ids_in_spans: List[str] = [
+        span["attributes"]["task_id"]
+        for top_spans in [spans.filter(["name"], "invoke-task")]
+        for span in top_spans
+    ]
+    # each top span should have unique span_id
+    assert len(set(task_ids_in_spans)) == len(task_ids_in_spans)
 
     task_ids_in_dependencies: List[str] = flatten(
         [[d["from"], d["to"]] for d in task_id_dependencies]
@@ -54,7 +57,7 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
 
     # Step 2: A task retry should not start before previous attempt for running task
     # has finished.
-    #
+
     # def get_runlogs(task_id):
     #    return [runlog for runlog in runlog_results if runlog["task_id"] == task_id]
     #
@@ -409,12 +412,12 @@ def test__task_retries__task_is_retried_until_success():
             def sleep_f(runparameters: RunParameters):
                 if runparameters["retry.nr"] <= 2:
                     raise Exception("Failed to run")
-                if runparameters["retry.nr"] in [3, 4]:
+                if runparameters["retry.nr"] in [3]:
                     time.sleep(1e6)
                 return True
 
             t0 = PythonFunctionTask_OT(
-                sleep_f, task_id="test_task", timeout_s=1, n_max_retries=10
+                sleep_f, task_id="test_task", timeout_s=5, n_max_retries=10
             )
 
             dependencies = TaskDependencies()
@@ -440,10 +443,10 @@ def test__task_retries__task_is_retried_until_success():
             ).sort_by_start_time()
         ]
 
-        assert len(statuses) == 6
+        assert len(statuses) == 5
         assert statuses == (
             3 * [{"status_code": "OK"}]
-            + 2 * [{"status_code": "ERROR", "description": "Timeout"}]
+            + [{"status_code": "ERROR", "description": "Timeout"}]
             + [{"status_code": "OK"}]
         )
 
