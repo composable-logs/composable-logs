@@ -130,7 +130,7 @@ def test_jupytext_exception_throwing_notebook(N_retries):
         for idx in failed_indices():
             failed_run_span = run_spans[idx]
 
-            exception = one(spans.exceptions_in(failed_run_span))
+            exception = one(spans.exceptions_in(failed_run_span))["attributes"]
             assert exception["exception.type"] == "PapermillExecutionError"
             assert "Thrown from notebook!" in exception["exception.message"]
 
