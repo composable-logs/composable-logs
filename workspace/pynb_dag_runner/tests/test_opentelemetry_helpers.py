@@ -15,6 +15,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     get_duration_s,
     iso8601_to_epoch_s,
     get_duration_range_us,
+    get_span_exceptions,
     Spans,
     SpanRecorder,
 )
@@ -81,6 +82,7 @@ def test_tracing_get_span_id_and_duration():
     assert get_span_id(test_span) == "<hex-span-id>"
     assert get_duration_s(test_span) == 86411.0000140667
     assert get_duration_range_us(test_span) == range(1633861535173367, 1633947946173381)
+    assert get_span_exceptions(test_span) == []
 
 
 @pytest.mark.parametrize("dummy_loop_parameter", range(3))
@@ -89,11 +91,16 @@ def test_tracing_native_python(dummy_loop_parameter):
         tracer = ot.trace.get_tracer(__name__)
 
         with tracer.start_as_current_span("TopLevel") as t:
-            pass
+            t.record_exception(ValueError("foo!"))
 
     span = one(r.spans)
     assert read_key(span, ["name"]) == "TopLevel"
     assert read_key(span, ["parent_id"]) is None
+
+    exception_event = one(get_span_exceptions(span))
+    assert exception_event["name"] == "exception"
+    assert exception_event["attributes"]["exception.type"] == "ValueError"
+    assert exception_event["attributes"]["exception.message"] == "foo!"
 
 
 @pytest.mark.parametrize("dummy_loop_parameter", range(3))

@@ -35,7 +35,15 @@ def read_key(nested_dict, keys: List[str]) -> Any:
         return read_key(nested_dict[first_key], rest_keys)
 
 
-def get_span_id(span) -> str:
+# ---- span functions ----
+Span = Any
+
+
+def get_span_exceptions(span: Span):
+    return [event for event in span["events"] if event.get("name", "") == "exception"]
+
+
+def get_span_id(span: Span) -> str:
     try:
         result = read_key(span, ["context", "span_id"])
         assert result is not None
@@ -50,13 +58,13 @@ def iso8601_to_epoch_s(iso8601_datetime: str) -> float:
     return dp.parse(iso8601_datetime).timestamp()
 
 
-def get_duration_range_us(span):
+def get_duration_range_us(span: Span):
     start_epoch_us: int = int(iso8601_to_epoch_s(span["start_time"]) * 1e6)
     end_epoch_us: int = int(iso8601_to_epoch_s(span["end_time"]) * 1e6)
     return range(start_epoch_us, end_epoch_us)
 
 
-def get_duration_s(span) -> float:
+def get_duration_s(span: Span) -> float:
     """
     Return time duration for span in seconds (as float)
     """
@@ -65,7 +73,7 @@ def get_duration_s(span) -> float:
     return end_epoch_s - start_epoch_s
 
 
-def is_parent_child(span_parent, span_child) -> bool:
+def is_parent_child(span_parent: Span, span_child: Span) -> bool:
     """
     Return True/False if span_parent is direct parent of span_child.
     """
@@ -80,7 +88,7 @@ class Spans:
     Container for Python dictionaries with OpenTelemetry span:s
     """
 
-    def __init__(self, spans):
+    def __init__(self, spans: List[Span]):
         self.spans = spans
 
     def filter(self, keys: List[str], value: Any):
@@ -103,6 +111,9 @@ class Spans:
 
     def __iter__(self):
         return iter(self.spans)
+
+    def __getitem__(self, idx):
+        return self.spans[idx]
 
     def contains(self, span):
         return get_span_id(span) in map(get_span_id, self)
@@ -138,7 +149,7 @@ class Spans:
                 self.contains_path(*ps, recursive=recursive) for ps in pairs(span_chain)
             )
 
-    def restrict_by_top(self, top) -> "Spans":
+    def restrict_by_top(self, top: Span) -> "Spans":
         """
         Restrict this collection of Spans to spans that can be connected to
         the parent-span using one or many parent-child relationship(s).
@@ -146,6 +157,14 @@ class Spans:
         Note: the provided span `top` is not included in the result.
         """
         return Spans([s for s in self if self.contains_path(top, s, recursive=True)])
+
+    def exceptions_in(self, top: Span):
+        """
+        Return list of Exception events in top and all sub-spans to top.
+        """
+        return flatten(
+            [get_span_exceptions(s) for s in [top] + list(self.restrict_by_top(top))]
+        )
 
 
 def _get_all_spans():

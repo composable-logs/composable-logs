@@ -203,12 +203,12 @@ def make_jupytext_task(
 
         try:
             notebook.evaluate(
-                output=evaluated_notebook,
-                parameters={"P": {**runparameters, **task_parameters}},
+                output=evaluated_notebook, parameters={"P": runparameters}
             )
+        except Exception as e:
+            raise e
         finally:
             evaluated_notebook.to_html()
-            return True
 
     async def invoke_task(runparameters: RunParameters) -> bool:
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
@@ -222,16 +222,23 @@ def make_jupytext_task(
                 timeout_s=timeout_s,
                 n_max_retries=n_max_retries,
             )
-            run_notebook.start(runparameters)
+            run_notebook.start({**runparameters, **task_parameters})
 
             is_success: bool = await run_notebook.get_ref()  # type: ignore
+
             if is_success:
                 span.set_status(Status(StatusCode.OK))
-                span.set_attribute("notebook_html", tmp_filepath(".html").read_text())
             else:
                 span.set_status(
                     Status(StatusCode.ERROR, "Jupytext notebook task failed")
                 )
+
+            try:
+                notebook_html = tmp_filepath(".html").read_text()
+            except:
+                notebook_html = ""
+            finally:
+                span.set_attribute("notebook_html", notebook_html)
 
         return is_success
 

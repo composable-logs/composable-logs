@@ -3,11 +3,10 @@ from pathlib import Path
 from typing import Any, Dict
 
 #
-from pynb_dag_runner.tasks.tasks import (
-    JupytextNotebookTask,
-    make_jupytext_task,
-    get_task_dependencies,
-)
+import pytest
+
+#
+from pynb_dag_runner.tasks.tasks import JupytextNotebookTask, make_jupytext_task
 
 from pynb_dag_runner.core.dag_runner import run_tasks, TaskDependencies
 from pynb_dag_runner.helpers import one, flatten, read_json
@@ -50,9 +49,9 @@ def test_jupytext_run_ok_notebook():
 
             run_tasks([jupytext_task], dependencies)
 
-        return rec.spans, get_task_dependencies(dependencies)
+        return rec.spans
 
-    def validate_spans(spans: Spans, task_dependencies):
+    def validate_spans(spans: Spans):
         py_span = one(
             spans.filter(["name"], "invoke-task").filter(
                 ["attributes", "task_type"], "python"
@@ -71,10 +70,84 @@ def test_jupytext_run_ok_notebook():
         for content in ["<html>", str(1 + 12 + 123), "variable_a=task-value"]:
             assert content in jupytext_span["attributes"]["notebook_html"]
 
-    validate_spans(*get_test_spans())
+    validate_spans(get_test_spans())
 
 
-def test_mini_jupytext_pipeline(tmp_path: Path):
+@pytest.mark.parametrize("N_retries", [2, 10])
+def test_jupytext_exception_throwing_notebook(N_retries):
+    def get_test_spans():
+        with SpanRecorder() as rec:
+            dependencies = TaskDependencies()
+
+            nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
+            jupytext_task = make_jupytext_task(
+                notebook=JupytextNotebook(nb_path / "notebook_exception.py"),
+                task_id="123",
+                tmp_dir=nb_path,
+                timeout_s=5,
+                n_max_retries=N_retries,
+                task_parameters={},
+            )
+
+            run_tasks([jupytext_task], dependencies)
+
+        return rec.spans
+
+    # notebook will fail on first three runs. Depending on number of retries
+    # determine which run:s are success/failed.
+    def ok_indices():
+        if N_retries == 2:
+            return []
+        else:
+            return [3]
+
+    def failed_indices():
+        if N_retries == 2:
+            return [0, 1]
+        else:
+            return [0, 1, 2]
+
+    def validate_spans(spans: Spans):
+        jupytext_span = one(
+            spans.filter(["name"], "invoke-task").filter(
+                ["attributes", "task_type"], "jupytext"
+            )
+        )
+        if len(ok_indices()) > 0:
+            assert jupytext_span["status"] == {"status_code": "OK"}
+        else:
+            assert jupytext_span["status"] == {
+                "status_code": "ERROR",
+                "description": "Jupytext notebook task failed",
+            }
+
+        run_spans = spans.filter(["name"], "task-run").sort_by_start_time()
+        assert len(run_spans) == len(ok_indices()) + len(failed_indices())
+
+        for idx in ok_indices():
+            assert run_spans[idx]["status"] == {"status_code": "OK"}
+
+        for idx in failed_indices():
+            failed_run_span = run_spans[idx]
+
+            exception = one(spans.exceptions_in(failed_run_span))
+            assert exception["exception.type"] == "PapermillExecutionError"
+            assert "Thrown from notebook!" in exception["exception.message"]
+
+            assert run_spans[idx]["status"] == {
+                "status_code": "ERROR",
+                "description": "Run failed",
+            }
+
+        # for both successful and failed runs, there should be (partially evaluated)
+        # notebook in html format
+        for content in ["<html>", str(1 + 12 + 123)]:
+            assert content in jupytext_span["attributes"]["notebook_html"]
+
+    validate_spans(get_test_spans())
+
+
+def skip_test_mini_jupytext_pipeline(tmp_path: Path):
 
     nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
 

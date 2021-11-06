@@ -39,7 +39,7 @@ class JupyterIpynbNotebook:
         Evaluation and parameters are injected using papermill (BSD licensed)
         """
         assert self.filepath.is_file()
-        assert not output.filepath.is_file()
+        # assert not output.filepath.is_file()
         assert cwd.is_dir()
 
         # For all parameters, see
@@ -134,7 +134,7 @@ class JupytextNotebook:
 
         try:
             assert self.filepath.is_file()
-            assert not output.filepath.is_file()
+            # assert not output.filepath.is_file()
 
             self.to_ipynb(output=tmp_notebook_ipynb)
 
