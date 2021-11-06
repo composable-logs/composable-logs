@@ -147,6 +147,61 @@ def test_jupytext_exception_throwing_notebook(N_retries):
     validate_spans(get_test_spans())
 
 
+def test_jupytext_stuck_notebook():
+    def get_test_spans():
+        with SpanRecorder() as rec:
+            dependencies = TaskDependencies()
+
+            nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
+            jupytext_task = make_jupytext_task(
+                notebook=JupytextNotebook(nb_path / "notebook_stuck.py"),
+                task_id="234",
+                tmp_dir=nb_path,
+                timeout_s=5,
+                n_max_retries=1,
+                task_parameters={},
+            )
+
+            run_tasks([jupytext_task], dependencies)
+
+        return rec.spans
+
+    def validate_spans(spans: Spans):
+        py_span = one(
+            spans.filter(["name"], "invoke-task").filter(
+                ["attributes", "task_type"], "python"
+            )
+        )
+        assert py_span["status"] == {
+            "description": "Task failed",
+            "status_code": "ERROR",
+        }
+
+        jupytext_span = one(
+            spans.filter(["name"], "invoke-task").filter(
+                ["attributes", "task_type"], "jupytext"
+            )
+        )
+        assert jupytext_span["status"] == {
+            "description": "Jupytext notebook task failed",
+            "status_code": "ERROR",
+        }
+
+        timeout_guard_span = one(spans.filter(["name"], "timeout-guard"))
+        assert timeout_guard_span["status"] == {
+            "status_code": "ERROR",
+            "description": "Timeout",
+        }
+
+        spans.contains_path(jupytext_span, timeout_guard_span, py_span)
+
+        assert len(spans.exceptions_in(jupytext_span)) == 0
+
+        assert "notebook_html" in jupytext_span["attributes"]
+
+    validate_spans(get_test_spans())
+
+
 def skip_test_mini_jupytext_pipeline(tmp_path: Path):
 
     nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
