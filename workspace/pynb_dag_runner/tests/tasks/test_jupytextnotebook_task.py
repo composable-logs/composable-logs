@@ -33,7 +33,7 @@ def isotimestamp_normalized():
     return datetime.datetime.now(datetime.timezone.utc).isoformat().replace(":", "-")
 
 
-def test_jupytext_nested_spans():
+def test_jupytext_run_ok_notebook():
     def get_test_spans():
         with SpanRecorder() as rec:
             dependencies = TaskDependencies()
@@ -45,7 +45,7 @@ def test_jupytext_nested_spans():
                 tmp_dir=nb_path,
                 timeout_s=5,
                 n_max_retries=1,
-                parameters={},
+                task_parameters={"task.variable_a": "task-value"},
             )
 
             run_tasks([jupytext_task], dependencies)
@@ -53,19 +53,23 @@ def test_jupytext_nested_spans():
         return rec.spans, get_task_dependencies(dependencies)
 
     def validate_spans(spans: Spans, task_dependencies):
-        jupytext_span = one(
-            spans.filter(["name"], "invoke-task").filter(
-                ["attributes", "task_type"], "jupytext"
-            )
-        )
         py_span = one(
             spans.filter(["name"], "invoke-task").filter(
                 ["attributes", "task_type"], "python"
             )
         )
-        spans.contains_path(jupytext_span, py_span)
-        assert jupytext_span["status"] == {"status_code": "OK"}
         assert py_span["status"] == {"status_code": "OK"}
+
+        jupytext_span = one(
+            spans.filter(["name"], "invoke-task").filter(
+                ["attributes", "task_type"], "jupytext"
+            )
+        )
+        spans.contains_path(jupytext_span, py_span)
+
+        assert jupytext_span["status"] == {"status_code": "OK"}
+        for content in ["<html>", str(1 + 12 + 123), "variable_a=task-value"]:
+            assert content in jupytext_span["attributes"]["notebook_html"]
 
     validate_spans(*get_test_spans())
 

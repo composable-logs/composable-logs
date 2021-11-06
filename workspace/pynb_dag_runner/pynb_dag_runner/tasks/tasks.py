@@ -186,25 +186,25 @@ class JupytextNotebookTask(PythonFunctionTask):
         )
 
 
-from pathlib import Path
-
-
 def make_jupytext_task(
     notebook: JupytextNotebook,
     task_id: str,
     tmp_dir: Path,
     timeout_s: float = None,
     n_max_retries: int = 1,
-    parameters: RunParameters = {},
+    task_parameters: RunParameters = {},
 ):
+    def tmp_filepath(extension: str) -> Path:
+        assert extension in [".ipynb", ".html"]
+        return (tmp_dir / notebook.filepath.name).with_suffix(extension)
+
     def f(runparameters: RunParameters):
-        evaluated_notebook = JupyterIpynbNotebook(
-            (tmp_dir / notebook.filepath.name).with_suffix(".ipynb")
-        )
+        evaluated_notebook = JupyterIpynbNotebook(tmp_filepath(".ipynb"))
 
         try:
             notebook.evaluate(
-                output=evaluated_notebook, parameters={"P": runparameters}
+                output=evaluated_notebook,
+                parameters={"P": {**runparameters, **task_parameters}},
             )
         finally:
             evaluated_notebook.to_html()
@@ -227,7 +227,7 @@ def make_jupytext_task(
             is_success: bool = await run_notebook.get_ref()  # type: ignore
             if is_success:
                 span.set_status(Status(StatusCode.OK))
-                span.set_attribute("notebook_html", "**NA**")
+                span.set_attribute("notebook_html", tmp_filepath(".html").read_text())
             else:
                 span.set_status(
                     Status(StatusCode.ERROR, "Jupytext notebook task failed")
