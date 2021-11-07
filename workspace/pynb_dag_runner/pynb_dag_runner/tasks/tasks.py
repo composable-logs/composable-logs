@@ -33,6 +33,10 @@ from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNote
 RunParameters = Mapping[str, Any]
 
 
+def prefix_keys(prefix: str, a_dict: RunParameters) -> RunParameters:
+    return {f"{prefix}.{k}": v for k, v in a_dict.items()}
+
+
 class PythonFunctionTask_OT(Task[bool]):
     def __init__(
         self,
@@ -211,21 +215,29 @@ def make_jupytext_task(
             evaluated_notebook.to_html()
 
     async def invoke_task(runparameters: RunParameters) -> bool:
+        assert runparameters == {}  # TODO: parameter is not used
+
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("invoke-task") as span:
             span.set_attribute("task_type", "jupytext")
             span.set_attribute("task_id", task_id)
+            span.set_attribute("timeout_s", timeout_s)
+            span.set_attribute("n_max_retries", n_max_retries)
 
+            prefixed_parameters = prefix_keys("task_parameter", task_parameters)
+            for k, v in prefixed_parameters.items():
+                span.set_attribute(k, v)
+
+            # PythonFunctionTask_OT will inject further parameters like retry_nr
             run_notebook = PythonFunctionTask_OT(
-                f=f,
+                f=lambda p: f(p),
                 task_id=f"{task_id}-render-notebook",
                 timeout_s=timeout_s,
                 n_max_retries=n_max_retries,
             )
-            run_notebook.start({**runparameters, **task_parameters})
+            run_notebook.start(prefixed_parameters)
 
             is_success: bool = await run_notebook.get_ref()  # type: ignore
-
             if is_success:
                 span.set_status(Status(StatusCode.OK))
             else:
@@ -238,7 +250,7 @@ def make_jupytext_task(
             except:
                 notebook_html = ""
             finally:
-                span.set_attribute("notebook_html", notebook_html)
+                span.set_attribute("out.notebook_html", notebook_html)
 
         return is_success
 

@@ -28,7 +28,7 @@ def isotimestamp_normalized():
     return datetime.datetime.now(datetime.timezone.utc).isoformat().replace(":", "-")
 
 
-# ---
+# ----
 
 """
 Data types for representing tasks recovered from OpenTelemetry traces emitted by
@@ -65,23 +65,35 @@ class LoggedTask(_LoggedSpan, _LoggedOutcome):
 
 @dataclass
 class LoggedJupytextTask(LoggedTask):
+    output: Optional[str]
     task_type: str = "jupytext"
 
 
 def make_jupytext_logged_task(
     jupytext_span: Span, all_spans: Spans
 ) -> LoggedJupytextTask:
+    is_success = jupytext_span["status"]["status_code"] == "OK"
+
     return LoggedJupytextTask(
-        span_id="foo",
-        is_success=True,
-        error=None,
-        task_id="foo",
-        task_parameters={},
+        span_id=jupytext_span["context"]["span_id"],
+        is_success=is_success,
+        error=None if is_success else jupytext_span["status"]["description"],
+        task_id=jupytext_span["attributes"]["task_id"],
+        task_parameters=jupytext_span["attributes"],
+        output="",
         runs=[],
     )
 
 
 def get_tasks(spans: Spans) -> List[LoggedTask]:
+    """
+    Convert a list of otel spans into a list of LoggedTask for easier processing.
+
+    Notes:
+     - this only outputs jupytext tasks.
+     - jupytext tasks are assumed to not be nested.
+
+    """
     jupytext_spans = spans.filter(["name"], "invoke-task").filter(
         ["attributes", "task_type"], "jupytext"
     )
@@ -110,7 +122,7 @@ def test_jupytext_run_ok_notebook():
             jupytext_task = make_test_nb_task(
                 nb_name="notebook_ok.py",
                 n_max_retries=5,
-                task_parameters={"task.variable_a": "task-value"},
+                task_parameters={"variable_a": "task-value"},
             )
             run_tasks([jupytext_task], TaskDependencies())
 
@@ -122,7 +134,9 @@ def test_jupytext_run_ok_notebook():
                 ["attributes", "task_type"], "python"
             )
         )
-        assert py_span["status"] == {"status_code": "OK"}
+        assert py_span["status"] == {"status_code": "OK"}, one(
+            spans.exceptions_in(py_span)
+        )["exception.message"]
 
         jupytext_span = one(
             spans.filter(["name"], "invoke-task").filter(
@@ -133,7 +147,7 @@ def test_jupytext_run_ok_notebook():
 
         assert jupytext_span["status"] == {"status_code": "OK"}
         for content in ["<html>", str(1 + 12 + 123), "variable_a=task-value"]:
-            assert content in jupytext_span["attributes"]["notebook_html"]
+            assert content in jupytext_span["attributes"]["out.notebook_html"]
 
     def validate_recover_tasks_from_spans(spans: Spans):
         extracted_tasks = get_tasks(spans)
@@ -206,7 +220,7 @@ def test_jupytext_exception_throwing_notebook(N_retries):
         # for both successful and failed runs, there should be (partially evaluated)
         # notebook in html format
         for content in ["<html>", str(1 + 12 + 123)]:
-            assert content in jupytext_span["attributes"]["notebook_html"]
+            assert content in jupytext_span["attributes"]["out.notebook_html"]
 
     validate_spans(get_test_spans())
 
@@ -260,6 +274,6 @@ def test_jupytext_stuck_notebook():
 
         assert len(spans.exceptions_in(jupytext_span)) == 0
 
-        assert "notebook_html" in jupytext_span["attributes"]
+        assert "out.notebook_html" in jupytext_span["attributes"]
 
     validate_spans(get_test_spans())
