@@ -28,22 +28,27 @@ def isotimestamp_normalized():
     return datetime.datetime.now(datetime.timezone.utc).isoformat().replace(":", "-")
 
 
+def make_test_nb_task(nb_name: str, n_max_retries: int, task_parameters={}):
+    nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
+    return make_jupytext_task(
+        notebook=JupytextNotebook(nb_path / nb_name),
+        task_id=f"{nb_name}-task",
+        tmp_dir=nb_path,
+        timeout_s=5,
+        n_max_retries=n_max_retries,
+        task_parameters=task_parameters,
+    )
+
+
 def test_jupytext_run_ok_notebook():
     def get_test_spans():
         with SpanRecorder() as rec:
-            dependencies = TaskDependencies()
-
-            nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
-            jupytext_task = make_jupytext_task(
-                notebook=JupytextNotebook(nb_path / "notebook_ok.py"),
-                task_id="123",
-                tmp_dir=nb_path,
-                timeout_s=5,
-                n_max_retries=1,
+            jupytext_task = make_test_nb_task(
+                nb_name="notebook_ok.py",
+                n_max_retries=5,
                 task_parameters={"task.variable_a": "task-value"},
             )
-
-            run_tasks([jupytext_task], dependencies)
+            run_tasks([jupytext_task], TaskDependencies())
 
         return rec.spans
 
@@ -73,19 +78,12 @@ def test_jupytext_run_ok_notebook():
 def test_jupytext_exception_throwing_notebook(N_retries):
     def get_test_spans():
         with SpanRecorder() as rec:
-            dependencies = TaskDependencies()
-
-            nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
-            jupytext_task = make_jupytext_task(
-                notebook=JupytextNotebook(nb_path / "notebook_exception.py"),
-                task_id="123",
-                tmp_dir=nb_path,
-                timeout_s=5,
+            jupytext_task = make_test_nb_task(
+                nb_name="notebook_exception.py",
                 n_max_retries=N_retries,
                 task_parameters={},
             )
-
-            run_tasks([jupytext_task], dependencies)
+            run_tasks([jupytext_task], TaskDependencies())
 
         return rec.spans
 
@@ -152,19 +150,12 @@ def test_jupytext_stuck_notebook():
 
     def get_test_spans():
         with SpanRecorder() as rec:
-            dependencies = TaskDependencies()
-
-            nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
-            jupytext_task = make_jupytext_task(
-                notebook=JupytextNotebook(nb_path / "notebook_stuck.py"),
-                task_id="234",
-                tmp_dir=nb_path,
-                timeout_s=5,
+            jupytext_task = make_test_nb_task(
+                nb_name="notebook_stuck.py",
                 n_max_retries=1,
                 task_parameters={},
             )
-
-            run_tasks([jupytext_task], dependencies)
+            run_tasks([jupytext_task], TaskDependencies())
 
         return rec.spans
 
