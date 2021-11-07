@@ -10,7 +10,7 @@ from pynb_dag_runner.tasks.tasks import make_jupytext_task
 from pynb_dag_runner.core.dag_runner import run_tasks, TaskDependencies
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook
-from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
+from pynb_dag_runner.opentelemetry_helpers import Spans, Span, SpanRecorder
 
 # TODO: all the below tests should run multiple times in stress tests
 # See, https://github.com/pynb-dag-runner/pynb-dag-runner/pull/5
@@ -26,6 +26,70 @@ def isotimestamp_normalized():
     This is useful to generate output directories that are guaranteed to not exist.
     """
     return datetime.datetime.now(datetime.timezone.utc).isoformat().replace(":", "-")
+
+
+# ---
+
+"""
+Data types for representing tasks recovered from OpenTelemetry traces emitted by
+pynb-dag-runner and Ray.
+"""
+
+from typing import List, Optional
+from dataclasses import dataclass
+from pynb_dag_runner.tasks.tasks import RunParameters
+
+
+@dataclass
+class _LoggedSpan:
+    span_id: str
+
+
+@dataclass
+class _LoggedOutcome:
+    is_success: bool
+    error: Optional[str]
+
+
+@dataclass
+class LoggedTaskRun(_LoggedSpan, _LoggedOutcome):
+    run_parameters: RunParameters
+
+
+@dataclass
+class LoggedTask(_LoggedSpan, _LoggedOutcome):
+    task_id: str
+    task_parameters: RunParameters
+    runs: List[LoggedTaskRun]
+
+
+@dataclass
+class LoggedJupytextTask(LoggedTask):
+    task_type: str = "jupytext"
+
+
+def make_jupytext_logged_task(
+    jupytext_span: Span, all_spans: Spans
+) -> LoggedJupytextTask:
+    return LoggedJupytextTask(
+        span_id="foo",
+        is_success=True,
+        error=None,
+        task_id="foo",
+        task_parameters={},
+        runs=[],
+    )
+
+
+def get_tasks(spans: Spans) -> List[LoggedTask]:
+    jupytext_spans = spans.filter(["name"], "invoke-task").filter(
+        ["attributes", "task_type"], "jupytext"
+    )
+
+    return [make_jupytext_logged_task(jt_span, spans) for jt_span in jupytext_spans]
+
+
+# ----
 
 
 def make_test_nb_task(nb_name: str, n_max_retries: int, task_parameters={}):
@@ -71,7 +135,13 @@ def test_jupytext_run_ok_notebook():
         for content in ["<html>", str(1 + 12 + 123), "variable_a=task-value"]:
             assert content in jupytext_span["attributes"]["notebook_html"]
 
-    validate_spans(get_test_spans())
+    def validate_recover_tasks_from_spans(spans: Spans):
+        extracted_tasks = get_tasks(spans)
+        assert len(extracted_tasks) == 1
+
+    spans = get_test_spans()
+    validate_spans(spans)
+    validate_recover_tasks_from_spans(spans)
 
 
 @pytest.mark.parametrize("N_retries", [2, 10])
