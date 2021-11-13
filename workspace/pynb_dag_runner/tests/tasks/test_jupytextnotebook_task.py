@@ -36,6 +36,7 @@ pynb-dag-runner and Ray.
 """
 
 from typing import List, Optional
+import dataclasses
 from dataclasses import dataclass
 from pynb_dag_runner.tasks.tasks import RunParameters
 
@@ -51,13 +52,18 @@ class _LoggedOutcome:
     error: Optional[str]
 
 
+class _To_Dict:
+    def as_dict(self):
+        return dataclasses.asdict(self)
+
+
 @dataclass
-class LoggedTaskRun(_LoggedSpan, _LoggedOutcome):
+class LoggedTaskRun(_LoggedSpan, _LoggedOutcome, _To_Dict):
     run_parameters: RunParameters
 
 
 @dataclass
-class LoggedTask(_LoggedSpan, _LoggedOutcome):
+class LoggedTask(_LoggedSpan, _LoggedOutcome, _To_Dict):
     task_id: str
     task_parameters: RunParameters
     runs: List[LoggedTaskRun]
@@ -65,7 +71,6 @@ class LoggedTask(_LoggedSpan, _LoggedOutcome):
 
 @dataclass
 class LoggedJupytextTask(LoggedTask):
-    output: Optional[str]
     task_type: str = "jupytext"
 
 
@@ -80,7 +85,6 @@ def make_jupytext_logged_task(
         error=None if is_success else jupytext_span["status"]["description"],
         task_id=jupytext_span["attributes"]["task_id"],
         task_parameters=jupytext_span["attributes"],
-        output="",
         runs=[],
     )
 
@@ -129,29 +133,35 @@ def test_jupytext_run_ok_notebook():
         return rec.spans
 
     def validate_spans(spans: Spans):
-        py_span = one(
-            spans.filter(["name"], "invoke-task").filter(
-                ["attributes", "task_type"], "python"
-            )
-        )
-        assert py_span["status"] == {"status_code": "OK"}, one(
-            spans.exceptions_in(py_span)
-        )["exception.message"]
-
         jupytext_span = one(
             spans.filter(["name"], "invoke-task").filter(
                 ["attributes", "task_type"], "jupytext"
             )
         )
-        spans.contains_path(jupytext_span, py_span)
-
         assert jupytext_span["status"] == {"status_code": "OK"}
-        for content in ["<html>", str(1 + 12 + 123), "variable_a=task-value"]:
-            assert content in jupytext_span["attributes"]["out.notebook_html"]
+
+        py_span = one(
+            spans.filter(["name"], "invoke-task").filter(
+                ["attributes", "task_type"], "python"
+            )
+        )
+        assert py_span["status"] == {"status_code": "OK"}
+
+        artefact_span = one(spans.filter(["name"], "artefact"))
+        for content in [str(1 + 12 + 123), "variable_a=task-value"]:
+            assert content in artefact_span["attributes"]["content"]
+
+        spans.contains_path(jupytext_span, py_span, artefact_span)
 
     def validate_recover_tasks_from_spans(spans: Spans):
-        extracted_tasks = get_tasks(spans)
-        assert len(extracted_tasks) == 1
+        extracted_task = one(get_tasks(spans))
+
+        assert isinstance(extracted_task, LoggedJupytextTask)
+        assert extracted_task.is_success == True
+        assert extracted_task.error is None
+        # assert extracted_task.task_parameters.keys() == {}
+        # assert len(extracted_task.output) > 0
+        # assert len(extracted_task.runs) > 0
 
     spans = get_test_spans()
     validate_spans(spans)
@@ -217,10 +227,14 @@ def test_jupytext_exception_throwing_notebook(N_retries):
                 "description": "Run failed",
             }
 
-        # for both successful and failed runs, there should be (partially evaluated)
-        # notebook in html format
-        for content in ["<html>", str(1 + 12 + 123)]:
-            assert content in jupytext_span["attributes"]["out.notebook_html"]
+        for idx in failed_indices() + ok_indices():
+            # for both successful and failed runs, a partially evaluated notebook
+            # should have been logged as an artefact.
+            artefact_span = one(
+                spans.restrict_by_top(run_spans[idx]).filter(["name"], "artefact")
+            )
+            assert artefact_span["attributes"]["name"] == "notebook.ipynb"
+            assert str(1 + 12 + 123) in artefact_span["attributes"]["content"]
 
     validate_spans(get_test_spans())
 
@@ -274,6 +288,7 @@ def test_jupytext_stuck_notebook():
 
         assert len(spans.exceptions_in(jupytext_span)) == 0
 
-        assert "out.notebook_html" in jupytext_span["attributes"]
+        # notebook evaluation never finishes, and no ipynb is logged
+        assert len(spans.filter(["name"], "artefact")) == 0
 
     validate_spans(get_test_spans())

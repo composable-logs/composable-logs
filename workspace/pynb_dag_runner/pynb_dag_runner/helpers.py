@@ -98,10 +98,14 @@ def read_jsonl(path: Path):
 
 def one(xs: List[A]) -> A:
     """
-    Assert that a list has only one element and return that element
+    Assert that input can be converted into list with only one element, and
+    return that element.
     """
     xs_list = list(xs)
     if not len(xs_list) == 1:
-        raise Exception(f"one: expected list with single element; got {str(xs_list)}.")
+        raise Exception(
+            "one: Expected input with only one element, "
+            f"but input has length {len(xs_list)}."
+        )
 
     return xs_list[0]

@@ -190,6 +190,14 @@ class JupytextNotebookTask(PythonFunctionTask):
         )
 
 
+def log_artefact(name, content):
+    tracer = otel.trace.get_tracer(__name__)  # type: ignore
+    with tracer.start_as_current_span("artefact") as span:
+        span.set_attribute("name", name)
+        span.set_attribute("content", content)
+        span.set_status(Status(StatusCode.OK))
+
+
 def make_jupytext_task(
     notebook: JupytextNotebook,
     task_id: str,
@@ -212,7 +220,7 @@ def make_jupytext_task(
         except Exception as e:
             raise e
         finally:
-            evaluated_notebook.to_html()
+            log_artefact("notebook.ipynb", evaluated_notebook.filepath.read_text())
 
     async def invoke_task(runparameters: RunParameters) -> bool:
         assert runparameters == {}  # TODO: parameter is not used
@@ -244,13 +252,6 @@ def make_jupytext_task(
                 span.set_status(
                     Status(StatusCode.ERROR, "Jupytext notebook task failed")
                 )
-
-            try:
-                notebook_html = tmp_filepath(".html").read_text()
-            except:
-                notebook_html = ""
-            finally:
-                span.set_attribute("out.notebook_html", notebook_html)
 
         return is_success
 
