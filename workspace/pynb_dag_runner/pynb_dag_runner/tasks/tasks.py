@@ -79,7 +79,6 @@ class PythonFunctionTask_OT(Task[bool]):
                     **invocation_runparameters,
                     **common_task_runparameters,
                     "task_id": task_id,
-                    "run_id": str(uuid.uuid4()),
                 }
 
                 # log runparameters to span
