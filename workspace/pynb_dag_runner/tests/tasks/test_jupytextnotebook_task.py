@@ -1,6 +1,7 @@
 import datetime
 from pathlib import Path
 from typing import Any, Dict
+from typing_extensions import TypeGuard
 
 #
 import pytest
@@ -41,29 +42,26 @@ from dataclasses import dataclass
 from pynb_dag_runner.tasks.tasks import RunParameters
 
 
-@dataclass
-class _LoggedSpan:
-    span_id: str
-
-
-@dataclass
-class _LoggedOutcome:
-    is_success: bool
-    error: Optional[str]
-
-
 class _To_Dict:
     def as_dict(self):
         return dataclasses.asdict(self)
 
 
 @dataclass
-class LoggedTaskRun(_LoggedSpan, _LoggedOutcome, _To_Dict):
+class _LoggedSpan:
+    span_id: str
+    is_success: bool
+    error: Optional[str]
+    # start/end time, duration
+
+
+@dataclass
+class LoggedTaskRun(_LoggedSpan, _To_Dict):
     run_parameters: RunParameters
 
 
 @dataclass
-class LoggedTask(_LoggedSpan, _LoggedOutcome, _To_Dict):
+class LoggedTask(_LoggedSpan, _To_Dict):
     task_id: str
     task_parameters: RunParameters
     runs: List[LoggedTaskRun]
@@ -79,13 +77,24 @@ def make_jupytext_logged_task(
 ) -> LoggedJupytextTask:
     is_success = jupytext_span["status"]["status_code"] == "OK"
 
+    def make_run(run_span: Span):
+        is_success = run_span["status"]["status_code"] == "OK"
+        return LoggedTaskRun(
+            span_id=run_span["context"]["span_id"],
+            is_success=is_success,
+            error=None if is_success else run_span["status"]["description"],
+            run_parameters=run_span["attributes"],
+        )
+
+    run_spans = all_spans.restrict_by_top(jupytext_span).filter(["name"], "task-run")
+
     return LoggedJupytextTask(
         span_id=jupytext_span["context"]["span_id"],
         is_success=is_success,
         error=None if is_success else jupytext_span["status"]["description"],
         task_id=jupytext_span["attributes"]["task_id"],
         task_parameters=jupytext_span["attributes"],
-        runs=[],
+        runs=[make_run(span) for span in run_spans],
     )
 
 
@@ -159,9 +168,17 @@ def test_jupytext_run_ok_notebook():
         assert isinstance(extracted_task, LoggedJupytextTask)
         assert extracted_task.is_success == True
         assert extracted_task.error is None
-        # assert extracted_task.task_parameters.keys() == {}
-        # assert len(extracted_task.output) > 0
-        # assert len(extracted_task.runs) > 0
+
+        run = one(extracted_task.runs)
+        assert isinstance(run, LoggedTaskRun)
+        assert run.is_success == True
+        assert run.error is None
+        assert run.run_parameters == {
+            "retry.max_retries": 5,
+            "retry.nr": 0,
+            "task_id": "notebook_ok.py-task-render-notebook",
+            "task_parameter.variable_a": "task-value",
+        }
 
     spans = get_test_spans()
     validate_spans(spans)
