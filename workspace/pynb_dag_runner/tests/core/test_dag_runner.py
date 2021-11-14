@@ -10,6 +10,7 @@ from pynb_dag_runner.core.dag_runner import (
     Task,
     TaskDependence,
     TaskDependencies,
+    in_sequence,
     run_tasks,
 )
 from tests.test_ray_helpers import StateActor
@@ -70,3 +71,24 @@ def test_task_run_order(dummy_loop_parameter):
     assert state[0] in [1, 2]
     assert state[1] in [1, 2]
     assert state[2] == 0
+
+
+def test__task_orchestration__run_three_tasks_in_sequence():
+    @ray.remote(num_cpus=0)
+    def f(arg):
+        assert arg == 42
+        return arg + 1
+
+    @ray.remote(num_cpus=0)
+    def g(arg):
+        assert arg == 43
+        return arg + 1
+
+    @ray.remote(num_cpus=0)
+    def h(arg):
+        assert arg == 44
+        return arg + 1
+
+    all_tasks = in_sequence(Task(f.remote), Task(g.remote), Task(h.remote))
+    all_tasks.start(ray.put(42))
+    assert ray.get(all_tasks.get_ref()) == 45

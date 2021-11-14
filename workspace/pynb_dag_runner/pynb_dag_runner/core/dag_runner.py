@@ -4,6 +4,7 @@ from typing import List, Optional, Any, TypeVar, Generic, Callable
 import ray
 
 #
+from pynb_dag_runner.helpers import one
 from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
 from pynb_dag_runner.ray_helpers import Future
 
@@ -55,6 +56,34 @@ class Task(Node, Generic[A]):
             )
 
         return ray.get(self.get_ref())
+
+
+def _two_tasks_in_sequence(task1: Task[A], task2: Task[A]) -> Task[A]:
+    def run_tasks_in_sequence(*ray_refs):
+        task1.start(*ray_refs)
+        task2.start(task1.get_ref())
+        return task2.get_ref()
+
+    return Task(f_remote=run_tasks_in_sequence)
+
+
+def in_sequence(*tasks: Task[A]) -> Task[A]:
+    """
+    Execute a list of tasks in sequence. The output of each task is passed as the
+    argument to the next task in the sequence.
+
+    Eg.
+        task1 -> task2 -> task3
+
+    """
+    if len(tasks) == 0:
+        raise ValueError("Empty task list provided")
+    else:
+        first, *rest = tasks
+        if len(rest) == 0:
+            return first
+        else:
+            return _two_tasks_in_sequence(first, in_sequence(*rest))
 
 
 class TaskDependence(Edge):

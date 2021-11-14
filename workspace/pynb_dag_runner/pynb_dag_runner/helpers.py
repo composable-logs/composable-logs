@@ -96,7 +96,7 @@ def read_jsonl(path: Path):
     return [json.loads(span_line) for span_line in path.read_text().splitlines()]
 
 
-def one(xs: List[A]) -> A:
+def one(xs: Sequence[A]) -> A:
     """
     Assert that input can be converted into list with only one element, and
     return that element.
