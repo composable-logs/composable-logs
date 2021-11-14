@@ -253,7 +253,40 @@ def test_jupytext_exception_throwing_notebook(N_retries):
             assert artefact_span["attributes"]["name"] == "notebook.ipynb"
             assert str(1 + 12 + 123) in artefact_span["attributes"]["content"]
 
-    validate_spans(get_test_spans())
+    def validate_recover_tasks_from_spans(spans: Spans):
+        extracted_task = one(get_tasks(spans))
+
+        assert isinstance(extracted_task, LoggedJupytextTask)
+
+        if len(ok_indices()) > 0:
+            assert extracted_task.is_success == True
+            assert extracted_task.error is None
+        else:
+            assert extracted_task.is_success == False
+            assert extracted_task.error == "Jupytext notebook task failed"
+
+        runs = extracted_task.runs
+        assert len(runs) == len(failed_indices() + ok_indices())
+
+        for run in runs:
+            assert isinstance(run, LoggedTaskRun)
+            assert run.run_parameters.keys() == {
+                "retry.max_retries",
+                "retry.nr",
+                "task_id",
+            }
+
+        for idx in ok_indices():
+            assert runs[idx].is_success == True
+            assert runs[idx].error is None
+
+        for idx in failed_indices():
+            assert runs[idx].is_success == False
+            assert runs[idx].error == "Run failed"
+
+    spans = get_test_spans()
+    validate_spans(spans)
+    validate_recover_tasks_from_spans(spans)
 
 
 def test_jupytext_stuck_notebook():
