@@ -341,4 +341,22 @@ def test_jupytext_stuck_notebook():
         # notebook evaluation never finishes, and no ipynb is logged
         assert len(spans.filter(["name"], "artefact")) == 0
 
-    validate_spans(get_test_spans())
+    def validate_recover_tasks_from_spans(spans: Spans):
+        extracted_task = one(get_tasks(spans))
+
+        assert isinstance(extracted_task, LoggedJupytextTask)
+
+        assert extracted_task.is_success == False
+        assert extracted_task.error == "Jupytext notebook task failed"
+
+        run = one(extracted_task.runs)
+        assert isinstance(run, LoggedTaskRun)
+        assert run.run_parameters.keys() == {
+            "retry.max_retries",
+            "retry.nr",
+            "task_id",
+        }
+
+    spans = get_test_spans()
+    validate_spans(spans)
+    validate_recover_tasks_from_spans(spans)
