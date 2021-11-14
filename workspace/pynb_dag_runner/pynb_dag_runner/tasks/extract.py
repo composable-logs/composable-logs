@@ -29,8 +29,15 @@ class _LoggedSpan:
 
 
 @dataclass
+class LoggedArtefact(_To_Dict):
+    name: str
+    content: str
+
+
+@dataclass
 class LoggedTaskRun(_LoggedSpan, _To_Dict):
     run_parameters: RunParameters
+    artefacts: List[LoggedArtefact]
 
 
 @dataclass
@@ -51,6 +58,16 @@ def _make_jupytext_logged_task(
     is_success = jupytext_span["status"]["status_code"] == "OK"
 
     def make_run(run_span: Span):
+        def make_artefact(artefact_span: Span) -> LoggedArtefact:
+            return LoggedArtefact(
+                name=artefact_span["attributes"]["name"],
+                content=artefact_span["attributes"]["content"],
+            )
+
+        artefact_spans = all_spans.restrict_by_top(run_span).filter(
+            ["name"], "artefact"
+        )
+
         is_success = run_span["status"]["status_code"] == "OK"
         return LoggedTaskRun(
             span_id=run_span["context"]["span_id"],
@@ -60,6 +77,7 @@ def _make_jupytext_logged_task(
             end_time=run_span["end_time"],
             duration_s=get_duration_s(run_span),
             run_parameters=run_span["attributes"],
+            artefacts=[make_artefact(span) for span in artefact_spans],
         )
 
     run_spans = all_spans.restrict_by_top(jupytext_span).filter(["name"], "task-run")

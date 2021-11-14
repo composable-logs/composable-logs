@@ -91,6 +91,11 @@ def test_jupytext_run_ok_notebook():
             "task_parameter.variable_a": "task-value",
         }
 
+        # all runs should have logged the evaluated ipynb notebook
+        assert one(run.artefacts).name == "notebook.ipynb"
+        for content in [str(1 + 12 + 123), "variable_a=task-value"]:
+            assert content in one(run.artefacts).content
+
     spans = get_test_spans()
     validate_spans(spans)
     validate_recover_tasks_from_spans(spans)
@@ -186,6 +191,10 @@ def test_jupytext_exception_throwing_notebook(N_retries):
                 "retry.nr",
                 "task_id",
             }
+            # all runs should have logged partially evaluated ipynb notebook
+            artefact = one(run.artefacts)
+            assert artefact.name == "notebook.ipynb"
+            assert str(1 + 12 + 123) in artefact.content
 
         for idx in ok_indices():
             assert runs[idx].is_success == True
@@ -249,7 +258,8 @@ def test_jupytext_stuck_notebook():
 
         assert len(spans.exceptions_in(jupytext_span)) == 0
 
-        # notebook evaluation never finishes, and no ipynb is logged
+        # notebook evaluation never finishes, and is cancled by Ray. Therefore no
+        # artefact ipynb content is logged
         assert len(spans.filter(["name"], "artefact")) == 0
 
     def validate_recover_tasks_from_spans(spans: Spans):
@@ -267,6 +277,7 @@ def test_jupytext_stuck_notebook():
             "retry.nr",
             "task_id",
         }
+        assert len(run.artefacts) == 0
 
         assert extracted_task.duration_s > run.duration_s > 5.0
 
