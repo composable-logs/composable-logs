@@ -268,6 +268,8 @@ def test_jupytext_stuck_notebook():
             "task_id",
         }
 
+        assert extracted_task.duration_s > run.duration_s > 5.0
+
     spans = get_test_spans()
     validate_spans(spans)
     validate_recover_tasks_from_spans(spans)
