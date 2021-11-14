@@ -1,6 +1,5 @@
 import datetime
 from pathlib import Path
-from typing import Any, Dict
 
 #
 import pytest
@@ -10,7 +9,8 @@ from pynb_dag_runner.tasks.tasks import make_jupytext_task
 from pynb_dag_runner.core.dag_runner import run_tasks, TaskDependencies
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook
-from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
+from pynb_dag_runner.opentelemetry_helpers import Spans, Span, SpanRecorder
+from pynb_dag_runner.tasks.extract import get_tasks, LoggedJupytextTask, LoggedTaskRun
 
 # TODO: all the below tests should run multiple times in stress tests
 # See, https://github.com/pynb-dag-runner/pynb-dag-runner/pull/5
@@ -28,26 +28,38 @@ def isotimestamp_normalized():
     return datetime.datetime.now(datetime.timezone.utc).isoformat().replace(":", "-")
 
 
+def make_test_nb_task(nb_name: str, n_max_retries: int, task_parameters={}):
+    nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
+    return make_jupytext_task(
+        notebook=JupytextNotebook(nb_path / nb_name),
+        task_id=f"{nb_name}-task",
+        tmp_dir=nb_path,
+        timeout_s=5,
+        n_max_retries=n_max_retries,
+        task_parameters=task_parameters,
+    )
+
+
 def test_jupytext_run_ok_notebook():
     def get_test_spans():
         with SpanRecorder() as rec:
-            dependencies = TaskDependencies()
-
-            nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
-            jupytext_task = make_jupytext_task(
-                notebook=JupytextNotebook(nb_path / "notebook_ok.py"),
-                task_id="123",
-                tmp_dir=nb_path,
-                timeout_s=5,
-                n_max_retries=1,
-                task_parameters={"task.variable_a": "task-value"},
+            jupytext_task = make_test_nb_task(
+                nb_name="notebook_ok.py",
+                n_max_retries=5,
+                task_parameters={"variable_a": "task-value"},
             )
-
-            run_tasks([jupytext_task], dependencies)
+            run_tasks([jupytext_task], TaskDependencies())
 
         return rec.spans
 
     def validate_spans(spans: Spans):
+        jupytext_span = one(
+            spans.filter(["name"], "invoke-task").filter(
+                ["attributes", "task_type"], "jupytext"
+            )
+        )
+        assert jupytext_span["status"] == {"status_code": "OK"}
+
         py_span = one(
             spans.filter(["name"], "invoke-task").filter(
                 ["attributes", "task_type"], "python"
@@ -55,37 +67,50 @@ def test_jupytext_run_ok_notebook():
         )
         assert py_span["status"] == {"status_code": "OK"}
 
-        jupytext_span = one(
-            spans.filter(["name"], "invoke-task").filter(
-                ["attributes", "task_type"], "jupytext"
-            )
-        )
-        spans.contains_path(jupytext_span, py_span)
+        artefact_span = one(spans.filter(["name"], "artefact"))
+        for content in [str(1 + 12 + 123), "variable_a=task-value"]:
+            assert content in artefact_span["attributes"]["content"]
 
-        assert jupytext_span["status"] == {"status_code": "OK"}
-        for content in ["<html>", str(1 + 12 + 123), "variable_a=task-value"]:
-            assert content in jupytext_span["attributes"]["notebook_html"]
+        spans.contains_path(jupytext_span, py_span, artefact_span)
 
-    validate_spans(get_test_spans())
+    def validate_recover_tasks_from_spans(spans: Spans):
+        extracted_task = one(get_tasks(spans))
+
+        assert isinstance(extracted_task, LoggedJupytextTask)
+        assert extracted_task.is_success == True
+        assert extracted_task.error is None
+
+        run = one(extracted_task.runs)
+        assert isinstance(run, LoggedTaskRun)
+        assert run.is_success == True
+        assert run.error is None
+        assert run.run_parameters == {
+            "retry.max_retries": 5,
+            "retry.nr": 0,
+            "task_id": "notebook_ok.py-task-render-notebook",
+            "task_parameter.variable_a": "task-value",
+        }
+
+        # all runs should have logged the evaluated ipynb notebook
+        assert one(run.artefacts).name == "notebook.ipynb"
+        for content in [str(1 + 12 + 123), "variable_a=task-value"]:
+            assert content in one(run.artefacts).content
+
+    spans = get_test_spans()
+    validate_spans(spans)
+    validate_recover_tasks_from_spans(spans)
 
 
 @pytest.mark.parametrize("N_retries", [2, 10])
 def test_jupytext_exception_throwing_notebook(N_retries):
     def get_test_spans():
         with SpanRecorder() as rec:
-            dependencies = TaskDependencies()
-
-            nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
-            jupytext_task = make_jupytext_task(
-                notebook=JupytextNotebook(nb_path / "notebook_exception.py"),
-                task_id="123",
-                tmp_dir=nb_path,
-                timeout_s=5,
+            jupytext_task = make_test_nb_task(
+                nb_name="notebook_exception.py",
                 n_max_retries=N_retries,
                 task_parameters={},
             )
-
-            run_tasks([jupytext_task], dependencies)
+            run_tasks([jupytext_task], TaskDependencies())
 
         return rec.spans
 
@@ -135,12 +160,53 @@ def test_jupytext_exception_throwing_notebook(N_retries):
                 "description": "Run failed",
             }
 
-        # for both successful and failed runs, there should be (partially evaluated)
-        # notebook in html format
-        for content in ["<html>", str(1 + 12 + 123)]:
-            assert content in jupytext_span["attributes"]["notebook_html"]
+        for idx in failed_indices() + ok_indices():
+            # for both successful and failed runs, a partially evaluated notebook
+            # should have been logged as an artefact.
+            artefact_span = one(
+                spans.restrict_by_top(run_spans[idx]).filter(["name"], "artefact")
+            )
+            assert artefact_span["attributes"]["name"] == "notebook.ipynb"
+            assert str(1 + 12 + 123) in artefact_span["attributes"]["content"]
 
-    validate_spans(get_test_spans())
+    def validate_recover_tasks_from_spans(spans: Spans):
+        extracted_task = one(get_tasks(spans))
+
+        assert isinstance(extracted_task, LoggedJupytextTask)
+
+        if len(ok_indices()) > 0:
+            assert extracted_task.is_success == True
+            assert extracted_task.error is None
+        else:
+            assert extracted_task.is_success == False
+            assert extracted_task.error == "Jupytext notebook task failed"
+
+        runs = extracted_task.runs
+        assert len(runs) == len(failed_indices() + ok_indices())
+
+        for run in runs:
+            assert isinstance(run, LoggedTaskRun)
+            assert run.run_parameters.keys() == {
+                "retry.max_retries",
+                "retry.nr",
+                "task_id",
+            }
+            # all runs should have logged partially evaluated ipynb notebook
+            artefact = one(run.artefacts)
+            assert artefact.name == "notebook.ipynb"
+            assert str(1 + 12 + 123) in artefact.content
+
+        for idx in ok_indices():
+            assert runs[idx].is_success == True
+            assert runs[idx].error is None
+
+        for idx in failed_indices():
+            assert runs[idx].is_success == False
+            assert runs[idx].error == "Run failed"
+
+    spans = get_test_spans()
+    validate_spans(spans)
+    validate_recover_tasks_from_spans(spans)
 
 
 def test_jupytext_stuck_notebook():
@@ -152,19 +218,12 @@ def test_jupytext_stuck_notebook():
 
     def get_test_spans():
         with SpanRecorder() as rec:
-            dependencies = TaskDependencies()
-
-            nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
-            jupytext_task = make_jupytext_task(
-                notebook=JupytextNotebook(nb_path / "notebook_stuck.py"),
-                task_id="234",
-                tmp_dir=nb_path,
-                timeout_s=5,
+            jupytext_task = make_test_nb_task(
+                nb_name="notebook_stuck.py",
                 n_max_retries=1,
                 task_parameters={},
             )
-
-            run_tasks([jupytext_task], dependencies)
+            run_tasks([jupytext_task], TaskDependencies())
 
         return rec.spans
 
@@ -199,6 +258,29 @@ def test_jupytext_stuck_notebook():
 
         assert len(spans.exceptions_in(jupytext_span)) == 0
 
-        assert "notebook_html" in jupytext_span["attributes"]
+        # notebook evaluation never finishes, and is cancled by Ray. Therefore no
+        # artefact ipynb content is logged
+        assert len(spans.filter(["name"], "artefact")) == 0
 
-    validate_spans(get_test_spans())
+    def validate_recover_tasks_from_spans(spans: Spans):
+        extracted_task = one(get_tasks(spans))
+
+        assert isinstance(extracted_task, LoggedJupytextTask)
+
+        assert extracted_task.is_success == False
+        assert extracted_task.error == "Jupytext notebook task failed"
+
+        run = one(extracted_task.runs)
+        assert isinstance(run, LoggedTaskRun)
+        assert run.run_parameters.keys() == {
+            "retry.max_retries",
+            "retry.nr",
+            "task_id",
+        }
+        assert len(run.artefacts) == 0
+
+        assert extracted_task.duration_s > run.duration_s > 5.0
+
+    spans = get_test_spans()
+    validate_spans(spans)
+    validate_recover_tasks_from_spans(spans)

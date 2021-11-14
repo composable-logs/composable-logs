@@ -33,6 +33,10 @@ from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNote
 RunParameters = Mapping[str, Any]
 
 
+def prefix_keys(prefix: str, a_dict: RunParameters) -> RunParameters:
+    return {f"{prefix}.{k}": v for k, v in a_dict.items()}
+
+
 class PythonFunctionTask_OT(Task[bool]):
     def __init__(
         self,
@@ -75,7 +79,6 @@ class PythonFunctionTask_OT(Task[bool]):
                     **invocation_runparameters,
                     **common_task_runparameters,
                     "task_id": task_id,
-                    "run_id": str(uuid.uuid4()),
                 }
 
                 # log runparameters to span
@@ -186,6 +189,14 @@ class JupytextNotebookTask(PythonFunctionTask):
         )
 
 
+def log_artefact(name, content):
+    tracer = otel.trace.get_tracer(__name__)  # type: ignore
+    with tracer.start_as_current_span("artefact") as span:
+        span.set_attribute("name", name)
+        span.set_attribute("content", content)
+        span.set_status(Status(StatusCode.OK))
+
+
 def make_jupytext_task(
     notebook: JupytextNotebook,
     task_id: str,
@@ -208,37 +219,38 @@ def make_jupytext_task(
         except Exception as e:
             raise e
         finally:
-            evaluated_notebook.to_html()
+            log_artefact("notebook.ipynb", evaluated_notebook.filepath.read_text())
 
     async def invoke_task(runparameters: RunParameters) -> bool:
+        assert runparameters == {}  # TODO: parameter is not used
+
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("invoke-task") as span:
             span.set_attribute("task_type", "jupytext")
             span.set_attribute("task_id", task_id)
+            span.set_attribute("timeout_s", timeout_s)
+            span.set_attribute("n_max_retries", n_max_retries)
 
+            prefixed_parameters = prefix_keys("task_parameter", task_parameters)
+            for k, v in prefixed_parameters.items():
+                span.set_attribute(k, v)
+
+            # PythonFunctionTask_OT will inject further parameters like retry_nr
             run_notebook = PythonFunctionTask_OT(
-                f=f,
+                f=lambda p: f(p),
                 task_id=f"{task_id}-render-notebook",
                 timeout_s=timeout_s,
                 n_max_retries=n_max_retries,
             )
-            run_notebook.start({**runparameters, **task_parameters})
+            run_notebook.start(prefixed_parameters)
 
             is_success: bool = await run_notebook.get_ref()  # type: ignore
-
             if is_success:
                 span.set_status(Status(StatusCode.OK))
             else:
                 span.set_status(
                     Status(StatusCode.ERROR, "Jupytext notebook task failed")
                 )
-
-            try:
-                notebook_html = tmp_filepath(".html").read_text()
-            except:
-                notebook_html = ""
-            finally:
-                span.set_attribute("notebook_html", notebook_html)
 
         return is_success
 

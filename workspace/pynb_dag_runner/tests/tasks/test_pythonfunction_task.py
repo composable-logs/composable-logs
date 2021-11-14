@@ -126,7 +126,7 @@ def test_tasks_runlog_output():
         assert read_key(run_span, ["attributes", "retry.max_retries"]) == 1
         assert read_key(run_span, ["attributes", "retry.nr"]) == 0
         assert run_span["attributes"].keys() == set(
-            ["run_id", "task_id", "retry.max_retries", "retry.nr"]
+            ["task_id", "retry.max_retries", "retry.nr"]
         )
 
         timeout_span = one(spans.filter(["name"], "timeout-guard"))
