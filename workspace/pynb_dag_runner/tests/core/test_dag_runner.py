@@ -8,6 +8,8 @@ import pytest, ray
 from pynb_dag_runner.ray_helpers import Future
 from pynb_dag_runner.core.dag_runner import (
     Task,
+    Task_OT,
+    eval_remote_in_otel_span,
     TaskDependence,
     TaskDependencies,
     in_sequence,
@@ -71,6 +73,34 @@ def test_task_run_order(dummy_loop_parameter):
     assert state[0] in [1, 2]
     assert state[1] in [1, 2]
     assert state[2] == 0
+
+
+def test__make_task_from_remote_function__success():
+    @ray.remote(num_cpus=0)
+    def f():
+        return 1234
+
+    task_f = eval_remote_in_otel_span(f.remote)
+    task_f.start()
+
+    result = ray.get(task_f.get_ref())
+
+    assert result.return_value == 1234
+    assert result.error is None
+
+
+def test__make_task_from_remote_function__fail():
+    @ray.remote(num_cpus=0)
+    def f():
+        raise Exception("kaboom!")
+
+    task_f = eval_remote_in_otel_span(f.remote)
+    task_f.start()
+
+    result = ray.get(task_f.get_ref())
+
+    assert result.return_value is None
+    assert "kaboom!" in str(result.error)
 
 
 def test__task_orchestration__run_three_tasks_in_sequence():

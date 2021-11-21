@@ -1,7 +1,10 @@
-from typing import List, Optional, Any, TypeVar, Generic, Callable
+from dataclasses import dataclass
+from typing import Awaitable, List, Optional, Any, TypeVar, Generic, Callable
 
 #
 import ray
+import opentelemetry as otel
+from opentelemetry.trace.span import format_span_id
 
 #
 from pynb_dag_runner.helpers import one
@@ -56,6 +59,86 @@ class Task(Node, Generic[A]):
             )
 
         return ray.get(self.get_ref())
+
+
+SpanId = str
+
+
+@dataclass
+class TaskOutcome(Generic[A]):
+    span_id: SpanId
+    return_value: A
+    error: Optional[Exception]
+
+
+class Task_OT(Generic[A]):
+    def __init__(self, f_remote: Callable[..., Future[TaskOutcome[A]]]):
+        self._f_remote = f_remote
+        self._future_or_none: Optional[Future[TaskOutcome[A]]] = None
+
+    def start(self, *args: Any) -> None:
+        """
+        Start execution of task and return
+        """
+        # self._future_or_none = self._f_remote(*args)
+        if self.has_started():
+            raise Exception(f"Task has already started")
+
+        assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
+
+        async def make_call():
+            result = await self._f_remote(*args)
+            assert isinstance(result, TaskOutcome)
+            return result
+
+        self._future_or_none = Future.lift_async(make_call)()
+
+    def get_ref(self) -> Future[A]:
+        if not self.has_started():
+            raise Exception(f"Task has not started")
+
+        return self._future_or_none  # type: ignore
+
+    def has_started(self) -> bool:
+        return self._future_or_none is not None
+
+    def has_completed(self) -> bool:
+        if not self.has_started():
+            return False
+
+        # See: https://docs.ray.io/en/master/package-ref.html#ray-wait
+        finished_refs, not_finished_refs = ray.wait([self.get_ref()], timeout=0)
+        assert len(finished_refs) + len(not_finished_refs) == 1
+
+        return len(finished_refs) == 1
+
+    def result(self) -> A:
+        """
+        Get result if task has already completed. Otherwise raise an exception.
+        """
+        if not self.has_completed():
+            raise Exception(
+                "Result has not finished. Calling ray.get would block execution"
+            )
+
+        return ray.get(self.get_ref())
+
+
+def eval_remote_in_otel_span(f_remote: Callable[..., Awaitable[A]]) -> Task_OT[A]:
+    async def make_call(*args):
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("eval-in-otel-span") as span:
+            span_id = format_span_id(span.get_span_context().span_id)
+            try:
+                return TaskOutcome(
+                    span_id=span_id,
+                    return_value=await f_remote(*args),
+                    error=None,
+                )
+            except Exception as e:
+                return TaskOutcome(span_id=span_id, return_value=None, error=e)
+
+    return Task_OT(f_remote=Future.lift_async(make_call))
 
 
 def _two_tasks_in_sequence(task1: Task[A], task2: Task[A]) -> Task[A]:

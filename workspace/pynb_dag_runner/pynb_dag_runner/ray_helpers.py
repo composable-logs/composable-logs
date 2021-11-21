@@ -40,8 +40,8 @@ class Future(Generic[A]):
 
     @staticmethod
     def lift_async(
-        f: Callable[[B], Awaitable[C]], num_cpus: int = 0
-    ) -> "Callable[[Future[B]], Future[C]]":
+        f: Callable[..., Awaitable[C]], num_cpus: int = 0
+    ) -> "Callable[..., Future[C]]":
         """
         Lift an async Python function f as below
 
