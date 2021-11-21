@@ -56,8 +56,8 @@ class Future(Generic[A]):
         """
 
         @ray.remote(num_cpus=num_cpus)
-        def wrapped_f(b: B) -> C:
-            return asyncio.get_event_loop().run_until_complete(f(b))
+        def wrapped_f(*args: B) -> C:
+            return asyncio.get_event_loop().run_until_complete(f(*args))
 
         return wrapped_f.remote
 
