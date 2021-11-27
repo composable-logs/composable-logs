@@ -127,10 +127,9 @@ class Task_OT(Generic[A]):
         async def make_call(*args):
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("eval-in-otel-span") as span:
-                span_id = format_span_id(span.get_span_context().span_id)
                 try:
                     return TaskOutcome(
-                        span_id=span_id,
+                        span_id=format_span_id(span.get_span_context().span_id),
                         return_value=await f_remote(*args),
                         error=None,
                     )
@@ -148,13 +147,24 @@ class Task_OT(Generic[A]):
         return cls.from_remote_f(remote_f.remote)
 
 
-def _two_tasks_in_sequence(task1: Task[A], task2: Task[A]) -> Task[A]:
-    def run_tasks_in_sequence(*ray_refs):
-        task1.start(*ray_refs)
-        task2.start(task1.get_ref())
-        return task2.get_ref()
+def _compose_two_tasks_in_sequence(task1: Task[A], task2: Task[A]) -> Task[A]:
+    async def run_tasks_in_sequence(*task1_arguments: Any):
+        assert not any(
+            isinstance(arg, ray._raylet.ObjectRef) for arg in task1_arguments
+        )
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("task-dependency") as span:
+            task1.start(*[ray.put(arg) for arg in task1_arguments])
+            outcome1 = await task1.get_ref()
+            task2.start(ray.put(outcome1))
+            outcome2 = await task2.get_ref()
 
-    return Task(f_remote=run_tasks_in_sequence)
+            span.set_attribute("dependency_from_span_id", outcome1.span_id)
+            span.set_attribute("dependency_to_span_id", outcome2.span_id)
+
+            return outcome2
+
+    return Task(f_remote=Future.lift_async(run_tasks_in_sequence))
 
 
 def in_sequence(*tasks: Task[A]) -> Task[A]:
@@ -165,6 +175,7 @@ def in_sequence(*tasks: Task[A]) -> Task[A]:
     Eg.
         task1 -> task2 -> task3
 
+    TODO: error handling
     """
     if len(tasks) == 0:
         raise ValueError("Empty task list provided")
@@ -173,7 +184,7 @@ def in_sequence(*tasks: Task[A]) -> Task[A]:
         if len(rest) == 0:
             return first
         else:
-            return _two_tasks_in_sequence(first, in_sequence(*rest))
+            return _compose_two_tasks_in_sequence(first, in_sequence(*rest))
 
 
 class TaskDependence(Edge):
