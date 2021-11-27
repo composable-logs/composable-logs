@@ -127,9 +127,10 @@ class Task_OT(Generic[A]):
         async def make_call(*args):
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("eval-in-otel-span") as span:
+                span_id = format_span_id(span.get_span_context().span_id)
                 try:
                     return TaskOutcome(
-                        span_id=format_span_id(span.get_span_context().span_id),
+                        span_id=span_id,
                         return_value=await f_remote(*args),
                         error=None,
                     )
