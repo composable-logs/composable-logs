@@ -80,11 +80,10 @@ class Task_OT(Generic[A]):
         """
         Start execution of task and return
         """
-        # self._future_or_none = self._f_remote(*args)
         if self.has_started():
             raise Exception(f"Task has already started")
 
-        assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
+        assert all(isinstance(s, ray._raylet.ObjectRef) for s in args)
 
         async def make_call():
             result = await self._f_remote(*args)
@@ -93,7 +92,7 @@ class Task_OT(Generic[A]):
 
         self._future_or_none = Future.lift_async(make_call)()
 
-    def get_ref(self) -> Future[A]:
+    def get_ref(self) -> Future[TaskOutcome[A]]:
         if not self.has_started():
             raise Exception(f"Task has not started")
 
@@ -123,22 +122,30 @@ class Task_OT(Generic[A]):
 
         return ray.get(self.get_ref())
 
+    @classmethod
+    def from_remote_f(cls, f_remote: Callable[..., Awaitable[A]]) -> "Task_OT[A]":
+        async def make_call(*args):
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
+            with tracer.start_as_current_span("eval-in-otel-span") as span:
+                span_id = format_span_id(span.get_span_context().span_id)
+                try:
+                    return TaskOutcome(
+                        span_id=span_id,
+                        return_value=await f_remote(*args),
+                        error=None,
+                    )
+                except Exception as e:
+                    return TaskOutcome(span_id=span_id, return_value=None, error=e)
 
-def eval_remote_in_otel_span(f_remote: Callable[..., Awaitable[A]]) -> Task_OT[A]:
-    async def make_call(*args):
-        tracer = otel.trace.get_tracer(__name__)  # type: ignore
-        with tracer.start_as_current_span("eval-in-otel-span") as span:
-            span_id = format_span_id(span.get_span_context().span_id)
-            try:
-                return TaskOutcome(
-                    span_id=span_id,
-                    return_value=await f_remote(*args),
-                    error=None,
-                )
-            except Exception as e:
-                return TaskOutcome(span_id=span_id, return_value=None, error=e)
+        return cls(f_remote=Future.lift_async(make_call))
 
-    return Task_OT(f_remote=Future.lift_async(make_call))
+    @classmethod
+    def from_f(cls, f: Callable[..., A], num_cpus: int = 0) -> "Task_OT[A]":
+        @ray.remote(num_cpus=num_cpus)
+        def remote_f(*args):
+            return f(*args)
+
+        return cls.from_remote_f(remote_f.remote)
 
 
 def _two_tasks_in_sequence(task1: Task[A], task2: Task[A]) -> Task[A]:

@@ -9,7 +9,7 @@ from pynb_dag_runner.ray_helpers import Future
 from pynb_dag_runner.core.dag_runner import (
     Task,
     Task_OT,
-    eval_remote_in_otel_span,
+    TaskOutcome,
     TaskDependence,
     TaskDependencies,
     in_sequence,
@@ -80,21 +80,23 @@ def test__make_task_from_remote_function__success():
     def f():
         return 1234
 
-    task_f = eval_remote_in_otel_span(f.remote)
-    task_f.start()
+    def g():
+        return 1234
 
-    result = ray.get(task_f.get_ref())
+    for t in [Task_OT.from_remote_f(f.remote), Task_OT.from_f(g)]:
+        t.start()
 
-    assert result.return_value == 1234
-    assert result.error is None
+        result = ray.get(t.get_ref())
+
+        assert result.return_value == 1234
+        assert result.error is None
 
 
-def test__make_task_from_remote_function__fail():
-    @ray.remote(num_cpus=0)
+def test__make_task_from_function__fail():
     def f():
         raise Exception("kaboom!")
 
-    task_f = eval_remote_in_otel_span(f.remote)
+    task_f = Task_OT.from_f(f)
     task_f.start()
 
     result = ray.get(task_f.get_ref())
@@ -104,21 +106,25 @@ def test__make_task_from_remote_function__fail():
 
 
 def test__task_orchestration__run_three_tasks_in_sequence():
-    @ray.remote(num_cpus=0)
-    def f(arg):
-        assert arg == 42
-        return arg + 1
+    def f():
+        return 43
 
-    @ray.remote(num_cpus=0)
     def g(arg):
-        assert arg == 43
-        return arg + 1
+        assert isinstance(arg, TaskOutcome)
+        assert arg.error is None
+        assert arg.return_value == 43
+        return arg.return_value + 1
 
-    @ray.remote(num_cpus=0)
     def h(arg):
-        assert arg == 44
-        return arg + 1
+        assert isinstance(arg, TaskOutcome)
+        assert arg.error is None
+        assert arg.return_value == 44
+        return arg.return_value + 1
 
-    all_tasks = in_sequence(Task(f.remote), Task(g.remote), Task(h.remote))
-    all_tasks.start(ray.put(42))
-    assert ray.get(all_tasks.get_ref()) == 45
+    all_tasks = in_sequence(Task_OT.from_f(f), Task_OT.from_f(g), Task_OT.from_f(h))
+    all_tasks.start()
+
+    outcome = ray.get(all_tasks.get_ref())
+    assert isinstance(outcome, TaskOutcome)
+    assert outcome.error is None
+    assert outcome.return_value == 45
