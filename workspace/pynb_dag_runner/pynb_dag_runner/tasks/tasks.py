@@ -1,6 +1,6 @@
 import uuid
 from pathlib import Path
-from typing import Callable, Dict, Mapping, Any, Optional
+from typing import Awaitable, Callable, Dict, Mapping, Any, Optional
 
 #
 import ray
@@ -8,7 +8,7 @@ import opentelemetry as otel
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
-from pynb_dag_runner.core.dag_runner import Task, TaskDependencies
+from pynb_dag_runner.core.dag_runner import Task, Task_OT, TaskDependencies
 from pynb_dag_runner.wrappers.runlog import Runlog
 from pynb_dag_runner.wrappers.compute_steps import (
     T,
@@ -58,7 +58,7 @@ class PythonFunctionTask_OT(Task[bool]):
         self.task_id = task_id
 
         f_remote: Callable[
-            [Future[RunParameters]], Future[bool]
+            [Future[RunParameters]], Awaitable[bool]
         ] = try_eval_f_async_wrapper(
             f=lambda runparameters: f(runparameters),
             timeout_s=timeout_s,
@@ -119,7 +119,7 @@ class PythonFunctionTask_OT(Task[bool]):
 
             return is_success
 
-        super().__init__(f_remote=Future.lift_async(invoke_task, num_cpus=1))
+        super().__init__(f_remote=Future.lift_async(invoke_task, num_cpus=1))  # type: ignore
 
 
 class PythonFunctionTask(Task[Runlog]):
@@ -254,7 +254,7 @@ def make_jupytext_task(
 
         return is_success
 
-    return Task(f_remote=Future.lift_async(invoke_task))
+    return Task(f_remote=Future.lift_async(invoke_task))  # type: ignore
 
 
 def get_task_dependencies(dependencies: TaskDependencies):

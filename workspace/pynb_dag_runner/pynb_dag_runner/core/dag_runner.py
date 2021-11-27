@@ -12,6 +12,7 @@ from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
 from pynb_dag_runner.ray_helpers import Future
 
 A = TypeVar("A")
+B = TypeVar("B")
 
 
 class Task(Node, Generic[A]):
@@ -61,20 +62,10 @@ class Task(Node, Generic[A]):
         return ray.get(self.get_ref())
 
 
-SpanId = str
-
-
-@dataclass
-class TaskOutcome(Generic[A]):
-    span_id: SpanId
-    return_value: A
-    error: Optional[Exception]
-
-
 class Task_OT(Generic[A]):
-    def __init__(self, f_remote: Callable[..., Future[TaskOutcome[A]]]):
+    def __init__(self, f_remote: Callable[..., Awaitable[A]]):
         self._f_remote = f_remote
-        self._future_or_none: Optional[Future[TaskOutcome[A]]] = None
+        self._future_or_none: Optional[Awaitable[A]] = None
 
     def start(self, *args: Any) -> None:
         """
@@ -87,12 +78,12 @@ class Task_OT(Generic[A]):
 
         async def make_call():
             result = await self._f_remote(*args)
-            assert isinstance(result, TaskOutcome)
+            # assert isinstance(result, TaskOutcome)
             return result
 
         self._future_or_none = Future.lift_async(make_call)()
 
-    def get_ref(self) -> Awaitable[TaskOutcome[A]]:
+    def get_ref(self) -> Awaitable[A]:
         if not self.has_started():
             raise Exception(f"Task has not started")
 
@@ -122,33 +113,60 @@ class Task_OT(Generic[A]):
 
         return ray.get(self.get_ref())
 
-    @classmethod
-    def from_remote_f(cls, f_remote: Callable[..., Awaitable[A]]) -> "Task_OT[A]":
-        async def make_call(*args):
-            tracer = otel.trace.get_tracer(__name__)  # type: ignore
-            with tracer.start_as_current_span("eval-in-otel-span") as span:
-                span_id = format_span_id(span.get_span_context().span_id)
-                try:
-                    return TaskOutcome(
-                        span_id=span_id,
-                        return_value=await f_remote(*args),
-                        error=None,
-                    )
-                except Exception as e:
-                    return TaskOutcome(span_id=span_id, return_value=None, error=e)
 
-        return cls(f_remote=Future.lift_async(make_call))
-
-    @classmethod
-    def from_f(cls, f: Callable[..., A], num_cpus: int = 0) -> "Task_OT[A]":
-        @ray.remote(num_cpus=num_cpus)
-        def remote_f(*args):
-            return f(*args)
-
-        return cls.from_remote_f(remote_f.remote)
+SpanId = str
 
 
-def _compose_two_tasks_in_sequence(task1: Task_OT[A], task2: Task_OT[A]) -> Task_OT[A]:
+@dataclass
+class TaskOutcome(Generic[A]):
+    span_id: SpanId
+    return_value: Optional[A]
+    error: Optional[Exception]
+
+
+def task_from_remote_f(
+    f_remote: Callable[..., Awaitable[B]]
+) -> "Task_OT[TaskOutcome[B]]":
+    """
+    Lift a Ray remote function f_remote(*args: A) -> B into a Task[TaskOutcome[B]].
+    """
+
+    async def make_call(*args: A) -> TaskOutcome[B]:
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("eval-in-otel-span") as span:
+            span_id = format_span_id(span.get_span_context().span_id)
+            try:
+                return TaskOutcome(
+                    span_id=span_id,
+                    return_value=await f_remote(*args),
+                    error=None,
+                )
+            except Exception as e:
+                return TaskOutcome(span_id=span_id, return_value=None, error=e)
+
+    return Task_OT(f_remote=Future.lift_async(make_call))
+
+
+def task_from_func(
+    f: Callable[..., TaskOutcome[B]], num_cpus: int = 0
+) -> "Task_OT[TaskOutcome[B]]":
+    """
+    Lift a Python function f(*args: A) -> TaskOutcome[B] into a Task[TaskOutcome[B]].
+
+    Note: this (and task_from_remote_f) are not a class methods for Task_OT since
+    we return a Task[TaskOutcome[B]] and not a Task[A].
+    """
+
+    @ray.remote(num_cpus=num_cpus)
+    def remote_f(*args: A) -> TaskOutcome[B]:
+        return f(*args)
+
+    return task_from_remote_f(remote_f.remote)
+
+
+def _compose_two_tasks_in_sequence(
+    task1: Task_OT[TaskOutcome[A]], task2: Task_OT[TaskOutcome[A]]
+) -> Task_OT[TaskOutcome[A]]:
     async def run_tasks_in_sequence(*task1_arguments: Any):
         assert not any(
             isinstance(arg, ray._raylet.ObjectRef) for arg in task1_arguments
@@ -168,7 +186,7 @@ def _compose_two_tasks_in_sequence(task1: Task_OT[A], task2: Task_OT[A]) -> Task
     return Task_OT(f_remote=Future.lift_async(run_tasks_in_sequence))
 
 
-def in_sequence(*tasks: Task_OT[A]) -> Task_OT[A]:
+def in_sequence(*tasks: Task_OT[TaskOutcome[A]]) -> Task_OT[TaskOutcome[A]]:
     """
     Execute a list of tasks in sequence. The output of each task is passed as the
     argument to the next task in the sequence.
