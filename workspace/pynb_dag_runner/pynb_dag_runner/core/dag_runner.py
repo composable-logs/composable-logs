@@ -1,9 +1,13 @@
-from typing import List, Optional, Any, TypeVar, Generic, Callable
+from dataclasses import dataclass
+from typing import Awaitable, List, Optional, Any, TypeVar, Generic, Callable
 
 #
 import ray
+import opentelemetry as otel
+from opentelemetry.trace.span import format_span_id
 
 #
+from pynb_dag_runner.helpers import one
 from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
 from pynb_dag_runner.ray_helpers import Future
 
@@ -55,6 +59,133 @@ class Task(Node, Generic[A]):
             )
 
         return ray.get(self.get_ref())
+
+
+SpanId = str
+
+
+@dataclass
+class TaskOutcome(Generic[A]):
+    span_id: SpanId
+    return_value: A
+    error: Optional[Exception]
+
+
+class Task_OT(Generic[A]):
+    def __init__(self, f_remote: Callable[..., Future[TaskOutcome[A]]]):
+        self._f_remote = f_remote
+        self._future_or_none: Optional[Future[TaskOutcome[A]]] = None
+
+    def start(self, *args: Any) -> None:
+        """
+        Start execution of task and return
+        """
+        if self.has_started():
+            raise Exception(f"Task has already started")
+
+        assert all(isinstance(s, ray._raylet.ObjectRef) for s in args)
+
+        async def make_call():
+            result = await self._f_remote(*args)
+            assert isinstance(result, TaskOutcome)
+            return result
+
+        self._future_or_none = Future.lift_async(make_call)()
+
+    def get_ref(self) -> Awaitable[TaskOutcome[A]]:
+        if not self.has_started():
+            raise Exception(f"Task has not started")
+
+        return self._future_or_none  # type: ignore
+
+    def has_started(self) -> bool:
+        return self._future_or_none is not None
+
+    def has_completed(self) -> bool:
+        if not self.has_started():
+            return False
+
+        # See: https://docs.ray.io/en/master/package-ref.html#ray-wait
+        finished_refs, not_finished_refs = ray.wait([self.get_ref()], timeout=0)
+        assert len(finished_refs) + len(not_finished_refs) == 1
+
+        return len(finished_refs) == 1
+
+    def result(self) -> A:
+        """
+        Get result if task has already completed. Otherwise raise an exception.
+        """
+        if not self.has_completed():
+            raise Exception(
+                "Result has not finished. Calling ray.get would block execution"
+            )
+
+        return ray.get(self.get_ref())
+
+    @classmethod
+    def from_remote_f(cls, f_remote: Callable[..., Awaitable[A]]) -> "Task_OT[A]":
+        async def make_call(*args):
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
+            with tracer.start_as_current_span("eval-in-otel-span") as span:
+                span_id = format_span_id(span.get_span_context().span_id)
+                try:
+                    return TaskOutcome(
+                        span_id=span_id,
+                        return_value=await f_remote(*args),
+                        error=None,
+                    )
+                except Exception as e:
+                    return TaskOutcome(span_id=span_id, return_value=None, error=e)
+
+        return cls(f_remote=Future.lift_async(make_call))
+
+    @classmethod
+    def from_f(cls, f: Callable[..., A], num_cpus: int = 0) -> "Task_OT[A]":
+        @ray.remote(num_cpus=num_cpus)
+        def remote_f(*args):
+            return f(*args)
+
+        return cls.from_remote_f(remote_f.remote)
+
+
+def _compose_two_tasks_in_sequence(task1: Task_OT[A], task2: Task_OT[A]) -> Task_OT[A]:
+    async def run_tasks_in_sequence(*task1_arguments: Any):
+        assert not any(
+            isinstance(arg, ray._raylet.ObjectRef) for arg in task1_arguments
+        )
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("task-dependency") as span:
+            task1.start(*[ray.put(arg) for arg in task1_arguments])
+            outcome1 = await task1.get_ref()
+            task2.start(ray.put(outcome1))
+            outcome2 = await task2.get_ref()
+
+            span.set_attribute("from_span_id", outcome1.span_id)
+            span.set_attribute("to_span_id", outcome2.span_id)
+
+            return outcome2
+
+    return Task_OT(f_remote=Future.lift_async(run_tasks_in_sequence))
+
+
+def in_sequence(*tasks: Task_OT[A]) -> Task_OT[A]:
+    """
+    Execute a list of tasks in sequence. The output of each task is passed as the
+    argument to the next task in the sequence.
+
+    Eg.
+        task1 -> task2 -> task3
+
+    TODO: error handling
+    """
+    if len(tasks) == 0:
+        raise ValueError("Empty task list provided")
+    else:
+        first, *rest = tasks
+        if len(rest) == 0:
+            return first
+        else:
+            return _compose_two_tasks_in_sequence(first, in_sequence(*rest))
 
 
 class TaskDependence(Edge):

@@ -8,8 +8,11 @@ import pytest, ray
 from pynb_dag_runner.ray_helpers import Future
 from pynb_dag_runner.core.dag_runner import (
     Task,
+    Task_OT,
+    TaskOutcome,
     TaskDependence,
     TaskDependencies,
+    in_sequence,
     run_tasks,
 )
 from tests.test_ray_helpers import StateActor
@@ -70,3 +73,58 @@ def test_task_run_order(dummy_loop_parameter):
     assert state[0] in [1, 2]
     assert state[1] in [1, 2]
     assert state[2] == 0
+
+
+def test__make_task_from_remote_function__success():
+    @ray.remote(num_cpus=0)
+    def f():
+        return 1234
+
+    def g():
+        return 1234
+
+    for t in [Task_OT.from_remote_f(f.remote), Task_OT.from_f(g)]:
+        t.start()
+
+        result = ray.get(t.get_ref())
+
+        assert result.return_value == 1234
+        assert result.error is None
+
+
+def test__make_task_from_function__fail():
+    def f():
+        raise Exception("kaboom!")
+
+    task_f = Task_OT.from_f(f)
+    task_f.start()
+
+    result = ray.get(task_f.get_ref())
+
+    assert result.return_value is None
+    assert "kaboom!" in str(result.error)
+
+
+def test__task_orchestration__run_three_tasks_in_sequence():
+    def f():
+        return 43
+
+    def g(arg):
+        assert isinstance(arg, TaskOutcome)
+        assert arg.error is None
+        assert arg.return_value == 43
+        return arg.return_value + 1
+
+    def h(arg):
+        assert isinstance(arg, TaskOutcome)
+        assert arg.error is None
+        assert arg.return_value == 44
+        return arg.return_value + 1
+
+    all_tasks = in_sequence(*[Task_OT.from_f(_f) for _f in [f, g, h]])
+    all_tasks.start()
+
+    outcome = ray.get(all_tasks.get_ref())
+    assert isinstance(outcome, TaskOutcome)
+    assert outcome.error is None
+    assert outcome.return_value == 45
