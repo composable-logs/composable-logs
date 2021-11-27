@@ -92,7 +92,7 @@ class Task_OT(Generic[A]):
 
         self._future_or_none = Future.lift_async(make_call)()
 
-    def get_ref(self) -> Future[TaskOutcome[A]]:
+    def get_ref(self) -> Awaitable[TaskOutcome[A]]:
         if not self.has_started():
             raise Exception(f"Task has not started")
 
@@ -147,7 +147,7 @@ class Task_OT(Generic[A]):
         return cls.from_remote_f(remote_f.remote)
 
 
-def _compose_two_tasks_in_sequence(task1: Task[A], task2: Task[A]) -> Task[A]:
+def _compose_two_tasks_in_sequence(task1: Task_OT[A], task2: Task_OT[A]) -> Task_OT[A]:
     async def run_tasks_in_sequence(*task1_arguments: Any):
         assert not any(
             isinstance(arg, ray._raylet.ObjectRef) for arg in task1_arguments
@@ -159,15 +159,15 @@ def _compose_two_tasks_in_sequence(task1: Task[A], task2: Task[A]) -> Task[A]:
             task2.start(ray.put(outcome1))
             outcome2 = await task2.get_ref()
 
-            span.set_attribute("dependency_from_span_id", outcome1.span_id)
-            span.set_attribute("dependency_to_span_id", outcome2.span_id)
+            span.set_attribute("from_span_id", outcome1.span_id)
+            span.set_attribute("to_span_id", outcome2.span_id)
 
             return outcome2
 
-    return Task(f_remote=Future.lift_async(run_tasks_in_sequence))
+    return Task_OT(f_remote=Future.lift_async(run_tasks_in_sequence))
 
 
-def in_sequence(*tasks: Task[A]) -> Task[A]:
+def in_sequence(*tasks: Task_OT[A]) -> Task_OT[A]:
     """
     Execute a list of tasks in sequence. The output of each task is passed as the
     argument to the next task in the sequence.
