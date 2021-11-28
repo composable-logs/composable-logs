@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass
-from typing import Awaitable, List, Optional, Any, TypeVar, Generic, Callable
+from typing import Awaitable, List, Optional, Any, TypeVar, Generic, Callable, Mapping
 
 #
 import ray
@@ -66,26 +66,46 @@ class Task(Node, Generic[A]):
         return ray.get(self.get_ref())
 
 
+SpanId = str
+TaskTags = Mapping[str, str]
+
+
+@dataclass(frozen=True, eq=True)
+class TaskOutcome(Generic[A]):
+    span_id: SpanId
+    return_value: Optional[A]
+    error: Optional[Exception]
+
+
 class Task_OT(Generic[A]):
-    def __init__(self, f_remote: Callable[..., Awaitable[A]]):
-        self._f_remote = f_remote
+    def __init__(self, f_remote: Callable[..., Awaitable[A]], tags: TaskTags = {}):
+        self._f_remote: Callable[..., Awaitable[A]] = f_remote
         self._future_or_none: Optional[Awaitable[A]] = None
+        self._tags: TaskTags = tags
 
     def start(self, *args: Any) -> None:
         """
         Start execution of task and return
         """
+        assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
+
         if self.has_started():
             raise Exception(f"Task has already started")
 
-        assert all(isinstance(s, ray._raylet.ObjectRef) for s in args)
+        async def make_call(*_args: Any):
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
+            with tracer.start_as_current_span("execute-task") as span:
+                try:
+                    result = await self._f_remote(*_args)
+                    for k, v in self._tags.items():
+                        span.set_attribute(k, v)
 
-        async def make_call():
-            result = await self._f_remote(*args)
-            # assert isinstance(result, TaskOutcome)
+                except Exception as e:
+                    raise e
+
             return result
 
-        self._future_or_none = Future.lift_async(make_call)()
+        self._future_or_none = Future.lift_async(make_call)(*args)
 
     def get_ref(self) -> Awaitable[A]:
         if not self.has_started():
@@ -118,18 +138,8 @@ class Task_OT(Generic[A]):
         return ray.get(self.get_ref())
 
 
-SpanId = str
-
-
-@dataclass
-class TaskOutcome(Generic[A]):
-    span_id: SpanId
-    return_value: Optional[A]
-    error: Optional[Exception]
-
-
 def task_from_remote_f(
-    f_remote: Callable[..., Awaitable[B]]
+    f_remote: Callable[..., Awaitable[B]], tags: TaskTags = {}
 ) -> Task_OT[TaskOutcome[B]]:
     """
     Lift a Ray remote function f_remote(*args: A) -> B into a Task[TaskOutcome[B]].
@@ -149,11 +159,11 @@ def task_from_remote_f(
                 span.record_exception(e)
                 return TaskOutcome(span_id=span_id, return_value=None, error=e)
 
-    return Task_OT(f_remote=Future.lift_async(make_call))
+    return Task_OT(f_remote=Future.lift_async(make_call), tags=tags)
 
 
 def task_from_func(
-    f: Callable[..., TaskOutcome[B]], num_cpus: int = 0
+    f: Callable[..., TaskOutcome[B]], num_cpus: int = 0, tags: TaskTags = {}
 ) -> Task_OT[TaskOutcome[B]]:
     """
     Lift a Python function f(*args: A) -> TaskOutcome[B] into a Task[TaskOutcome[B]].
@@ -166,7 +176,7 @@ def task_from_func(
     def remote_f(*args: A) -> TaskOutcome[B]:
         return f(*args)
 
-    return task_from_remote_f(remote_f.remote)
+    return task_from_remote_f(remote_f.remote, tags=tags)
 
 
 def _compose_two_tasks_in_sequence(
@@ -178,9 +188,9 @@ def _compose_two_tasks_in_sequence(
         )
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("task-dependency") as span:
-            task1.start(*[ray.put(arg) for arg in task1_arguments])
+            task1.start(*task1_arguments)
             outcome1 = await task1.get_ref()
-            task2.start(ray.put(outcome1))
+            task2.start(outcome1)
             outcome2 = await task2.get_ref()
 
             span.set_attribute("from_span_id", outcome1.span_id)
@@ -229,7 +239,7 @@ def in_parallel(
 
         return await asyncio.gather(*[task.get_ref() for task in tasks])
 
-    async def flatten(*task_arguments) -> TaskOutcome[List[TaskOutcome[A]]]:
+    async def flatten(*task_arguments: U) -> TaskOutcome[List[TaskOutcome[A]]]:
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("run-in-parallel") as span:
             task_outcomes: List[TaskOutcome[A]] = await run_tasks_in_parallel(

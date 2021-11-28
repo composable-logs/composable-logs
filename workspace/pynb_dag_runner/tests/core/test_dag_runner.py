@@ -16,6 +16,21 @@ from pynb_dag_runner.core.dag_runner import (
     in_parallel,
     run_tasks,
 )
+from pynb_dag_runner.opentelemetry_helpers import (
+    get_span_id,
+    has_keys,
+    read_key,
+    is_parent_child,
+    get_duration_s,
+    iso8601_to_epoch_s,
+    get_duration_range_us,
+    get_span_exceptions,
+    Spans,
+    SpanRecorder,
+)
+from pynb_dag_runner.helpers import one
+
+#
 from tests.test_ray_helpers import StateActor
 
 
@@ -107,28 +122,35 @@ def test__make_task_from_function__fail():
 
 
 def test__task_orchestration__run_three_tasks_in_sequence():
-    def f():
-        return 43
+    def get_test_spans():
+        with SpanRecorder() as sr:
 
-    def g(arg):
-        assert isinstance(arg, TaskOutcome)
-        assert arg.error is None
-        assert arg.return_value == 43
-        return arg.return_value + 1
+            def f():
+                return 43
 
-    def h(arg):
-        assert isinstance(arg, TaskOutcome)
-        assert arg.error is None
-        assert arg.return_value == 44
-        return arg.return_value + 1
+            def g(arg):
+                assert isinstance(arg, TaskOutcome)
+                assert arg.error is None
+                assert arg.return_value == 43
+                return arg.return_value + 1
 
-    all_tasks = in_sequence(*[task_from_func(_f) for _f in [f, g, h]])
-    all_tasks.start()
+            def h(arg):
+                assert isinstance(arg, TaskOutcome)
+                assert arg.error is None
+                assert arg.return_value == 44
+                return arg.return_value + 1
 
-    outcome = ray.get(all_tasks.get_ref())
-    assert isinstance(outcome, TaskOutcome)
-    assert outcome.error is None
-    assert outcome.return_value == 45
+            all_tasks = in_sequence(*[task_from_func(_f) for _f in [f, g, h]])
+            all_tasks.start()
+
+            outcome = ray.get(all_tasks.get_ref())
+            assert isinstance(outcome, TaskOutcome)
+            assert outcome.error is None
+            assert outcome.return_value == 45
+
+        return sr.spans
+
+    spans: Spans = get_test_spans()
 
 
 def test__task_orchestration__run_three_tasks_in_parallel__failed():
