@@ -91,7 +91,7 @@ def test_task_run_order(dummy_loop_parameter):
     assert state[2] == 0
 
 
-def test__make_task_from_remote_function__success():
+def test__task_ot__make_task_from_remote_function__success():
     @ray.remote(num_cpus=0)
     def f():
         return 1234
@@ -108,7 +108,7 @@ def test__make_task_from_remote_function__success():
         assert result.error is None
 
 
-def test__make_task_from_function__fail():
+def test__task_ot__make_task_from_function__fail():
     def f():
         raise Exception("kaboom!")
 
@@ -121,7 +121,7 @@ def test__make_task_from_function__fail():
     assert "kaboom!" in str(result.error)
 
 
-def test__task_orchestration__run_three_tasks_in_sequence():
+def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
     def get_test_spans():
         with SpanRecorder() as sr:
 
@@ -153,7 +153,7 @@ def test__task_orchestration__run_three_tasks_in_sequence():
     spans: Spans = get_test_spans()
 
 
-def test__task_orchestration__run_three_tasks_in_parallel__failed():
+def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
     def f(*args):
         return 1234
 
@@ -173,7 +173,7 @@ def test__task_orchestration__run_three_tasks_in_parallel__failed():
     assert [o.return_value for o in outcome.return_value] == [1234, None, 123]
 
 
-def test__task_orchestration__run_three_tasks_in_parallel__success():
+def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
     def f(*args):
         return 1234
 
