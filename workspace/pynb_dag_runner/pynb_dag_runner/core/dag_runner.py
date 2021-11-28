@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import dataclass
 from typing import Awaitable, List, Optional, Any, TypeVar, Generic, Callable
 
@@ -13,6 +14,9 @@ from pynb_dag_runner.ray_helpers import Future
 
 A = TypeVar("A")
 B = TypeVar("B")
+U = TypeVar("U")
+V = TypeVar("V")
+W = TypeVar("W")
 
 
 class Task(Node, Generic[A]):
@@ -126,7 +130,7 @@ class TaskOutcome(Generic[A]):
 
 def task_from_remote_f(
     f_remote: Callable[..., Awaitable[B]]
-) -> "Task_OT[TaskOutcome[B]]":
+) -> Task_OT[TaskOutcome[B]]:
     """
     Lift a Ray remote function f_remote(*args: A) -> B into a Task[TaskOutcome[B]].
     """
@@ -142,6 +146,7 @@ def task_from_remote_f(
                     error=None,
                 )
             except Exception as e:
+                span.record_exception(e)
                 return TaskOutcome(span_id=span_id, return_value=None, error=e)
 
     return Task_OT(f_remote=Future.lift_async(make_call))
@@ -149,7 +154,7 @@ def task_from_remote_f(
 
 def task_from_func(
     f: Callable[..., TaskOutcome[B]], num_cpus: int = 0
-) -> "Task_OT[TaskOutcome[B]]":
+) -> Task_OT[TaskOutcome[B]]:
     """
     Lift a Python function f(*args: A) -> TaskOutcome[B] into a Task[TaskOutcome[B]].
 
@@ -167,7 +172,7 @@ def task_from_func(
 def _compose_two_tasks_in_sequence(
     task1: Task_OT[TaskOutcome[A]], task2: Task_OT[TaskOutcome[A]]
 ) -> Task_OT[TaskOutcome[A]]:
-    async def run_tasks_in_sequence(*task1_arguments: Any):
+    async def run_tasks_in_sequence(*task1_arguments: U) -> TaskOutcome[A]:
         assert not any(
             isinstance(arg, ray._raylet.ObjectRef) for arg in task1_arguments
         )
@@ -204,6 +209,57 @@ def in_sequence(*tasks: Task_OT[TaskOutcome[A]]) -> Task_OT[TaskOutcome[A]]:
             return first
         else:
             return _compose_two_tasks_in_sequence(first, in_sequence(*rest))
+
+
+def in_parallel(
+    *tasks: Task_OT[TaskOutcome[A]],
+) -> Task_OT[TaskOutcome[List[TaskOutcome[A]]]]:
+    """
+    Return new task that runs the provided tasks in parallel (with available resources)
+     - The return value of new task is the list of return values of provided input tasks
+       (see type signature).
+     - Arguments passed to the combined task is passed to all tasks when calling start()
+     - The returned task fails if any of the input tasks fail.
+     - The span_id:s for the tasks run in parallel are logged.
+    """
+
+    async def run_tasks_in_parallel(*task_arguments: U) -> List[TaskOutcome[A]]:
+        for task in tasks:
+            task.start(*task_arguments)
+
+        return await asyncio.gather(*[task.get_ref() for task in tasks])
+
+    async def flatten(*task_arguments) -> TaskOutcome[List[TaskOutcome[A]]]:
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("run-in-parallel") as span:
+            task_outcomes: List[TaskOutcome[A]] = await run_tasks_in_parallel(
+                *task_arguments
+            )
+
+            span_ids = [task_outcome.span_id for task_outcome in task_outcomes]
+            span.set_attribute("span_ids", span_ids)
+
+            # check for errors in any of the tasks
+            failed_span_ids = [
+                task_outcome.span_id
+                for task_outcome in task_outcomes
+                if task_outcome.error is not None
+            ]
+            exception: Optional[Exception] = None
+            if len(failed_span_ids) > 0:
+                exception = Exception(
+                    "Failed to run span_id:s " + ",".join(failed_span_ids)
+                )
+                span.record_exception(exception)
+
+            span_id = format_span_id(span.get_span_context().span_id)
+            return TaskOutcome(
+                span_id=span_id,
+                return_value=task_outcomes,
+                error=exception,
+            )
+
+    return Task_OT(f_remote=Future.lift_async(flatten))
 
 
 class TaskDependence(Edge):

@@ -13,6 +13,7 @@ from pynb_dag_runner.core.dag_runner import (
     TaskOutcome,
     TaskDependencies,
     in_sequence,
+    in_parallel,
     run_tasks,
 )
 from tests.test_ray_helpers import StateActor
@@ -128,3 +129,40 @@ def test__task_orchestration__run_three_tasks_in_sequence():
     assert isinstance(outcome, TaskOutcome)
     assert outcome.error is None
     assert outcome.return_value == 45
+
+
+def test__task_orchestration__run_three_tasks_in_parallel__failed():
+    def f(*args):
+        return 1234
+
+    def g(*args):
+        raise Exception("Exception from g")
+
+    def h(*args):
+        return 123
+
+    combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g, h]])
+
+    combined_task.start()
+    outcome = ray.get(combined_task.get_ref())
+
+    assert isinstance(outcome, TaskOutcome)
+    assert outcome.error is not None
+    assert [o.return_value for o in outcome.return_value] == [1234, None, 123]
+
+
+def test__task_orchestration__run_three_tasks_in_parallel__success():
+    def f(*args):
+        return 1234
+
+    def g(*args):
+        return 123
+
+    combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g]])
+
+    combined_task.start()
+    outcome = ray.get(combined_task.get_ref())
+
+    assert isinstance(outcome, TaskOutcome)
+    assert outcome.error is None
+    assert [o.return_value for o in outcome.return_value] == [1234, 123]
