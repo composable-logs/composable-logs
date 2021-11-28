@@ -189,13 +189,10 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B]):
         self._tags: TaskTags = tags
 
     def start(self, *args: U) -> None:
-        """
-        Start execution of task and return
-        """
         assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
 
         if self.has_started():
-            raise Exception(f"Task has already started")
+            raise Exception(f"Tasks can only be run once, and this has already started")
 
         async def make_call(*_args: Any) -> B:
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
@@ -279,6 +276,8 @@ def _compose_two_tasks_in_sequence(
         with tracer.start_as_current_span("task-dependency") as span:
             task1.start(*task1_arguments)
             outcome1 = await task1.get_ref()
+
+            # TODO: second task should probably be skipped if first one fails
             task2.start(outcome1)
             outcome2 = await task2.get_ref()
 
