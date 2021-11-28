@@ -158,6 +158,11 @@ class Try(Generic[A]):
         self.value = value
         self.error = error
 
+    def get(self) -> A:
+        if self.error is not None:
+            raise Exception(f"Try does not contain any value (err={self.error})")
+        return self.value  # type: ignore
+
 
 X = TypeVar("X", contravariant=True)
 Y = TypeVar("Y", covariant=True)
@@ -233,7 +238,7 @@ def task_from_remote_f(
     Lift a Ray remote function f_remote(*args: A) -> B into a Task[TaskOutcome[B]].
     """
 
-    def combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
+    def _combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
         span_id = format_span_id(span.get_span_context().span_id)
         if b.error is None:
             return TaskOutcome(span_id=span_id, return_value=b.value, error=None)
@@ -241,7 +246,7 @@ def task_from_remote_f(
             return TaskOutcome(span_id=span_id, return_value=None, error=b.error)
 
     return GenTask_OT(
-        f_remote=Future.lift_async(f_remote), combiner=combiner, tags=tags
+        f_remote=Future.lift_async(f_remote), combiner=_combiner, tags=tags
     )
 
 
@@ -263,9 +268,10 @@ def task_from_func(
 
 
 def _compose_two_tasks_in_sequence(
-    task1: Task_OT[TaskOutcome[A]], task2: Task_OT[TaskOutcome[A]]
-) -> Task_OT[TaskOutcome[A]]:
-    async def run_tasks_in_sequence(*task1_arguments: U) -> TaskOutcome[A]:
+    task1: TaskP[U, TaskOutcome[A]],
+    task2: TaskP[TaskOutcome[A], TaskOutcome[B]],
+) -> TaskP[U, TaskOutcome[B]]:
+    async def run_tasks_in_sequence(*task1_arguments: U) -> TaskOutcome[B]:
         assert not any(
             isinstance(arg, ray._raylet.ObjectRef) for arg in task1_arguments
         )
@@ -281,10 +287,17 @@ def _compose_two_tasks_in_sequence(
 
             return outcome2
 
-    return Task_OT(f_remote=Future.lift_async(run_tasks_in_sequence))
+    def _combiner(span: Span, b: Try[TaskOutcome[B]]) -> TaskOutcome[B]:
+        return b.get()
+
+    return GenTask_OT(
+        f_remote=Future.lift_async(run_tasks_in_sequence), combiner=_combiner
+    )
 
 
-def in_sequence(*tasks: Task_OT[TaskOutcome[A]]) -> Task_OT[TaskOutcome[A]]:
+def in_sequence(
+    *tasks: TaskP[TaskOutcome[A], TaskOutcome[A]]
+) -> TaskP[TaskOutcome[A], TaskOutcome[A]]:
     """
     Execute a list of tasks in sequence. The output of each task is passed as the
     argument to the next task in the sequence.
