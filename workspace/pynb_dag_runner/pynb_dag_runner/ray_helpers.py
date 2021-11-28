@@ -12,12 +12,14 @@ B = TypeVar("B")
 C = TypeVar("C")
 
 
-class Future(Generic[A]):
+class Future(Awaitable[A]):
     """
     Helper class that can be used to add type hints for Ray Futures (or object ref:s).
 
     We can not type check all interfaces to Ray, but type hints can be used to document
     the code and at least catch some type errors.
+
+    See: https://github.com/ray-project/ray/blob/master/python/ray/types.py
     """
 
     @staticmethod
@@ -41,7 +43,7 @@ class Future(Generic[A]):
     @staticmethod
     def lift_async(
         f: Callable[..., Awaitable[C]], num_cpus: int = 0
-    ) -> "Callable[..., Future[C]]":
+    ) -> Callable[..., Awaitable[C]]:
         """
         Lift an async Python function f as below
 

@@ -5,14 +5,15 @@ from typing import List, Set, Dict, Tuple, Optional, Any, Callable
 import pytest, ray
 
 #
-from pynb_dag_runner.ray_helpers import Future
 from pynb_dag_runner.core.dag_runner import (
     Task,
     Task_OT,
+    task_from_func,
+    task_from_remote_f,
     TaskOutcome,
-    TaskDependence,
     TaskDependencies,
     in_sequence,
+    in_parallel,
     run_tasks,
 )
 from tests.test_ray_helpers import StateActor
@@ -83,7 +84,7 @@ def test__make_task_from_remote_function__success():
     def g():
         return 1234
 
-    for t in [Task_OT.from_remote_f(f.remote), Task_OT.from_f(g)]:
+    for t in [task_from_remote_f(f.remote), task_from_func(g)]:
         t.start()
 
         result = ray.get(t.get_ref())
@@ -96,7 +97,7 @@ def test__make_task_from_function__fail():
     def f():
         raise Exception("kaboom!")
 
-    task_f = Task_OT.from_f(f)
+    task_f = task_from_func(f)
     task_f.start()
 
     result = ray.get(task_f.get_ref())
@@ -121,10 +122,47 @@ def test__task_orchestration__run_three_tasks_in_sequence():
         assert arg.return_value == 44
         return arg.return_value + 1
 
-    all_tasks = in_sequence(*[Task_OT.from_f(_f) for _f in [f, g, h]])
+    all_tasks = in_sequence(*[task_from_func(_f) for _f in [f, g, h]])
     all_tasks.start()
 
     outcome = ray.get(all_tasks.get_ref())
     assert isinstance(outcome, TaskOutcome)
     assert outcome.error is None
     assert outcome.return_value == 45
+
+
+def test__task_orchestration__run_three_tasks_in_parallel__failed():
+    def f(*args):
+        return 1234
+
+    def g(*args):
+        raise Exception("Exception from g")
+
+    def h(*args):
+        return 123
+
+    combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g, h]])
+
+    combined_task.start()
+    outcome = ray.get(combined_task.get_ref())
+
+    assert isinstance(outcome, TaskOutcome)
+    assert outcome.error is not None
+    assert [o.return_value for o in outcome.return_value] == [1234, None, 123]
+
+
+def test__task_orchestration__run_three_tasks_in_parallel__success():
+    def f(*args):
+        return 1234
+
+    def g(*args):
+        return 123
+
+    combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g]])
+
+    combined_task.start()
+    outcome = ray.get(combined_task.get_ref())
+
+    assert isinstance(outcome, TaskOutcome)
+    assert outcome.error is None
+    assert [o.return_value for o in outcome.return_value] == [1234, 123]
