@@ -25,6 +25,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     iso8601_to_epoch_s,
     get_duration_range_us,
     get_span_exceptions,
+    Span,
     Spans,
     SpanRecorder,
 )
@@ -126,15 +127,18 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
         with SpanRecorder() as sr:
 
             def f():
+                time.sleep(0.125)
                 return 43
 
             def g(arg):
+                time.sleep(0.125)
                 assert isinstance(arg, TaskOutcome)
                 assert arg.error is None
                 assert arg.return_value == 43
                 return arg.return_value + 1
 
             def h(arg):
+                time.sleep(0.125)
                 assert isinstance(arg, TaskOutcome)
                 assert arg.error is None
                 assert arg.return_value == 44
@@ -155,7 +159,38 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
 
         return sr.spans
 
-    spans: Spans = get_test_spans()
+    def validate_spans(spans: Spans):
+        deps = spans.filter(["name"], "task-dependency").sort_by_start_time()
+        assert len(deps) == 2
+        dep_fg, dep_gh = deps
+
+        def get_span_for_task(func_name: str) -> Span:
+            assert func_name in ["f", "g", "h"]
+            return one(spans.filter(["attributes", "tags.foo"], func_name))
+
+        # Check that span_id:s referenced in task relationships are found. This may
+        # fail if span_id:s are not correctly formatted (eg. with 0x prefix).
+        for d in [dep_fg, dep_gh]:
+            for k in ["from_task_span_id", "to_task_span_id"]:
+                assert spans.contains_span_id(d["attributes"][k])
+
+        def dep_from_span(dep) -> Span:
+            return spans.get_by_span_id(dep["attributes"]["from_task_span_id"])
+
+        def dep_to_span(dep) -> Span:
+            return spans.get_by_span_id(dep["attributes"]["to_task_span_id"])
+
+        # check that dependency relations correspond to "f -> g" and "g -> h"
+        assert dep_from_span(dep_fg) == get_span_for_task("f")
+
+        # Dependency is not represented by a direct link (see in_sequence
+        # implementation), but
+        spans.contains_path(dep_to_span(dep_fg), get_span_for_task("g"), recursive=True)
+
+        assert dep_from_span(dep_gh) == get_span_for_task("g")
+        assert dep_to_span(dep_gh) == get_span_for_task("h")
+
+    validate_spans(get_test_spans())
 
 
 def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():

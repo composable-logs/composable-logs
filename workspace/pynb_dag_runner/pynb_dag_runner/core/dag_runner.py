@@ -200,7 +200,7 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B]):
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("execute-task") as span:
                 for k, v in self._tags.items():
-                    span.set_attribute(k, v)
+                    span.set_attribute(f"tags.{k}", v)
                 try:
                     result: A = await self._f_remote(*_args)
                     return self._combiner(span, Try(result, None))
@@ -238,7 +238,8 @@ def task_from_remote_f(
     """
 
     def _combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
-        span_id = format_span_id(span.get_span_context().span_id)
+        # manually add "0x" to be compatible with OTEL json:s
+        span_id = "0x" + format_span_id(span.get_span_context().span_id)
         if b.error is None:
             return TaskOutcome(span_id=span_id, return_value=b.value, error=None)
         else:
@@ -283,8 +284,8 @@ def _compose_two_tasks_in_sequence(
             task2.start(outcome1)
             outcome2 = await task2.get_ref()
 
-            span.set_attribute("from_span_id", outcome1.span_id)
-            span.set_attribute("to_span_id", outcome2.span_id)
+            span.set_attribute("from_task_span_id", outcome1.span_id)
+            span.set_attribute("to_task_span_id", outcome2.span_id)
 
             return outcome2
 

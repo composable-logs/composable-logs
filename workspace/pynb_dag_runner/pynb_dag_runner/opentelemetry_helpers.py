@@ -7,7 +7,7 @@ import opentelemetry as ot
 import dateutil.parser as dp  # type: ignore
 
 #
-from pynb_dag_runner.helpers import pairs, flatten, read_jsonl
+from pynb_dag_runner.helpers import pairs, flatten, read_jsonl, one
 
 # ---- helper functions to read OpenTelemetry span dictionaries ----
 
@@ -101,6 +101,9 @@ class Spans:
 
         return Spans([span for span in self.spans if match(span, keys, value)])
 
+    def get_by_span_id(self, span_id) -> Span:
+        return one([span for span in self if get_span_id(span) == span_id])
+
     def sort_by_start_time(self):
         return Spans(
             list(sorted(self, key=lambda s: dp.parse(s["start_time"]).timestamp()))
@@ -115,8 +118,11 @@ class Spans:
     def __getitem__(self, idx):
         return self.spans[idx]
 
-    def contains(self, span):
-        return get_span_id(span) in map(get_span_id, self)
+    def contains_span_id(self, span_id) -> bool:
+        return span_id in map(get_span_id, self)
+
+    def contains(self, span) -> bool:
+        return self.contains_span_id(get_span_id(span))
 
     def contains_path(self, *span_chain, recursive: bool = True) -> bool:
         """
