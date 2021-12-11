@@ -140,7 +140,12 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 assert arg.return_value == 44
                 return arg.return_value + 1
 
-            all_tasks = in_sequence(*[task_from_func(_f) for _f in [f, g, h]])
+            tasks = [
+                task_from_func(f, tags={"foo": "f"}),
+                task_from_func(g, tags={"foo": "g"}),
+                task_from_func(h, tags={"foo": "h"}),
+            ]
+            all_tasks = in_sequence(*tasks)
             all_tasks.start()
 
             outcome = ray.get(all_tasks.get_ref())

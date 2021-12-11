@@ -30,6 +30,7 @@ W = TypeVar("W")
 
 
 class Task(Node, Generic[A]):
+    # --- deprecated ---
     # all below methods are non-blocking
 
     def __init__(self, f_remote: Callable[..., Future[A]]):
@@ -88,6 +89,7 @@ class TaskOutcome(Generic[A]):
 
 
 class Task_OT(Generic[A]):
+    # --- deprecated ---
     def __init__(
         self,
         f_remote: Callable[..., Awaitable[A]],
@@ -365,6 +367,9 @@ def in_parallel(
             )
 
     return Task_OT(f_remote=Future.lift_async(flatten))
+
+
+## v--- deprecated ---v
 
 
 class TaskDependence(Edge):
