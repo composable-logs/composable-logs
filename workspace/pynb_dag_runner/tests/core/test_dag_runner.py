@@ -8,6 +8,7 @@ import pytest, ray
 from pynb_dag_runner.core.dag_runner import (
     Task,
     Task_OT,
+    TaskP,
     task_from_func,
     task_from_remote_f,
     TaskOutcome,
@@ -123,7 +124,7 @@ def test__task_ot__make_task_from_function__fail():
 
 
 def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
-    def get_test_spans():
+    def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
 
             def f():
@@ -144,7 +145,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 assert arg.return_value == 44
                 return arg.return_value + 1
 
-            tasks = [
+            tasks: List[TaskP] = [
                 task_from_func(f, tags={"foo": "f"}),
                 task_from_func(g, tags={"foo": "g"}),
                 task_from_func(h, tags={"foo": "h"}),
@@ -184,7 +185,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
         assert dep_from_span(dep_fg) == get_span_for_task("f")
 
         # Dependency is not represented by a direct link (see in_sequence
-        # implementation), but
+        # implementation), but include intermediate orchestration tasks.
         spans.contains_path(dep_to_span(dep_fg), get_span_for_task("g"), recursive=True)
 
         assert dep_from_span(dep_gh) == get_span_for_task("g")
@@ -204,7 +205,6 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
         return 123
 
     combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g, h]])
-
     combined_task.start()
     outcome = ray.get(combined_task.get_ref())
 
@@ -214,17 +214,36 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
 
 
 def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
-    def f(*args):
-        return 1234
+    def get_test_spans() -> Spans:
+        with SpanRecorder() as sr:
 
-    def g(*args):
-        return 123
+            def f(*args):
+                return 1234
 
-    combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g]])
+            def g(*args):
+                return 123
 
-    combined_task.start()
-    outcome = ray.get(combined_task.get_ref())
+            def h(*args):
+                return 12
 
-    assert isinstance(outcome, TaskOutcome)
-    assert outcome.error is None
-    assert [o.return_value for o in outcome.return_value] == [1234, 123]
+            tasks: List[TaskP] = [
+                task_from_func(f, tags={"foo": "f"}),
+                task_from_func(g, tags={"foo": "g"}),
+                task_from_func(h, tags={"foo": "h"}),
+            ]
+            all_tasks = in_parallel(*tasks)  # type: ignore
+            all_tasks.start()
+
+            outcome = ray.get(all_tasks.get_ref())
+
+            assert isinstance(outcome, TaskOutcome)
+            assert outcome.error is None
+            assert [o.return_value for o in outcome.return_value] == [1234, 123, 12]  # type: ignore
+        return sr.spans
+
+    def validate_spans(spans: Spans):
+        # TODO: no dependency information is now logged from parallel tasks
+        deps = spans.filter(["name"], "task-dependency").sort_by_start_time()
+        assert len(deps) == 0
+
+    validate_spans(get_test_spans())
