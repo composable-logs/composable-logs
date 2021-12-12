@@ -21,7 +21,7 @@ def test__task_ot__make_task_from_remote_function__success():
         assert ray.get(task.has_started.remote()) == False
         assert ray.get(task.has_completed.remote()) == False
 
-        for _ in range(4):
+        for _ in range(10):
             task.start.remote()
 
         assert ray.get(task.has_completed.remote()) == False
@@ -45,7 +45,7 @@ def test__task_ot__make_task_from_function__fail():
     assert ray.get(task_f.has_started.remote()) == False
     assert ray.get(task_f.has_completed.remote()) == False
 
-    for _ in range(1000):
+    for _ in range(10):
         task_f.start.remote()
 
     assert ray.get(task_f.has_started.remote()) == True
