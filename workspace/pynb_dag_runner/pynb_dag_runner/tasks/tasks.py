@@ -8,7 +8,7 @@ import opentelemetry as otel
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
-from pynb_dag_runner.core.dag_runner import Task, Task_OT, TaskDependencies
+from pynb_dag_runner.core.dag_runner import Task, TaskDependencies
 from pynb_dag_runner.wrappers.runlog import Runlog
 from pynb_dag_runner.wrappers.compute_steps import (
     T,

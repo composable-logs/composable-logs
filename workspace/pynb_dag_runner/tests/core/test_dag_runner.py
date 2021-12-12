@@ -7,7 +7,6 @@ import pytest, ray
 #
 from pynb_dag_runner.core.dag_runner import (
     Task,
-    Task_OT,
     TaskP,
     task_from_func,
     task_from_remote_f,

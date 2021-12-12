@@ -21,6 +21,7 @@ from opentelemetry.trace.span import format_span_id, Span
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
 from pynb_dag_runner.ray_helpers import Future, RayMypy
+from pynb_dag_runner.opentelemetry_helpers import SpanId
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -77,7 +78,6 @@ class Task(Node, Generic[A]):
         return ray.get(self.get_ref())
 
 
-SpanId = str
 TaskTags = Mapping[str, str]
 
 
@@ -86,72 +86,6 @@ class TaskOutcome(Generic[A]):
     span_id: SpanId
     return_value: Optional[A]
     error: Optional[Exception]
-
-
-class Task_OT(Generic[A]):
-    # --- deprecated ---
-    def __init__(
-        self,
-        f_remote: Callable[..., Awaitable[A]],
-        tags: TaskTags = {},
-    ):
-        self._f_remote: Callable[..., Awaitable[A]] = f_remote
-        self._future_or_none: Optional[Awaitable[A]] = None
-        self._tags: TaskTags = tags
-
-    def start(self, *args: Any) -> None:
-        """
-        Start execution of task and return
-        """
-        assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
-
-        if self.has_started():
-            raise Exception(f"Task has already started")
-
-        async def make_call(*_args: Any):
-            tracer = otel.trace.get_tracer(__name__)  # type: ignore
-            with tracer.start_as_current_span("execute-task") as span:
-                try:
-                    result = await self._f_remote(*_args)
-                    for k, v in self._tags.items():
-                        span.set_attribute(k, v)
-
-                except Exception as e:
-                    raise e
-
-            return result
-
-        self._future_or_none = Future.lift_async(make_call)(*args)
-
-    def get_ref(self) -> Awaitable[A]:
-        if not self.has_started():
-            raise Exception(f"Task has not started")
-
-        return self._future_or_none  # type: ignore
-
-    def has_started(self) -> bool:
-        return self._future_or_none is not None
-
-    def has_completed(self) -> bool:
-        if not self.has_started():
-            return False
-
-        # See: https://docs.ray.io/en/master/package-ref.html#ray-wait
-        finished_refs, not_finished_refs = ray.wait([self.get_ref()], timeout=0)
-        assert len(finished_refs) + len(not_finished_refs) == 1
-
-        return len(finished_refs) == 1
-
-    def result(self) -> A:
-        """
-        Get result if task has already completed. Otherwise raise an exception.
-        """
-        if not self.has_completed():
-            raise Exception(
-                "Result has not finished. Calling ray.get would block execution"
-            )
-
-        return ray.get(self.get_ref())
 
 
 class Try(Generic[A]):
@@ -214,6 +148,7 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
     async def get_result(self) -> B:
         if not self.has_started():
             raise Exception(f"Task has not started")
+        assert self._future_or_none is not None  # (for mypy to rule out None value)
         return await self._future_or_none  # blocking
 
     def has_started(self) -> bool:
