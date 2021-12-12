@@ -7,8 +7,8 @@ import pytest, ray
 #
 from pynb_dag_runner.core.dag_runner import (
     Task,
-    Task_OT,
     TaskP,
+    RemoteTaskP,
     task_from_func,
     task_from_remote_f,
     TaskOutcome,
@@ -93,36 +93,6 @@ def test_task_run_order(dummy_loop_parameter):
     assert state[2] == 0
 
 
-def test__task_ot__make_task_from_remote_function__success():
-    @ray.remote(num_cpus=0)
-    def f():
-        return 1234
-
-    def g():
-        return 1234
-
-    for t in [task_from_remote_f(f.remote), task_from_func(g)]:
-        t.start()
-
-        result = ray.get(t.get_ref())
-
-        assert result.return_value == 1234
-        assert result.error is None
-
-
-def test__task_ot__make_task_from_function__fail():
-    def f():
-        raise Exception("kaboom!")
-
-    task_f = task_from_func(f)
-    task_f.start()
-
-    result = ray.get(task_f.get_ref())
-
-    assert result.return_value is None
-    assert "kaboom!" in str(result.error)
-
-
 def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
@@ -145,15 +115,15 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 assert arg.return_value == 44
                 return arg.return_value + 1
 
-            tasks: List[TaskP] = [
+            tasks: List[RemoteTaskP] = [
                 task_from_func(f, tags={"foo": "f"}),
                 task_from_func(g, tags={"foo": "g"}),
                 task_from_func(h, tags={"foo": "h"}),
             ]
-            all_tasks = in_sequence(*tasks)
-            all_tasks.start()
+            all_tasks = in_sequence(*tasks)  # type: ignore
+            all_tasks.start.remote()
 
-            outcome = ray.get(all_tasks.get_ref())
+            outcome = ray.get(all_tasks.get_result.remote())
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
             assert outcome.return_value == 45
@@ -205,8 +175,8 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
         return 123
 
     combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g, h]])
-    combined_task.start()
-    outcome = ray.get(combined_task.get_ref())
+    combined_task.start.remote()
+    outcome = ray.get(combined_task.get_result.remote())
 
     assert isinstance(outcome, TaskOutcome)
     assert outcome.error is not None
@@ -226,15 +196,15 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
             def h(*args):
                 return 12
 
-            tasks: List[TaskP] = [
+            tasks: List[RemoteTaskP] = [
                 task_from_func(f, tags={"foo": "f"}),
                 task_from_func(g, tags={"foo": "g"}),
                 task_from_func(h, tags={"foo": "h"}),
             ]
             all_tasks = in_parallel(*tasks)  # type: ignore
-            all_tasks.start()
+            all_tasks.start.remote()
 
-            outcome = ray.get(all_tasks.get_ref())
+            outcome = ray.get(all_tasks.get_result.remote())
 
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None

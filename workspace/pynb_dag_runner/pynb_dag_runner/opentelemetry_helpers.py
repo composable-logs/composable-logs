@@ -37,13 +37,14 @@ def read_key(nested_dict, keys: List[str]) -> Any:
 
 # ---- span functions ----
 Span = Any
+SpanId = str
 
 
 def get_span_exceptions(span: Span):
     return [event for event in span["events"] if event.get("name", "") == "exception"]
 
 
-def get_span_id(span: Span) -> str:
+def get_span_id(span: Span) -> SpanId:
     try:
         result = read_key(span, ["context", "span_id"])
         assert result is not None
@@ -118,13 +119,13 @@ class Spans:
     def __getitem__(self, idx):
         return self.spans[idx]
 
-    def contains_span_id(self, span_id) -> bool:
+    def contains_span_id(self, span_id: SpanId) -> bool:
         return span_id in map(get_span_id, self)
 
-    def contains(self, span) -> bool:
+    def contains(self, span: Span) -> bool:
         return self.contains_span_id(get_span_id(span))
 
-    def contains_path(self, *span_chain, recursive: bool = True) -> bool:
+    def contains_path(self, *span_chain: Span, recursive: bool = True) -> bool:
         """
         Return true/false depending on whether there is a parent-child relationship
         link between the spans in span_chain.
