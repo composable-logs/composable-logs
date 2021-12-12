@@ -112,8 +112,36 @@ class TaskP(Protocol[X, Y]):
         ...
 
 
+# We can not directly use TaskP-protocol since our Task-class will be remote Ray actor.
+# The below encode a Ray actor with the above (remote) class methods.
+
+
+class _RemoteTaskP_start(Protocol[X]):
+    def remote(self, *args: X) -> None:
+        ...
+
+
+class _RemoteTaskP_get_results(Protocol[Y]):
+    def remote(self) -> Awaitable[Y]:
+        ...
+
+
+class RemoteTaskP(Protocol[X, Y]):
+    @property
+    def start(self) -> _RemoteTaskP_start[X]:
+        ...
+
+    @property
+    def get_result(self) -> _RemoteTaskP_get_results[Y]:
+        ...
+
+
 @ray.remote(num_cpus=0)
 class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
+    """
+    Represent a task that a can be run once
+    """
+
     def __init__(
         self,
         f_remote: Callable[..., Awaitable[A]],  # ... = [U, ..., U]
@@ -128,8 +156,9 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
     def start(self, *args: U) -> None:
         assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
 
+        # if task has started do nothing
         if self.has_started():
-            raise Exception(f"Tasks can only be run once, and this has already started")
+            return
 
         async def make_call(*_args: U) -> B:
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
@@ -155,7 +184,7 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
         return self._future_or_none is not None
 
     def has_completed(self) -> bool:
-        if not self.has_started():
+        if self._future_or_none is None:
             return False
 
         # See: https://docs.ray.io/en/master/package-ref.html#ray-wait
@@ -200,30 +229,6 @@ def task_from_func(
         return f(*args)
 
     return task_from_remote_f(remote_f.remote, tags=tags)
-
-
-XX = TypeVar("XX", contravariant=True)
-YY = TypeVar("YY", covariant=True)
-
-
-class _RemoteTaskP_start(Protocol[XX]):
-    def remote(self, *args: XX) -> None:
-        ...
-
-
-class _RemoteTaskP_get_results(Protocol[YY]):
-    def remote(self) -> Awaitable[YY]:
-        ...
-
-
-class RemoteTaskP(Protocol[XX, YY]):
-    @property
-    def start(self) -> _RemoteTaskP_start[XX]:
-        ...
-
-    @property
-    def get_result(self) -> _RemoteTaskP_get_results[YY]:
-        ...
 
 
 def _compose_two_tasks_in_sequence(

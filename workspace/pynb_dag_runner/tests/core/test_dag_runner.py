@@ -92,36 +92,6 @@ def test_task_run_order(dummy_loop_parameter):
     assert state[2] == 0
 
 
-def test__task_ot__make_task_from_remote_function__success():
-    @ray.remote(num_cpus=0)
-    def f():
-        return 1234
-
-    def g():
-        return 1234
-
-    for t in [task_from_remote_f(f.remote), task_from_func(g)]:
-        t.start.remote()
-
-        result = ray.get(t.get_result.remote())
-
-        assert result.return_value == 1234
-        assert result.error is None
-
-
-def test__task_ot__make_task_from_function__fail():
-    def f():
-        raise Exception("kaboom!")
-
-    task_f = task_from_func(f)
-    task_f.start.remote()
-
-    result = ray.get(task_f.get_result.remote())
-
-    assert result.return_value is None
-    assert "kaboom!" in str(result.error)
-
-
 def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:

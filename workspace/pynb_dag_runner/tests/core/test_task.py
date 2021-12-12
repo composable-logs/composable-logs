@@ -1,51 +1,60 @@
 import time
 
 #
-import ray, pytest
+import ray
 
 #
-from pynb_dag_runner.core.dag_runner import Task
+from pynb_dag_runner.core.dag_runner import task_from_func, task_from_remote_f
 
 
-def test_task_execute_states():
+def test__task_ot__make_task_from_remote_function__success():
     @ray.remote(num_cpus=0)
-    def f(*args):
-        time.sleep(0.1)
+    def f():
+        time.sleep(0.125)
         return 1234
 
-    task = Task(f.remote)
+    def g():
+        time.sleep(0.125)
+        return 1234
 
-    # test properties of task before task execution has started
-    assert not task.has_started()
-    assert not task.has_completed()
-    with pytest.raises(Exception):
-        task.result()  # fails before task has started
+    for task in [task_from_remote_f(f.remote), task_from_func(g)]:
+        assert ray.get(task.has_started.remote()) == False
+        assert ray.get(task.has_completed.remote()) == False
 
-    # test properties of task while task execution is in progress
-    task.start()
-    assert task.has_started()
-    assert not task.has_completed()
-    with pytest.raises(Exception):
-        task.result()  # fails since task has not completed
+        for _ in range(4):
+            task.start.remote()
 
-    # test properties of task when task has completed
-    time.sleep(0.2)
-    assert task.has_started()
-    assert task.has_completed()
-    assert task.result() == ray.get(task.get_ref()) == 1234
+        assert ray.get(task.has_completed.remote()) == False
+        assert ray.get(task.has_started.remote()) == True
+
+        result = ray.get(task.get_result.remote())
+        assert result.return_value == 1234
+        assert result.error is None
+
+        assert ray.get(task.has_started.remote()) == True
+        assert ray.get(task.has_completed.remote()) == True
 
 
-def test_task_exceptions_should_propagate():
-    @ray.remote(num_cpus=0)
-    def f(*args):
-        raise Exception("BOOM123!")
+def test__task_ot__make_task_from_function__fail():
+    def f():
+        time.sleep(1)
+        raise Exception("kaboom!")
 
-    task = Task(f.remote)
+    task_f = task_from_func(f)
 
-    try:
-        task.start()
-        time.sleep(0.2)
-        ray.get(task.get_ref())
+    assert ray.get(task_f.has_started.remote()) == False
+    assert ray.get(task_f.has_completed.remote()) == False
 
-    except Exception as e:
-        assert "BOOM123!" in str(e)
+    for _ in range(1000):
+        task_f.start.remote()
+
+    assert ray.get(task_f.has_started.remote()) == True
+    assert ray.get(task_f.has_completed.remote()) == False
+
+    result = ray.get(task_f.get_result.remote())
+
+    assert ray.get(task_f.has_started.remote()) == True
+    assert ray.get(task_f.has_completed.remote()) == True
+
+    assert result.return_value is None
+    assert "kaboom!" in str(result.error)
