@@ -1,4 +1,4 @@
-import asyncio, inspect
+import asyncio, random
 from typing import Any, Coroutine, TypeVar, Generic, Callable, List, Optional, Awaitable
 
 #
@@ -10,6 +10,24 @@ from opentelemetry.trace import StatusCode, Status  # type: ignore
 A = TypeVar("A")
 B = TypeVar("B")
 C = TypeVar("C")
+
+
+class RayMypy:
+    """
+    Dummy class to avoid generate missing .remote attribute error on constructor calls
+    like:
+
+      SubClass.remote(<class SubClass constructor arguments>)
+
+    Ray will warn about this existing before overwriting this at runtime, so this code
+    is never run, but makes type checking better.
+    """
+
+    @classmethod
+    def remote(cls, *args, **kwargs):
+        if random.random() < 0.5:
+            raise Exception("This should never run")
+        return cls(*args, **kwargs)
 
 
 class Future(Awaitable[A]):

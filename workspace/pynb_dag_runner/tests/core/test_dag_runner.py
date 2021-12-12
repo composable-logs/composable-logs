@@ -102,9 +102,9 @@ def test__task_ot__make_task_from_remote_function__success():
         return 1234
 
     for t in [task_from_remote_f(f.remote), task_from_func(g)]:
-        t.start()
+        t.start.remote()
 
-        result = ray.get(t.get_ref())
+        result = ray.get(t.get_result.remote())
 
         assert result.return_value == 1234
         assert result.error is None
@@ -115,9 +115,9 @@ def test__task_ot__make_task_from_function__fail():
         raise Exception("kaboom!")
 
     task_f = task_from_func(f)
-    task_f.start()
+    task_f.start.remote()
 
-    result = ray.get(task_f.get_ref())
+    result = ray.get(task_f.get_result.remote())
 
     assert result.return_value is None
     assert "kaboom!" in str(result.error)
@@ -150,10 +150,10 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 task_from_func(g, tags={"foo": "g"}),
                 task_from_func(h, tags={"foo": "h"}),
             ]
-            all_tasks = in_sequence(*tasks)
-            all_tasks.start()
+            all_tasks = in_sequence(*tasks)  # type: ignore
+            all_tasks.start.remote()
 
-            outcome = ray.get(all_tasks.get_ref())
+            outcome = ray.get(all_tasks.get_result.remote())
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
             assert outcome.return_value == 45
@@ -205,8 +205,8 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
         return 123
 
     combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g, h]])
-    combined_task.start()
-    outcome = ray.get(combined_task.get_ref())
+    combined_task.start.remote()
+    outcome = ray.get(combined_task.get_result.remote())
 
     assert isinstance(outcome, TaskOutcome)
     assert outcome.error is not None
@@ -232,9 +232,9 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
                 task_from_func(h, tags={"foo": "h"}),
             ]
             all_tasks = in_parallel(*tasks)  # type: ignore
-            all_tasks.start()
+            all_tasks.start.remote()
 
-            outcome = ray.get(all_tasks.get_ref())
+            outcome = ray.get(all_tasks.get_result.remote())
 
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
