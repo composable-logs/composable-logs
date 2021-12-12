@@ -8,6 +8,7 @@ import pytest, ray
 from pynb_dag_runner.core.dag_runner import (
     Task,
     TaskP,
+    RemoteTaskP,
     task_from_func,
     task_from_remote_f,
     TaskOutcome,
@@ -114,7 +115,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 assert arg.return_value == 44
                 return arg.return_value + 1
 
-            tasks: List[TaskP] = [
+            tasks: List[RemoteTaskP] = [
                 task_from_func(f, tags={"foo": "f"}),
                 task_from_func(g, tags={"foo": "g"}),
                 task_from_func(h, tags={"foo": "h"}),
@@ -195,7 +196,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
             def h(*args):
                 return 12
 
-            tasks: List[TaskP] = [
+            tasks: List[RemoteTaskP] = [
                 task_from_func(f, tags={"foo": "f"}),
                 task_from_func(g, tags={"foo": "g"}),
                 task_from_func(h, tags={"foo": "h"}),

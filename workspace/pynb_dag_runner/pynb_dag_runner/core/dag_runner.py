@@ -16,6 +16,7 @@ from typing import (
 import ray
 import opentelemetry as otel
 from opentelemetry.trace.span import format_span_id, Span
+from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
 from pynb_dag_runner.helpers import one
@@ -121,7 +122,7 @@ class _RemoteTaskP_start(Protocol[X]):
         ...
 
 
-class _RemoteTaskP_get_results(Protocol[Y]):
+class _RemoteTaskP_get(Protocol[Y]):
     def remote(self) -> Awaitable[Y]:
         ...
 
@@ -132,7 +133,15 @@ class RemoteTaskP(Protocol[X, Y]):
         ...
 
     @property
-    def get_result(self) -> _RemoteTaskP_get_results[Y]:
+    def get_result(self) -> _RemoteTaskP_get[Y]:
+        ...
+
+    @property
+    def has_started(self) -> _RemoteTaskP_get[bool]:
+        ...
+
+    @property
+    def has_completed(self) -> _RemoteTaskP_get[bool]:
         ...
 
 
@@ -163,13 +172,17 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
         async def make_call(*_args: U) -> B:
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("execute-task") as span:
-                for k, v in self._tags.items():
-                    span.set_attribute(f"tags.{k}", v)
                 try:
+                    # pre-task
+                    for k, v in self._tags.items():
+                        span.set_attribute(f"tags.{k}", v)
+
+                    # wait for task to finish
                     result: A = await self._f_remote(*_args)
+
+                    # post-task
                     return self._combiner(span, Try(result, None))
                 except Exception as e:
-                    span.record_exception(e)
                     return self._combiner(span, Try(None, e))
 
         self._future_or_none = Future.lift_async(make_call)(*args)  # non-blocking
@@ -195,8 +208,10 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
 
 
 def task_from_remote_f(
-    f_remote: Callable[..., Awaitable[B]], tags: TaskTags = {}
-) -> TaskP[U, TaskOutcome[B]]:
+    f_remote: Callable[..., Awaitable[B]],
+    tags: TaskTags = {},
+    fail_message: str = "Remote function call failed",
+) -> RemoteTaskP[U, TaskOutcome[B]]:
     """
     Lift a Ray remote function f_remote(*args: A) -> B into a Task[TaskOutcome[B]].
     """
@@ -205,8 +220,12 @@ def task_from_remote_f(
         # manually add "0x" to be compatible with OTEL json:s
         span_id = "0x" + format_span_id(span.get_span_context().span_id)
         if b.error is None:
+            span.set_status(Status(StatusCode.OK))
             return TaskOutcome(span_id=span_id, return_value=b.value, error=None)
         else:
+            span.record_exception(b.error)
+            span.set_status(Status(StatusCode.ERROR, fail_message))
+
             return TaskOutcome(span_id=span_id, return_value=None, error=b.error)
 
     return GenTask_OT.remote(
@@ -216,7 +235,7 @@ def task_from_remote_f(
 
 def task_from_func(
     f: Callable[..., TaskOutcome[B]], num_cpus: int = 0, tags: TaskTags = {}
-) -> TaskP[U, TaskOutcome[B]]:
+) -> RemoteTaskP[U, TaskOutcome[B]]:
     """
     Lift a Python function f(*args: A) -> TaskOutcome[B] into a Task[TaskOutcome[B]].
 
