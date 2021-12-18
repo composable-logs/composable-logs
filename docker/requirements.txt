@@ -1,4 +1,4 @@
-ray[default]==1.7.0
+ray[default]==1.9.0
 notebook==6.4.1
 jupytext==1.11.4
 papermill==2.3.3
