@@ -24,15 +24,21 @@ dev-down:
 
 ### Define tasks run inside Docker
 
-docker-run-in-cicd:
-	# Run bash command(s) in (non-dev) Docker container.
+run-in-docker:
+	# Run bash command(s) in Docker image DOCKER_IMG (=cicd or dev)
 
-	docker run --rm \
+	docker run --rm -t \
 	    --network none \
 	    --volume $$(pwd)/workspace:/home/host_user/workspace \
 	    --workdir /home/host_user/workspace/ \
-	    pynb-dag-runner-cicd \
+	    pynb-dag-runner-$(DOCKER_IMG) \
 	    "$(COMMAND)"
+
+docker-run-in-cicd:
+	make COMMAND="$(COMMAND)" DOCKER_IMG="cicd" run-in-docker
+
+docker-run-in-dev:
+	make COMMAND="$(COMMAND)" DOCKER_IMG="dev" run-in-docker
 
 clean:
 	make COMMAND="(cd pynb_dag_runner; make clean)" docker-run-in-cicd
@@ -49,3 +55,10 @@ test:
 	        test-mypy \
 	        test-black \
 	)" docker-run-in-cicd
+
+pytest-watch:
+	# run pytest in watch mode with ability to filter out specific test(s)
+	make COMMAND="( \
+	    cd pynb_dag_runner; \
+	    make WATCH_MODE=1 PYTEST_FILTER=\"$(PYTEST_FILTER)\" test-pytest \
+	)" docker-run-in-dev

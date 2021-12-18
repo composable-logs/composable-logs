@@ -1,16 +1,26 @@
 SHELL := /bin/bash
 
+ifdef WATCH_MODE
+  $(info ">> Running unit tests in watch mode ...")
+  CMD_PREFIX := find . | grep ".py" | entr
+else
+  CMD_PREFIX :=
+endif
+
 test-pytest:
-	echo ">> Checking unit tests ..."
-	pytest --durations=10 --continue-on-collection-errors tests
+	echo ">> Running unit tests ..."
+	$(CMD_PREFIX) pytest \
+	    -k "$(PYTEST_FILTER)" \
+	    --durations=10 \
+	    --continue-on-collection-errors tests
 
 test-mypy:
-	echo ">> Checking mypy type hints ..."
-	mypy --ignore-missing-imports --exclude build .
+	echo ">> Running mypy type tests ..."
+	$(CMD_PREFIX) mypy --ignore-missing-imports --exclude build .
 
 test-black:
-	echo ">> Checking black code formatting ..."
-	black --check --diff .
+	echo ">> Verify that code is black formatted ..."
+	$(CMD_PREFIX) black --check --diff .
 
 build:
 	echo ">> Building library wheel file ..."
