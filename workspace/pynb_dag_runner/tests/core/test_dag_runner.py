@@ -16,6 +16,7 @@ from pynb_dag_runner.core.dag_runner import (
     in_sequence,
     in_parallel,
     run_tasks,
+    run_and_await_tasks,
 )
 from pynb_dag_runner.opentelemetry_helpers import (
     get_span_id,
@@ -93,6 +94,20 @@ def test_task_run_order(dummy_loop_parameter):
     assert state[2] == 0
 
 
+def test__task_ot__async_wait_for_task():
+    def f():
+        time.sleep(0.125)
+        return 43
+
+    task = task_from_func(f, tags={"foo": "f"})
+
+    outcome = run_and_await_tasks([task], task, timeout_s=10)
+
+    assert isinstance(outcome, TaskOutcome)
+    assert outcome.error is None
+    assert outcome.return_value == 43
+
+
 def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
@@ -123,7 +138,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
             all_tasks = in_sequence(*tasks)  # type: ignore
             all_tasks.start.remote()
 
-            outcome = ray.get(all_tasks.get_result.remote())
+            outcome = ray.get(all_tasks.get_task_result.remote())
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
             assert outcome.return_value == 45
@@ -176,7 +191,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
 
     combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g, h]])
     combined_task.start.remote()
-    outcome = ray.get(combined_task.get_result.remote())
+    outcome = ray.get(combined_task.get_task_result.remote())
 
     assert isinstance(outcome, TaskOutcome)
     assert outcome.error is not None
@@ -204,7 +219,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
             all_tasks = in_parallel(*tasks)  # type: ignore
             all_tasks.start.remote()
 
-            outcome = ray.get(all_tasks.get_result.remote())
+            outcome = ray.get(all_tasks.get_task_result.remote())
 
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None

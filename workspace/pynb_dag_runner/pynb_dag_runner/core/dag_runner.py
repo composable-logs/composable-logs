@@ -133,7 +133,7 @@ class RemoteTaskP(Protocol[X, Y]):
         ...
 
     @property
-    def get_result(self) -> _RemoteTaskP_get[Y]:
+    def get_task_result(self) -> _RemoteTaskP_get[Y]:
         ...
 
     @property
@@ -143,6 +143,25 @@ class RemoteTaskP(Protocol[X, Y]):
     @property
     def has_completed(self) -> _RemoteTaskP_get[bool]:
         ...
+
+
+@ray.remote(num_cpus=0)
+class SignalActor:
+    """
+    Ray actor with binary signal that can be awaited for synchronizing computations.
+
+    Based on example code from Ray docs, see
+    https://docs.ray.io/en/latest/advanced.html
+    """
+
+    def __init__(self):
+        self.ready_event = asyncio.Event()
+
+    def activate(self) -> None:
+        self.ready_event.set()
+
+    async def wait(self) -> None:
+        await self.ready_event.wait()
 
 
 @ray.remote(num_cpus=0)
@@ -162,14 +181,24 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
         self._future_or_none: Optional[Awaitable[B]] = None
         self._tags: TaskTags = tags
 
+        # awaitable async signal indicating that task has started
+        # TODO: Could this be combined with _future_or_none?
+        self._start_signal: SignalActor = SignalActor.remote()  # type: ignore
+
+        # TODO: The below will not serialize, but SignalActor works ok (?)
+        # self.ready_event = asyncio.Event()
+
     def start(self, *args: U) -> None:
         assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
 
-        # if task has started do nothing
+        # task computation should only be run once. So, if task has started do nothing.
         if self.has_started():
             return
 
         async def make_call(*_args: U) -> B:
+            # when start signal resolves, start-method has been called on task
+            await self._start_signal.activate.remote()  # type: ignore
+
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("execute-task") as span:
                 try:
@@ -178,20 +207,28 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
                         span.set_attribute(f"tags.{k}", v)
 
                     # wait for task to finish
-                    result: A = await self._f_remote(*_args)
+                    f_result: A = await self._f_remote(*_args)
 
                     # post-task
-                    return self._combiner(span, Try(result, None))
+                    task_result = self._combiner(span, Try(f_result, None))
                 except Exception as e:
-                    return self._combiner(span, Try(None, e))
+                    task_result = self._combiner(span, Try(None, e))
+
+            return task_result
 
         self._future_or_none = Future.lift_async(make_call)(*args)  # non-blocking
 
-    async def get_result(self) -> B:
-        if not self.has_started():
-            raise Exception(f"Task has not started")
+    async def get_task_result(self) -> B:
+        """
+        Returns an awaitable that resolves to this task's return value. This method can
+        be called either before or after the task has started.
+        """
+        # wait for task .start() method to be called
+        await self._start_signal.wait.remote()  # type: ignore
+
+        # wait for task computation to finish
         assert self._future_or_none is not None  # (for mypy to rule out None value)
-        return await self._future_or_none  # blocking
+        return await self._future_or_none
 
     def has_started(self) -> bool:
         return self._future_or_none is not None
@@ -261,11 +298,11 @@ def _compose_two_tasks_in_sequence(
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("task-dependency") as span:
             task1.start.remote(*task1_arguments)
-            outcome1 = await task1.get_result.remote()
+            outcome1 = await task1.get_task_result.remote()
 
             # TODO: second task should probably be skipped if first one fails
             task2.start.remote(outcome1)
-            outcome2 = await task2.get_result.remote()
+            outcome2 = await task2.get_task_result.remote()
 
             span.set_attribute("from_task_span_id", outcome1.span_id)
             span.set_attribute("to_task_span_id", outcome2.span_id)
@@ -320,7 +357,7 @@ def in_parallel(
         for task in tasks:
             task.start.remote(*task_arguments)
 
-        return await asyncio.gather(*[task.get_result.remote() for task in tasks])
+        return await asyncio.gather(*[task.get_task_result.remote() for task in tasks])
 
     async def flatten_results(
         *task_arguments: TaskOutcome[A],
@@ -362,6 +399,28 @@ def in_parallel(
     return GenTask_OT.remote(
         f_remote=Future.lift_async(flatten_results), combiner=_combiner
     )
+
+
+def run_and_await_tasks(
+    tasks_to_run: List[RemoteTaskP],
+    task_to_await: RemoteTaskP[A, B],
+    timeout_s: float = None,
+) -> B:
+    """
+    Start the provided list of tasks, return when the `task_to_await` task has finished.
+
+    Optionally limit compute time with timeout
+    None (no timeout), or timeout in seconds
+
+    Returns:
+      return value of `task_to_await`
+    """
+    assert len(tasks_to_run) > 0
+
+    for task in tasks_to_run:
+        task.start.remote()
+
+    return ray.get(task_to_await.get_task_result.remote(), timeout=timeout_s)
 
 
 ## v--- deprecated ---v
