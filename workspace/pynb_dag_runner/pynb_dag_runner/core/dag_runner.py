@@ -165,6 +165,33 @@ class SignalActor:
 
 
 @ray.remote(num_cpus=0)
+class FutureActor:
+    """
+    Ray actor containing future value that can be awaited
+
+    Based on example code from Ray docs, see
+    https://docs.ray.io/en/latest/advanced.html
+
+    Note:
+    Adding (Generic[A]) to class definition gives error
+       _pickle.PicklingError: Can't pickle <functools._lru_cache_wrapper object at ..>:
+       it's not the same object as typing.Generic.__class_getitem__
+    """
+
+    def __init__(self):
+        self._ready_event = asyncio.Event()
+        self._value: Optional[A] = None
+
+    def set_value(self, new_value) -> None:
+        self._value = new_value
+        self._ready_event.set()
+
+    async def wait(self) -> Any:
+        await self._ready_event.wait()
+        return self._value
+
+
+@ray.remote(num_cpus=0)
 class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
     """
     Represent a task that a can be run once
@@ -181,20 +208,20 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
         self._combiner: Callable[[Span, Try[A]], B] = combiner
         self._future_or_none: Optional[Awaitable[B]] = None
         self._on_complete_callbacks: List[Callable[[B], None]] = on_complete_callbacks
+        self._span_id_future: FutureActor = FutureActor.remote()  # type: ignore
         self._tags: TaskTags = tags
-
-        # awaitable async signal indicating that task has started
-        # TODO: Could this be combined with _future_or_none?
-        self._start_signal: SignalActor = SignalActor.remote()  # type: ignore
-
-        # TODO: The below will not serialize, but SignalActor works ok (?)
-        # self.ready_event = asyncio.Event()
 
     def add_callback(self, cb: Callable[[B], None]) -> None:
         if self.has_started():
             raise Exception("Cannot add callbacks once task has started")
 
         self._on_complete_callbacks.append(cb)
+
+    async def get_span_id(self) -> str:
+        return await self._span_id_future.wait.remote()  # type: ignore
+
+    def _set_span_id(self, span: Span):
+        self._span_id_future.set_value.remote(get_span_hexid(span))
 
     def start(self, *args: U) -> None:
         assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
@@ -204,12 +231,18 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
             return
 
         async def make_call(*_args: U) -> B:
-            # when start signal resolves, start-method has been called on task
-            await self._start_signal.activate.remote()  # type: ignore
-
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("execute-task") as span:
                 try:
+                    # Note:
+                    # This function is run as a remote Ray function with self being a
+                    # copy of the Task actor; Thus, any changes like self.x = 123 will
+                    # not update the main actor.
+                    #
+                    # Reading is, however, possible. Updating state on remote actors
+                    # referenced from self, is ok, however as below.
+                    self._set_span_id(span)
+
                     # pre-task
                     for k, v in self._tags.items():
                         span.set_attribute(f"tags.{k}", v)
@@ -234,8 +267,8 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
         Returns an awaitable that resolves to this task's return value. This method can
         be called either before or after the task has started.
         """
-        # wait for task .start() method to be called
-        await self._start_signal.wait.remote()  # type: ignore
+        # wait for task to have started
+        _ = await self.get_span_id()
 
         # wait for task computation to finish
         assert self._future_or_none is not None  # (for mypy to rule out None value)
