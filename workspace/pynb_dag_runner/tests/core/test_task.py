@@ -47,7 +47,7 @@ def test_make_task_from_function_or_remote_function(task_fail: bool, lift_f: boo
             assert ray.get(task.has_completed.remote()) == False
             assert ray.get(task.has_started.remote()) == True
 
-            result = ray.get(task.get_result.remote())
+            result = ray.get(task.get_task_result.remote())
             if task_fail:
                 assert result.return_value is None
                 assert "kaboom!" in str(result.error)
