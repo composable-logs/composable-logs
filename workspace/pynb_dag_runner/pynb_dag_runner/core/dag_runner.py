@@ -221,7 +221,7 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
         return await self._span_id_future.wait.remote()  # type: ignore
 
     def _set_span_id(self, span: Span):
-        self._span_id_future.set_value.remote(get_span_hexid(span))
+        self._span_id_future.set_value.remote(get_span_hexid(span))  # type: ignore
 
     def start(self, *args: U) -> None:
         assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
@@ -239,8 +239,8 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
                     # copy of the Task actor; Thus, any changes like self.x = 123 will
                     # not update the main actor.
                     #
-                    # Reading is, however, possible. Updating state on remote actors
-                    # referenced from self, is ok, however as below.
+                    # Reading self is possible, and updating state on remote actors
+                    # referenced from self works, as done one the next line.
                     self._set_span_id(span)
 
                     # pre-task
