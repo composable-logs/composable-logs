@@ -174,11 +174,13 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
         self,
         f_remote: Callable[..., Awaitable[A]],  # ... = [U, ..., U]
         combiner: Callable[[Span, Try[A]], B],
+        on_complete_callbacks: List[Callable[[B], None]] = [],
         tags: TaskTags = {},
     ):
         self._f_remote: Callable[..., Awaitable[A]] = f_remote
         self._combiner: Callable[[Span, Try[A]], B] = combiner
         self._future_or_none: Optional[Awaitable[B]] = None
+        self._on_complete_callbacks: List[Callable[[B], None]] = on_complete_callbacks
         self._tags: TaskTags = tags
 
         # awaitable async signal indicating that task has started
@@ -187,6 +189,12 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
 
         # TODO: The below will not serialize, but SignalActor works ok (?)
         # self.ready_event = asyncio.Event()
+
+    def add_callback(self, cb: Callable[[B], None]) -> None:
+        if self.has_started():
+            raise Exception("Cannot add callbacks once task has started")
+
+        self._on_complete_callbacks.append(cb)
 
     def start(self, *args: U) -> None:
         assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
@@ -213,6 +221,9 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
                     task_result = self._combiner(span, Try(f_result, None))
                 except Exception as e:
                     task_result = self._combiner(span, Try(None, e))
+
+            for cb in self._on_complete_callbacks:
+                cb(task_result)
 
             return task_result
 
