@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 #
 from pynb_dag_runner.tasks.tasks import RunParameters
-from pynb_dag_runner.opentelemetry_helpers import Spans, Span
+from pynb_dag_runner.opentelemetry_helpers import Spans, SpanDict
 from pynb_dag_runner.opentelemetry_helpers import get_duration_s
 
 
@@ -53,12 +53,12 @@ class LoggedJupytextTask(LoggedTask):
 
 
 def _make_jupytext_logged_task(
-    jupytext_span: Span, all_spans: Spans
+    jupytext_span: SpanDict, all_spans: Spans
 ) -> LoggedJupytextTask:
     is_success = jupytext_span["status"]["status_code"] == "OK"
 
-    def make_run(run_span: Span):
-        def make_artefact(artefact_span: Span) -> LoggedArtefact:
+    def make_run(run_span: SpanDict):
+        def make_artefact(artefact_span: SpanDict) -> LoggedArtefact:
             return LoggedArtefact(
                 name=artefact_span["attributes"]["name"],
                 content=artefact_span["attributes"]["content"],

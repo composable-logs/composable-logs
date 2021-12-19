@@ -4,6 +4,7 @@ from typing import Any, List
 
 # Note "from opentelemetry import trace" fails mypy
 import opentelemetry as ot
+from opentelemetry.trace.span import format_span_id, Span
 import dateutil.parser as dp  # type: ignore
 
 #
@@ -36,15 +37,20 @@ def read_key(nested_dict, keys: List[str]) -> Any:
 
 
 # ---- span functions ----
-Span = Any
+SpanDict = Any
 SpanId = str
 
 
-def get_span_exceptions(span: Span):
+def get_span_hexid(span: SpanDict) -> str:
+    # manually add "0x" to be compatible with OTEL json:s
+    return "0x" + format_span_id(span.get_span_context().span_id)
+
+
+def get_span_exceptions(span: SpanDict):
     return [event for event in span["events"] if event.get("name", "") == "exception"]
 
 
-def get_span_id(span: Span) -> SpanId:
+def get_span_id(span: SpanDict) -> SpanId:
     try:
         result = read_key(span, ["context", "span_id"])
         assert result is not None
@@ -59,13 +65,13 @@ def iso8601_to_epoch_s(iso8601_datetime: str) -> float:
     return dp.parse(iso8601_datetime).timestamp()
 
 
-def get_duration_range_us(span: Span):
+def get_duration_range_us(span: SpanDict):
     start_epoch_us: int = int(iso8601_to_epoch_s(span["start_time"]) * 1e6)
     end_epoch_us: int = int(iso8601_to_epoch_s(span["end_time"]) * 1e6)
     return range(start_epoch_us, end_epoch_us)
 
 
-def get_duration_s(span: Span) -> float:
+def get_duration_s(span: SpanDict) -> float:
     """
     Return time duration for span in seconds (as float)
     """
@@ -74,7 +80,7 @@ def get_duration_s(span: Span) -> float:
     return end_epoch_s - start_epoch_s
 
 
-def is_parent_child(span_parent: Span, span_child: Span) -> bool:
+def is_parent_child(span_parent: SpanDict, span_child: SpanDict) -> bool:
     """
     Return True/False if span_parent is direct parent of span_child.
     """
@@ -89,7 +95,7 @@ class Spans:
     Container for Python dictionaries with OpenTelemetry span:s
     """
 
-    def __init__(self, spans: List[Span]):
+    def __init__(self, spans: List[SpanDict]):
         self.spans = spans
 
     def filter(self, keys: List[str], value: Any):
@@ -102,7 +108,7 @@ class Spans:
 
         return Spans([span for span in self.spans if match(span, keys, value)])
 
-    def get_by_span_id(self, span_id) -> Span:
+    def get_by_span_id(self, span_id) -> SpanDict:
         return one([span for span in self if get_span_id(span) == span_id])
 
     def sort_by_start_time(self):
@@ -122,7 +128,7 @@ class Spans:
     def contains_span_id(self, span_id: SpanId) -> bool:
         return span_id in map(get_span_id, self)
 
-    def contains(self, span: Span) -> bool:
+    def contains(self, span: SpanDict) -> bool:
         return self.contains_span_id(get_span_id(span))
 
     def contains_path(self, *span_chain: Span, recursive: bool = True) -> bool:
@@ -156,7 +162,7 @@ class Spans:
                 self.contains_path(*ps, recursive=recursive) for ps in pairs(span_chain)
             )
 
-    def restrict_by_top(self, top: Span) -> "Spans":
+    def restrict_by_top(self, top: SpanDict) -> "Spans":
         """
         Restrict this collection of Spans to spans that can be connected to
         the parent-span using one or many parent-child relationship(s).
@@ -165,7 +171,7 @@ class Spans:
         """
         return Spans([s for s in self if self.contains_path(top, s, recursive=True)])
 
-    def exceptions_in(self, top: Span):
+    def exceptions_in(self, top: SpanDict):
         """
         Return list of Exception events in top and all sub-spans to top.
         """

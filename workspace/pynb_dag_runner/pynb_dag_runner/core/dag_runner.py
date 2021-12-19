@@ -22,7 +22,7 @@ from opentelemetry.trace import StatusCode, Status  # type: ignore
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
 from pynb_dag_runner.ray_helpers import Future, RayMypy
-from pynb_dag_runner.opentelemetry_helpers import SpanId
+from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -266,7 +266,7 @@ def task_from_remote_f(
 
     def _combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
         # manually add "0x" to be compatible with OTEL json:s
-        span_id = "0x" + format_span_id(span.get_span_context().span_id)
+        span_id = get_span_hexid(span)
         if b.error is None:
             span.set_status(Status(StatusCode.OK))
             return TaskOutcome(span_id=span_id, return_value=b.value, error=None)
