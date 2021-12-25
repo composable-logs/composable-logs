@@ -21,7 +21,7 @@ from opentelemetry.trace import StatusCode, Status  # type: ignore
 #
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
-from pynb_dag_runner.ray_helpers import Future, RayMypy
+from pynb_dag_runner.ray_helpers import Future, FutureActor, RayMypy
 from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid
 
 A = TypeVar("A")
@@ -143,33 +143,6 @@ class RemoteTaskP(Protocol[X, Y]):
     @property
     def has_completed(self) -> _RemoteTaskP_get[bool]:
         ...
-
-
-@ray.remote(num_cpus=0)
-class FutureActor:
-    """
-    Ray actor containing future value that can be awaited
-
-    Based on example code from Ray docs, see
-    https://docs.ray.io/en/latest/advanced.html
-
-    Note:
-    Adding (Generic[A]) to class definition gives error
-       _pickle.PicklingError: Can't pickle <functools._lru_cache_wrapper object at ..>:
-       it's not the same object as typing.Generic.__class_getitem__
-    """
-
-    def __init__(self):
-        self._ready_event = asyncio.Event()
-        self._value: Optional[A] = None
-
-    def set_value(self, new_value) -> None:
-        self._value = new_value
-        self._ready_event.set()
-
-    async def wait(self) -> Any:
-        await self._ready_event.wait()
-        return self._value
 
 
 @ray.remote(num_cpus=0)
