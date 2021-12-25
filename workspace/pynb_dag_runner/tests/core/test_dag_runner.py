@@ -13,7 +13,7 @@ from pynb_dag_runner.core.dag_runner import (
     task_from_remote_f,
     TaskOutcome,
     TaskDependencies,
-    in_sequence,
+    run_in_sequence,
     in_parallel,
     run_tasks,
     run_and_await_tasks,
@@ -28,6 +28,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     get_duration_range_us,
     get_span_exceptions,
     Span,
+    SpanDict,
     Spans,
     SpanRecorder,
 )
@@ -95,7 +96,7 @@ def test_task_run_order(dummy_loop_parameter):
 
 
 def test__task_ot__async_wait_for_task():
-    def f():
+    def f(*args):
         time.sleep(0.125)
         return 43
 
@@ -112,7 +113,9 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
 
-            def f():
+            def f(*args):
+                if len(args) > 0:
+                    raise Exception("f got a paraterer")
                 time.sleep(0.125)
                 return 43
 
@@ -135,13 +138,20 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 task_from_func(g, tags={"foo": "g"}),
                 task_from_func(h, tags={"foo": "h"}),
             ]
-            all_tasks = in_sequence(*tasks)  # type: ignore
-            all_tasks.start.remote()
+            task_f, task_g, task_h = tasks
 
-            outcome = ray.get(all_tasks.get_task_result.remote())
+            run_in_sequence(task_f, task_g, task_h)
+
+            outcome = run_and_await_tasks([task_f], task_h, timeout_s=10)
+
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
             assert outcome.return_value == 45
+
+            # all tasks have completed, and we can query results repeatedly
+            for t in 10 * tasks:
+                assert ray.get(t.has_completed.remote()) == True
+                assert isinstance(ray.get(t.get_task_result.remote()), TaskOutcome)
 
         return sr.spans
 
@@ -160,18 +170,15 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
             for k in ["from_task_span_id", "to_task_span_id"]:
                 assert spans.contains_span_id(d["attributes"][k])
 
-        def dep_from_span(dep) -> Span:
-            return spans.get_by_span_id(dep["attributes"]["from_task_span_id"])
+        def dep_from_span(s: SpanDict) -> SpanDict:
+            return spans.get_by_span_id(s["attributes"]["from_task_span_id"])
 
-        def dep_to_span(dep) -> Span:
-            return spans.get_by_span_id(dep["attributes"]["to_task_span_id"])
+        def dep_to_span(s: SpanDict) -> SpanDict:
+            return spans.get_by_span_id(s["attributes"]["to_task_span_id"])
 
         # check that dependency relations correspond to "f -> g" and "g -> h"
         assert dep_from_span(dep_fg) == get_span_for_task("f")
-
-        # Dependency is not represented by a direct link (see in_sequence
-        # implementation), but include intermediate orchestration tasks.
-        spans.contains_path(dep_to_span(dep_fg), get_span_for_task("g"), recursive=True)
+        assert dep_to_span(dep_fg) == get_span_for_task("g")
 
         assert dep_from_span(dep_gh) == get_span_for_task("g")
         assert dep_to_span(dep_gh) == get_span_for_task("h")

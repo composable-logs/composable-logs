@@ -14,6 +14,7 @@ from pynb_dag_runner.ray_helpers import (
     retry_wrapper,
     retry_wrapper_ot,
     Future,
+    FutureActor,
 )
 from pynb_dag_runner.opentelemetry_helpers import read_key, Spans, SpanRecorder
 
@@ -28,6 +29,28 @@ class StateActor:
 
     def get(self):
         return self._state
+
+
+### Test FutureActor
+
+
+def test_future_actor():
+    future_value = FutureActor.remote()
+
+    future_value.set_value.remote("foo")
+
+    for _ in range(10):
+        assert ray.get(future_value.wait.remote()) == "foo"
+
+
+@pytest.mark.asyncio
+async def test_future_actor_async():
+    future_value = FutureActor.remote()
+
+    future_value.set_value.remote("bar")
+
+    for _ in range(10):
+        assert (await future_value.wait.remote()) == "bar"
 
 
 ### Test Future static functions
