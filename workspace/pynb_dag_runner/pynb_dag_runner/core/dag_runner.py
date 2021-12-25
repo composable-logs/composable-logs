@@ -336,7 +336,7 @@ def _cb_compose_tasks(
     TODO: error handling
     """
 
-    async def task1_on_complete_handler(task1_result) -> None:
+    async def task1_on_complete_handler(task1_result: TaskOutcome[A]) -> None:
         task1_span_id = await task1.get_span_id.remote()
         task2.start.remote(task1_result)
         task2_span_id = await task2.get_span_id.remote()
