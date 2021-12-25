@@ -146,25 +146,6 @@ class RemoteTaskP(Protocol[X, Y]):
 
 
 @ray.remote(num_cpus=0)
-class SignalActor:
-    """
-    Ray actor with binary signal that can be awaited for synchronizing computations.
-
-    Based on example code from Ray docs, see
-    https://docs.ray.io/en/latest/advanced.html
-    """
-
-    def __init__(self):
-        self.ready_event = asyncio.Event()
-
-    def activate(self) -> None:
-        self.ready_event.set()
-
-    async def wait(self) -> None:
-        await self.ready_event.wait()
-
-
-@ray.remote(num_cpus=0)
 class FutureActor:
     """
     Ray actor containing future value that can be awaited
@@ -298,7 +279,6 @@ def task_from_remote_f(
     """
 
     def _combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
-        # manually add "0x" to be compatible with OTEL json:s
         span_id = get_span_hexid(span)
         if b.error is None:
             span.set_status(Status(StatusCode.OK))
