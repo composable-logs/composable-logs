@@ -19,7 +19,7 @@ from opentelemetry.trace.span import format_span_id, Span
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
-from pynb_dag_runner.helpers import one
+from pynb_dag_runner.helpers import one, pairs
 from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
 from pynb_dag_runner.ray_helpers import Future, FutureActor, RayMypy
 from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid
@@ -117,7 +117,7 @@ class TaskP(Protocol[X, Y]):
 # The below encode a Ray actor with the above (remote) class methods.
 
 
-class _RemoteTaskP_start(Protocol[X]):
+class _RemoteTaskP_set(Protocol[X]):
     def remote(self, *args: X) -> None:
         ...
 
@@ -129,11 +129,19 @@ class _RemoteTaskP_get(Protocol[Y]):
 
 class RemoteTaskP(Protocol[X, Y]):
     @property
-    def start(self) -> _RemoteTaskP_start[X]:
+    def start(self) -> _RemoteTaskP_set[X]:
+        ...
+
+    @property
+    def add_callback(self) -> _RemoteTaskP_set[Callable[[Y], Awaitable[None]]]:
         ...
 
     @property
     def get_task_result(self) -> _RemoteTaskP_get[Y]:
+        ...
+
+    @property
+    def get_span_id(self) -> _RemoteTaskP_get[str]:
         ...
 
     @property
@@ -155,17 +163,19 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
         self,
         f_remote: Callable[..., Awaitable[A]],  # ... = [U, ..., U]
         combiner: Callable[[Span, Try[A]], B],
-        on_complete_callbacks: List[Callable[[B], None]] = [],
+        on_complete_callbacks: List[Callable[[B], Awaitable[None]]] = [],
         tags: TaskTags = {},
     ):
         self._f_remote: Callable[..., Awaitable[A]] = f_remote
         self._combiner: Callable[[Span, Try[A]], B] = combiner
         self._future_or_none: Optional[Awaitable[B]] = None
-        self._on_complete_callbacks: List[Callable[[B], None]] = on_complete_callbacks
+        self._on_complete_callbacks: List[
+            Callable[[B], Awaitable[None]]
+        ] = on_complete_callbacks
         self._span_id_future: FutureActor = FutureActor.remote()  # type: ignore
         self._tags: TaskTags = tags
 
-    def add_callback(self, cb: Callable[[B], None]) -> None:
+    def add_callback(self, cb: Callable[[B], Awaitable[None]]) -> None:
         if self.has_started():
             raise Exception("Cannot add callbacks once task has started")
 
@@ -210,7 +220,7 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
                     task_result = self._combiner(span, Try(None, e))
 
             for cb in self._on_complete_callbacks:
-                cb(task_result)
+                await cb(task_result)
 
             return task_result
 
@@ -312,6 +322,49 @@ def _compose_two_tasks_in_sequence(
     return GenTask_OT.remote(
         f_remote=Future.lift_async(run_tasks_in_sequence), combiner=_combiner
     )
+
+
+def _cb_compose_tasks(
+    task1: RemoteTaskP[U, TaskOutcome[A]],
+    task2: RemoteTaskP[TaskOutcome[A], TaskOutcome[B]],
+):
+    """
+    Add on_complete callback to task1 so that:
+      - task2 starts when task1 finishes
+      - log (task1 -> task2) dependency
+
+    TODO: error handling
+    """
+
+    async def task1_on_complete_handler(task1_result) -> None:
+        task1_span_id = await task1.get_span_id.remote()
+        task2.start.remote(task1_result)
+        task2_span_id = await task2.get_span_id.remote()
+
+        # After span_id:s of Task1 and Task2 are known, log that these have a
+        # sequential dependence
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("task-dependency") as span:
+            span.set_attribute("from_task_span_id", task1_span_id)
+            span.set_attribute("to_task_span_id", task2_span_id)
+
+    task1.add_callback.remote(task1_on_complete_handler)
+
+
+def run_in_sequence(*tasks: RemoteTaskP[TaskOutcome[A], TaskOutcome[A]]):
+    """
+    Execute a list of tasks in sequence. The output of each task is passed as the
+    argument to the next task in the sequence.
+
+    Eg.
+        task1 -> task2 -> task3
+
+    """
+    if len(tasks) <= 1:
+        raise ValueError("Need at least two input tasks")
+    else:
+        for task1, task2 in pairs(tasks):
+            _cb_compose_tasks(task1, task2)
 
 
 def in_sequence(

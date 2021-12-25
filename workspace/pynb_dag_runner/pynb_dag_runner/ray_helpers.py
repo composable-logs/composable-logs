@@ -49,12 +49,18 @@ class FutureActor:
     def __init__(self):
         self._ready_event = asyncio.Event()
         self._value: Optional[A] = None
+        self._value_is_set = False
 
     def set_value(self, new_value) -> None:
+        if self._value_is_set:
+            raise Exception("Value already set")
         self._value = new_value
         self._ready_event.set()
+        self._value_is_set = True
 
     async def wait(self) -> Any:
+        if self._value_is_set:
+            return self._value
         await self._ready_event.wait()
         return self._value
 
