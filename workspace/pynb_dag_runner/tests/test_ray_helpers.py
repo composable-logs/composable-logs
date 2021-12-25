@@ -39,7 +39,8 @@ def test_future_actor():
 
     future_value.set_value.remote("foo")
 
-    assert ray.get(future_value.wait.remote()) == "foo"
+    for _ in range(10):
+        assert ray.get(future_value.wait.remote()) == "foo"
 
 
 @pytest.mark.asyncio
@@ -48,7 +49,8 @@ async def test_future_actor_async():
 
     future_value.set_value.remote("bar")
 
-    assert (await future_value.wait.remote()) == "bar"
+    for _ in range(10):
+        assert (await future_value.wait.remote()) == "bar"
 
 
 ### Test Future static functions

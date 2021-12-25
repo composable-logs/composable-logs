@@ -367,28 +367,6 @@ def run_in_sequence(*tasks: RemoteTaskP[TaskOutcome[A], TaskOutcome[A]]):
             _cb_compose_tasks(task1, task2)
 
 
-def in_sequence(
-    *tasks: RemoteTaskP[TaskOutcome[A], TaskOutcome[A]]
-) -> RemoteTaskP[TaskOutcome[A], TaskOutcome[A]]:
-    """
-    Execute a list of tasks in sequence. The output of each task is passed as the
-    argument to the next task in the sequence.
-
-    Eg.
-        task1 -> task2 -> task3
-
-    TODO: error handling
-    """
-    if len(tasks) == 0:
-        raise ValueError("Empty task list provided")
-    else:
-        first, *rest = tasks
-        if len(rest) == 0:
-            return first
-        else:
-            return _compose_two_tasks_in_sequence(first, in_sequence(*rest))
-
-
 def in_parallel(
     *tasks: RemoteTaskP[TaskOutcome[A], TaskOutcome[B]],
 ) -> RemoteTaskP[TaskOutcome[A], TaskOutcome[List[TaskOutcome[B]]]]:
