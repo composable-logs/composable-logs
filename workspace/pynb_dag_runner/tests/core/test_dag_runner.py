@@ -7,7 +7,6 @@ import pytest, ray
 #
 from pynb_dag_runner.core.dag_runner import (
     Task,
-    TaskP,
     RemoteTaskP,
     task_from_func,
     task_from_remote_f,
@@ -140,7 +139,13 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
             ]
             task_f, task_g, task_h = tasks
 
+            # define task dependencies
             run_in_sequence(task_f, task_g, task_h)
+
+            # no has has started
+            for task in 10 * tasks:
+                assert ray.get(task.has_started.remote()) == False
+                assert ray.get(task.has_completed.remote()) == False
 
             outcome = run_and_await_tasks([task_f], task_h, timeout_s=10)
 
@@ -149,9 +154,10 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
             assert outcome.return_value == 45
 
             # all tasks have completed, and we can query results repeatedly
-            for t in 10 * tasks:
-                assert ray.get(t.has_completed.remote()) == True
-                assert isinstance(ray.get(t.get_task_result.remote()), TaskOutcome)
+            for task in 10 * tasks:
+                assert ray.get(task.has_started.remote()) == True
+                assert ray.get(task.has_completed.remote()) == True
+                assert isinstance(ray.get(task.get_task_result.remote()), TaskOutcome)
 
         return sr.spans
 
