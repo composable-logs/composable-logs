@@ -14,6 +14,7 @@ from pynb_dag_runner.core.dag_runner import (
     TaskDependencies,
     run_in_sequence,
     in_parallel,
+    fan_in,
     run_tasks,
     run_and_await_tasks,
 )
@@ -188,6 +189,57 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
 
         assert dep_from_span(dep_gh) == get_span_for_task("g")
         assert dep_to_span(dep_gh) == get_span_for_task("h")
+
+    validate_spans(get_test_spans())
+
+
+def test__task_ot__task_orchestration__fan_in_two_tasks():
+    def get_test_spans() -> Spans:
+        with SpanRecorder() as sr:
+
+            def f1(*args):
+                time.sleep(0.1)
+                return 43
+
+            def f2(*args):
+                time.sleep(0.2)
+                return 44
+
+            def fx(*args):
+                time.sleep(0.3)
+                return 45
+
+            tasks = [
+                task_from_func(f1, tags={"foo": "f1"}),
+                task_from_func(f2, tags={"foo": "f2"}),
+                task_from_func(fx, tags={"foo": "fan_in"}),
+            ]
+            task_1, task_2, task_fan_in = tasks
+
+            # define task dependencies
+            fan_in([task_1, task_2], task_fan_in)
+
+            # no has has started
+            for task in 10 * tasks:
+                assert ray.get(task.has_started.remote()) == False
+                assert ray.get(task.has_completed.remote()) == False
+
+            outcome = run_and_await_tasks([task_1, task_2], task_fan_in, timeout_s=10)
+
+            assert isinstance(outcome, TaskOutcome)
+            assert outcome.error is None
+            assert outcome.return_value == 45
+
+            # all tasks have completed, and we can query results repeatedly
+            for task in 10 * tasks:
+                assert ray.get(task.has_started.remote()) == True
+                assert ray.get(task.has_completed.remote()) == True
+                assert isinstance(ray.get(task.get_task_result.remote()), TaskOutcome)
+
+        return sr.spans
+
+    def validate_spans(spans: Spans):
+        pass
 
     validate_spans(get_test_spans())
 
