@@ -426,8 +426,9 @@ def fan_in(
        task3 ---/
 
     Also log these task dependencies after target_task is started.
-
     """
+    if len(paralllel_tasks) == 0:
+        raise ValueError("Called with zero length task list.")
 
     @ray.remote(num_cpus=0)
     class TargetTaskTrigger:
@@ -435,7 +436,10 @@ def fan_in(
             self._completed_tasks = []
 
         async def start_target_task(self):
-            target_task.start.remote()
+            parallel_tasks_results: List[TaskOutcome[B]] = [
+                await task.get_task_result.remote() for task in paralllel_tasks
+            ]
+            target_task.start.remote(parallel_tasks_results)
 
             target_span_id = await target_task.get_span_id.remote()
 
