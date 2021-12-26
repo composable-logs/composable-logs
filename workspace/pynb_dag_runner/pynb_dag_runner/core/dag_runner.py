@@ -294,36 +294,6 @@ def task_from_func(
     return task_from_remote_f(remote_f.remote, tags=tags)
 
 
-def _compose_two_tasks_in_sequence(
-    task1: RemoteTaskP[U, TaskOutcome[A]],
-    task2: RemoteTaskP[TaskOutcome[A], TaskOutcome[B]],
-) -> RemoteTaskP[U, TaskOutcome[B]]:
-    async def run_tasks_in_sequence(*task1_arguments: U) -> TaskOutcome[B]:
-        assert not any(
-            isinstance(arg, ray._raylet.ObjectRef) for arg in task1_arguments
-        )
-        tracer = otel.trace.get_tracer(__name__)  # type: ignore
-        with tracer.start_as_current_span("task-dependency") as span:
-            task1.start.remote(*task1_arguments)
-            outcome1 = await task1.get_task_result.remote()
-
-            # TODO: second task should probably be skipped if first one fails
-            task2.start.remote(outcome1)
-            outcome2 = await task2.get_task_result.remote()
-
-            span.set_attribute("from_task_span_id", outcome1.span_id)
-            span.set_attribute("to_task_span_id", outcome2.span_id)
-
-            return outcome2
-
-    def _combiner(span: Span, b: Try[TaskOutcome[B]]) -> TaskOutcome[B]:
-        return b.get()
-
-    return GenTask_OT.remote(
-        f_remote=Future.lift_async(run_tasks_in_sequence), combiner=_combiner
-    )
-
-
 def _cb_compose_tasks(
     task1: RemoteTaskP[U, TaskOutcome[A]],
     task2: RemoteTaskP[TaskOutcome[A], TaskOutcome[B]],
