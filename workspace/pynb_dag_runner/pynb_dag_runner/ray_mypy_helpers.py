@@ -1,7 +1,6 @@
 from typing import Awaitable, TypeVar, Protocol
 
-# We can not directly use TaskP-protocol since our Task-class will be remote Ray actor.
-# The below encode a Ray actor with the above (remote) class methods.
+# Helper protocols for encoding Protocols for remote methods on Ray remote actors.
 
 X = TypeVar("X", contravariant=True)
 Y = TypeVar("Y", covariant=True)
