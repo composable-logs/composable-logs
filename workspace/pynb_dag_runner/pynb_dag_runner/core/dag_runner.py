@@ -168,12 +168,13 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
     ):
         self._f_remote: Callable[..., Awaitable[A]] = f_remote
         self._combiner: Callable[[Span, Try[A]], B] = combiner
-        self._future_or_none: Optional[Awaitable[B]] = None
+        self._span_id_future: FutureActor = FutureActor.remote()  # type: ignore
+        self._future_value: FutureActor = FutureActor.remote()  # type: ignore
         self._on_complete_callbacks: List[
             Callable[[B], Awaitable[None]]
         ] = on_complete_callbacks
-        self._span_id_future: FutureActor = FutureActor.remote()  # type: ignore
         self._tags: TaskTags = tags
+        self._start_called = False
 
     def add_callback(self, cb: Callable[[B], Awaitable[None]]) -> None:
         if self.has_started():
@@ -184,8 +185,14 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
     async def get_span_id(self) -> str:
         return await self._span_id_future.wait.remote()  # type: ignore
 
+    def _set_result(self, value: B):
+        self._future_value.set_value.remote(value)  # type: ignore
+
     def _set_span_id(self, span: Span):
         self._span_id_future.set_value.remote(get_span_hexid(span))  # type: ignore
+
+    def has_started(self) -> bool:
+        return self._start_called
 
     def start(self, *args: U) -> None:
         assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
@@ -194,7 +201,9 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
         if self.has_started():
             return
 
-        async def make_call(*_args: U) -> B:
+        self._start_called = True
+
+        async def make_call(*_args: U):
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("execute-task") as span:
                 try:
@@ -219,37 +228,27 @@ class GenTask_OT(Generic[U, A, B], TaskP[U, B], RayMypy):
                 except Exception as e:
                     task_result = self._combiner(span, Try(None, e))
 
+            # note, result is set before callbacks are called
+            self._set_result(task_result)
+
             for cb in self._on_complete_callbacks:
                 await cb(task_result)
 
-            return task_result
-
-        self._future_or_none = Future.lift_async(make_call)(*args)  # non-blocking
+        # Start computation in other (possibly remote) Python process, non-blocking call
+        Future.lift_async(make_call)(*args)
 
     async def get_task_result(self) -> B:
         """
         Returns an awaitable that resolves to this task's return value. This method can
         be called either before or after the task has started.
         """
-        # wait for task to have started
-        _ = await self.get_span_id()
+        return await self._future_value.wait.remote()  # type: ignore
 
-        # wait for task computation to finish
-        assert self._future_or_none is not None  # (for mypy to rule out None value)
-        return await self._future_or_none
-
-    def has_started(self) -> bool:
-        return self._future_or_none is not None
+    async def has_completed_async(self) -> bool:
+        return await self._future_value.value_is_set.remote()  # type: ignore
 
     def has_completed(self) -> bool:
-        if self._future_or_none is None:
-            return False
-
-        # See: https://docs.ray.io/en/master/package-ref.html#ray-wait
-        finished_refs, not_finished_refs = ray.wait([self._future_or_none], timeout=0)
-        assert len(finished_refs) + len(not_finished_refs) == 1
-
-        return len(finished_refs) == 1
+        return ray.get(self._future_value.value_is_set.remote())  # type: ignore
 
 
 def task_from_remote_f(
