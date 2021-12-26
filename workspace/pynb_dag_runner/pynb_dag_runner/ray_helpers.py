@@ -35,8 +35,6 @@ class FutureActor:
     """
     Ray actor containing future value that can be set and awaited independently.
 
-    Exceptions
-
     Based on example code from Ray docs, see
     https://docs.ray.io/en/latest/advanced.html
 
@@ -55,8 +53,11 @@ class FutureActor:
         if self._value_is_set:
             raise Exception("Value already set")
         self._value = new_value
-        self._ready_event.set()
         self._value_is_set = True
+        self._ready_event.set()
+
+    def value_is_set(self) -> bool:
+        return self._value_is_set
 
     async def wait(self) -> Any:
         if self._value_is_set:
