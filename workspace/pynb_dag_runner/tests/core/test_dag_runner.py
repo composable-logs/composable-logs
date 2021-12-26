@@ -209,7 +209,7 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
                 time.sleep(0.3)
                 return 45
 
-            tasks = [
+            tasks: List[RemoteTaskP] = [
                 task_from_func(f1, tags={"foo": "f1"}),
                 task_from_func(f2, tags={"foo": "f2"}),
                 task_from_func(fx, tags={"foo": "fan_in"}),
