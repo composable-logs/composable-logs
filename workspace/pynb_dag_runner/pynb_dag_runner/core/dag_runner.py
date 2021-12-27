@@ -27,6 +27,7 @@ from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid
 
 A = TypeVar("A")
 B = TypeVar("B")
+C = TypeVar("C")
 U = TypeVar("U")
 V = TypeVar("V")
 W = TypeVar("W")
@@ -311,6 +312,9 @@ def _cb_compose_tasks(
     """
 
     async def task1_on_complete_handler(task1_result: TaskOutcome[A]) -> None:
+        assert await task1.has_started.remote() == True
+        assert await task1.has_completed.remote() == True
+
         task1_span_id = await task1.get_span_id.remote()
         task2.start.remote(task1_result)
         task2_span_id = await task2.get_span_id.remote()
@@ -403,6 +407,67 @@ def in_parallel(
     )
 
 
+def fan_in(
+    paralllel_tasks: List[RemoteTaskP[TaskOutcome[A], TaskOutcome[B]]],
+    target_task: RemoteTaskP[List[TaskOutcome[B]], TaskOutcome[C]],
+):
+    """
+    Add on_complete callbacks to tasks in `paralllel_tasks` so that `target_task`-task
+    is started when all tasks in `paralllel_tasks` have completed.
+
+    Eg.,
+
+       task1 ---\
+                 \
+                  v
+       task2 ------> target_task
+                  ^
+                 /
+       task3 ---/
+
+    Also log these task dependencies after target_task is started.
+    """
+    if len(paralllel_tasks) == 0:
+        raise ValueError("Called with zero length task list.")
+
+    @ray.remote(num_cpus=0)
+    class TargetTaskTrigger:
+        def __init__(self):
+            self._completed_tasks = []
+
+        async def start_target_task(self):
+            parallel_tasks_results: List[TaskOutcome[B]] = [
+                await task.get_task_result.remote() for task in paralllel_tasks
+            ]
+            target_task.start.remote(parallel_tasks_results)
+
+            target_span_id = await target_task.get_span_id.remote()
+
+            # Log task dependencies
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
+            for task in self._completed_tasks:
+                with tracer.start_as_current_span("task-dependency") as span:
+                    span.set_attribute(
+                        "from_task_span_id", await task.get_span_id.remote()
+                    )
+                    span.set_attribute("to_task_span_id", target_span_id)
+
+        async def record_completed_task(self, task):
+            self._completed_tasks.append(task)
+
+            if len(self._completed_tasks) == len(paralllel_tasks):
+                await self.start_target_task()
+
+    target_task_trigger = TargetTaskTrigger.remote()  # type: ignore
+
+    for task in paralllel_tasks:
+
+        async def task_on_complete_handler(task_result: TaskOutcome[B]) -> None:
+            await target_task_trigger.record_completed_task.remote(task)
+
+        task.add_callback.remote(task_on_complete_handler)
+
+
 def run_and_await_tasks(
     tasks_to_run: List[RemoteTaskP],
     task_to_await: RemoteTaskP[A, B],
@@ -416,6 +481,10 @@ def run_and_await_tasks(
 
     Returns:
       return value of `task_to_await`
+
+    Notes:
+    - If task_to_await has on_complete callbacks, then this function may return before
+    those have completed.
     """
     assert len(tasks_to_run) > 0
 
