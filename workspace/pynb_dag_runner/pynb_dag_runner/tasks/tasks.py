@@ -8,7 +8,7 @@ import opentelemetry as otel
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
-from pynb_dag_runner.core.dag_runner import Task, TaskDependencies
+from pynb_dag_runner.core.dag_runner import Task, TaskDependencies, task_from_remote_f
 from pynb_dag_runner.wrappers.runlog import Runlog
 from pynb_dag_runner.wrappers.compute_steps import (
     T,
@@ -120,6 +120,84 @@ class PythonFunctionTask_OT(Task[bool]):
             return is_success
 
         super().__init__(f_remote=Future.lift_async(invoke_task, num_cpus=1))  # type: ignore
+
+
+def make_python_function_task_ot(
+    f: Callable[[RunParameters], Any],
+    task_id: str,
+    timeout_s: float = None,
+    n_max_retries: int = 1,
+    num_cpus: int = 1,
+    common_task_runparameters: RunParameters = {},
+):
+    """
+    Create Task to execute Python function
+
+    task_id:s should be 1-1 with the nodes in the dependency DAG, but one
+    task_id may correspond to many run_id:s if there are retries.
+    """
+    assert n_max_retries >= 1
+
+    f_remote: Callable[
+        [Future[RunParameters]], Awaitable[bool]
+    ] = try_eval_f_async_wrapper(
+        f=lambda runparameters: f(runparameters),
+        timeout_s=timeout_s,
+        success_handler=lambda _: True,
+        error_handler=lambda _: False,
+    )
+
+    async def task_run(invocation_runparameters: RunParameters) -> Any:
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("task-run") as span:
+
+            # determine runparameters for this task invocation
+            runparameters = {
+                **invocation_runparameters,
+                **common_task_runparameters,
+                "task_id": task_id,
+            }
+
+            # log runparameters to span
+            for k, v in runparameters.items():
+                span.set_attribute(k, v)
+
+            is_success: bool = await f_remote(ray.put(runparameters))  # type: ignore
+            if is_success:
+                span.set_status(Status(StatusCode.OK))
+            else:
+                span.set_status(Status(StatusCode.ERROR, "Run failed"))
+
+        return is_success
+
+    async def retry_wrapper(runparameters: RunParameters) -> bool:
+        retry_arguments = [
+            {
+                **runparameters,
+                "retry.max_retries": n_max_retries,
+                "retry.nr": retry_nr,
+            }
+            for retry_nr in range(n_max_retries)
+        ]
+
+        # TODO: retry_wrapper_ot logic could be moved here?
+        return await retry_wrapper_ot(task_run, retry_arguments)
+
+    async def invoke_task(runparameters: RunParameters) -> bool:
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("invoke-task") as span:
+            span.set_attribute("task_type", "python")
+            span.set_attribute("task_id", task_id)
+            is_success: bool = await retry_wrapper(runparameters=runparameters)
+            if is_success:
+                span.set_status(Status(StatusCode.OK))
+            else:
+                span.set_status(Status(StatusCode.ERROR, "Task failed"))
+
+        return is_success
+
+    f_remote = Future.lift_async(invoke_task, num_cpus=num_cpus)  # type: ignore
+    return task_from_remote_f(f_remote=f_remote, tags={})
 
 
 class PythonFunctionTask(Task[Runlog]):
