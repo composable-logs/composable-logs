@@ -19,6 +19,7 @@ from pynb_dag_runner.core.dag_runner import (
     run_and_await_tasks,
 )
 from pynb_dag_runner.opentelemetry_helpers import (
+    SpanId,
     get_span_id,
     has_keys,
     read_key,
@@ -32,7 +33,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
 )
-from pynb_dag_runner.helpers import one
+from pynb_dag_runner.helpers import A, one
 
 #
 from tests.test_ray_helpers import StateActor
@@ -109,6 +110,13 @@ def test__task_ot__async_wait_for_task():
     assert outcome.return_value == 43
 
 
+def dependency_span__to__from_to_ids(dep_span: SpanDict) -> Tuple[SpanId, SpanId]:
+    return (
+        dep_span["attributes"]["from_task_span_id"],
+        dep_span["attributes"]["to_task_span_id"],
+    )
+
+
 def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
@@ -143,7 +151,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
             # define task dependencies
             run_in_sequence(task_f, task_g, task_h)
 
-            # no has has started
+            # no task has has started
             for task in 10 * tasks:
                 assert ray.get(task.has_started.remote()) == False
                 assert ray.get(task.has_completed.remote()) == False
@@ -167,9 +175,8 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
         assert len(deps) == 2
         dep_fg, dep_gh = deps
 
-        def get_span_for_task(func_name: str) -> Span:
-            assert func_name in ["f", "g", "h"]
-            return one(spans.filter(["attributes", "tags.foo"], func_name))
+        def lookup_task_span_id(func_name: str) -> SpanId:
+            return get_span_id(one(spans.filter(["attributes", "tags.foo"], func_name)))
 
         # Check that span_id:s referenced in task relationships are found. This may
         # fail if span_id:s are not correctly formatted (eg. with 0x prefix).
@@ -177,18 +184,16 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
             for k in ["from_task_span_id", "to_task_span_id"]:
                 assert spans.contains_span_id(d["attributes"][k])
 
-        def dep_from_span(s: SpanDict) -> SpanDict:
-            return spans.get_by_span_id(s["attributes"]["from_task_span_id"])
-
-        def dep_to_span(s: SpanDict) -> SpanDict:
-            return spans.get_by_span_id(s["attributes"]["to_task_span_id"])
-
         # check that dependency relations correspond to "f -> g" and "g -> h"
-        assert dep_from_span(dep_fg) == get_span_for_task("f")
-        assert dep_to_span(dep_fg) == get_span_for_task("g")
+        assert dependency_span__to__from_to_ids(dep_fg) == (
+            lookup_task_span_id(func_name="f"),
+            lookup_task_span_id(func_name="g"),
+        )
 
-        assert dep_from_span(dep_gh) == get_span_for_task("g")
-        assert dep_to_span(dep_gh) == get_span_for_task("h")
+        assert dependency_span__to__from_to_ids(dep_gh) == (
+            lookup_task_span_id(func_name="g"),
+            lookup_task_span_id(func_name="h"),
+        )
 
     validate_spans(get_test_spans())
 
@@ -227,7 +232,7 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
             # define task dependencies
             fan_in([task_1, task_2], task_fan_in)
 
-            # no has has started
+            # no task has has started
             for task in 10 * tasks:
                 assert ray.get(task.has_started.remote()) == False
                 assert ray.get(task.has_completed.remote()) == False
@@ -247,7 +252,34 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
         return sr.spans
 
     def validate_spans(spans: Spans):
-        pass
+        deps = spans.filter(["name"], "task-dependency")
+        assert len(deps) == 2
+        dep_a, dep_b = deps
+
+        logged_dependencies: Set[Tuple[SpanId, SpanId]] = set(
+            [
+                dependency_span__to__from_to_ids(dep_a),
+                dependency_span__to__from_to_ids(dep_b),
+            ]
+        )
+
+        def lookup_task_span_id(func_name: str) -> SpanId:
+            return get_span_id(one(spans.filter(["attributes", "tags.foo"], func_name)))
+
+        expected_dependencies: Set[Tuple[SpanId, SpanId]] = set(
+            [
+                (
+                    lookup_task_span_id(func_name="f1"),
+                    lookup_task_span_id(func_name="fan_in"),
+                ),
+                (
+                    lookup_task_span_id(func_name="f2"),
+                    lookup_task_span_id(func_name="fan_in"),
+                ),
+            ]
+        )
+
+        assert expected_dependencies == logged_dependencies
 
     validate_spans(get_test_spans())
 
