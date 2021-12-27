@@ -8,6 +8,7 @@ import pytest
 from pynb_dag_runner.tasks.tasks import (
     PythonFunctionTask,
     PythonFunctionTask_OT,
+    make_python_function_task_ot,
     RunParameters,
     get_task_dependencies,
 )
@@ -79,24 +80,6 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
         ts0 = max([get_duration_range_us(s).stop for s in spans_from])
         ts1 = min([get_duration_range_us(s).start for s in spans_to])
         assert ts0 < ts1
-
-
-### ---- Tests for get_task_dependencies ----
-
-
-def test_get_task_dependencies():
-    assert len(get_task_dependencies(TaskDependencies())) == 0
-
-    t0 = PythonFunctionTask_OT(f=lambda _: None, task_id="t0")
-    t1 = PythonFunctionTask_OT(f=lambda _: None, task_id="t1")
-    t2 = PythonFunctionTask_OT(f=lambda _: None, task_id="t2")
-    t3 = PythonFunctionTask_OT(f=lambda _: None, task_id="t3")
-
-    assert get_task_dependencies((t0 >> t1 >> t2) + TaskDependencies(t1 >> t3)) == [
-        {"from": "t0", "to": "t1"},
-        {"from": "t1", "to": "t2"},
-        {"from": "t1", "to": "t3"},
-    ]
 
 
 ### ---- Test PythonFunctionTask evaluation ----
