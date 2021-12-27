@@ -197,22 +197,30 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
 
-            def f1(*args):
+            def f1():
                 time.sleep(0.1)
                 return 43
 
-            def f2(*args):
+            def f2():
                 time.sleep(0.2)
                 return 44
 
-            def fx(*args):
+            def f_fan_in(arg):
+                # argument should be list of TaskOutcome:s from f1 and f2
+                assert isinstance(arg, list)
+                assert len(arg) == 2
+                for fan_in_outcome in arg:
+                    assert isinstance(fan_in_outcome, TaskOutcome)
+                    assert fan_in_outcome.error is None
+                    assert fan_in_outcome.return_value in [43, 44]
+
                 time.sleep(0.3)
                 return 45
 
             tasks: List[RemoteTaskP] = [
                 task_from_func(f1, tags={"foo": "f1"}),
                 task_from_func(f2, tags={"foo": "f2"}),
-                task_from_func(fx, tags={"foo": "fan_in"}),
+                task_from_func(f_fan_in, tags={"foo": "fan_in"}),
             ]
             task_1, task_2, task_fan_in = tasks
 
