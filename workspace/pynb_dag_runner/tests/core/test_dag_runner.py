@@ -9,7 +9,6 @@ from pynb_dag_runner.core.dag_runner import (
     Task,
     RemoteTaskP,
     task_from_func,
-    task_from_remote_f,
     TaskOutcome,
     TaskDependencies,
     run_in_sequence,

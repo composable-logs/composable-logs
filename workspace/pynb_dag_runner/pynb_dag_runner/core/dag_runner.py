@@ -251,7 +251,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         return await self._future_value.value_is_set.remote()  # type: ignore
 
 
-def task_from_remote_f(
+def _task_from_remote_f(
     f_remote: Callable[[U], Awaitable[B]],
     tags: TaskTags = {},
     fail_message: str = "Remote function call failed",
@@ -286,8 +286,6 @@ def task_from_func(
     Lift a Python function f(u: U) -> TaskOutcome[B] into a
     RemoteTaskP[U, TaskOutcome[B]].
 
-    Note: this (and task_from_remote_f) are not a class methods for GenTask_OT since
-    we return a Task[TaskOutcome[B]] and not a Task[A].
     """
 
     try_f_remote = try_f_with_timeout_guard(f=f, timeout_s=timeout_s)
@@ -296,7 +294,7 @@ def task_from_func(
     def remote_f(arg: U) -> B:
         return f(arg)
 
-    return task_from_remote_f(remote_f.remote, tags=tags)
+    return _task_from_remote_f(remote_f.remote, tags=tags)
 
 
 def _cb_compose_tasks(
