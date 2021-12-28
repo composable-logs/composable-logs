@@ -257,7 +257,7 @@ def _task_from_remote_f(
     fail_message: str = "Remote function call failed",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     """
-    Lift a Ray remote function f_remote(*args: A) -> B into a Task[TaskOutcome[B]].
+    Lift a Ray remote function U -> B into a Task[U, TaskOutcome[B]].
     """
 
     def _combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
@@ -299,7 +299,7 @@ def task_from_func(
 
     try_f_remote: Callable[
         [Awaitable[U]], Awaitable[Try[B]]
-    ] = try_f_with_timeout_guard(f=f, timeout_s=timeout_s)
+    ] = try_f_with_timeout_guard(f=f, timeout_s=timeout_s, num_cpus=num_cpus)
 
     return _task_from_remote_f(try_f_remote, tags=tags)
 

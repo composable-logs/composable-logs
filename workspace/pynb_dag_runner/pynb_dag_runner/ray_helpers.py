@@ -129,6 +129,7 @@ def _try_eval_f_async_wrapper(
     timeout_s: Optional[float],
     success_handler: Callable[[B], C],
     error_handler: Callable[[Exception], C],
+    num_cpus: int = 1,
 ) -> Callable[[Awaitable[A]], Awaitable[C]]:
     """
     Lift a function f: A -> B and result/error handlers into a function operating
@@ -137,7 +138,7 @@ def _try_eval_f_async_wrapper(
     The lifted function logs to OpenTelemetry
     """
 
-    @ray.remote(num_cpus=0)
+    @ray.remote(num_cpus=num_cpus)
     class ExecActor:
         def call(self, *args):
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
@@ -195,12 +196,12 @@ def _try_eval_f_async_wrapper(
 
 
 def try_f_with_timeout_guard(
-    f: Callable[[A], B],
-    timeout_s: Optional[float],
+    f: Callable[[A], B], timeout_s: Optional[float], num_cpus: int
 ) -> Callable[[Awaitable[A]], Awaitable[Try[B]]]:
     return _try_eval_f_async_wrapper(
         f=f,
         timeout_s=timeout_s,
+        num_cpus=num_cpus,
         success_handler=lambda f_result: Try(value=f_result, error=None),
         error_handler=lambda f_exception: Try(value=None, error=f_exception),
     )
