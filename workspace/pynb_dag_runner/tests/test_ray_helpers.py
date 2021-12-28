@@ -10,7 +10,7 @@ import pytest, ray
 #
 from pynb_dag_runner.helpers import flatten, range_intersect, one
 from pynb_dag_runner.ray_helpers import (
-    try_eval_f_async_wrapper,
+    _try_eval_f_async_wrapper,
     retry_wrapper,
     retry_wrapper_ot,
     Future,
@@ -83,7 +83,7 @@ def test_future_async_lift():
     assert ray.get(Future.lift_async(f)(ray.put(1))) == 2
 
 
-### tests for try_eval_f_async_wrapper wrapper
+### tests for _try_eval_f_async_wrapper wrapper
 
 
 def test_timeout_w_success():
@@ -95,7 +95,7 @@ def test_timeout_w_success():
             def f(x: int) -> int:
                 return x + 1
 
-            f_timeout: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
+            f_timeout: Callable[[Future[int]], Future[int]] = _try_eval_f_async_wrapper(
                 f,
                 timeout_s=10,
                 success_handler=lambda x: 2 * x,
@@ -126,7 +126,7 @@ def test_timeout_w_exception():
             def f(dummy):
                 raise ValueError(f"BOOM{dummy}")
 
-            f_timeout = try_eval_f_async_wrapper(
+            f_timeout = _try_eval_f_async_wrapper(
                 f,
                 timeout_s=10,
                 success_handler=lambda _: None,
@@ -172,7 +172,7 @@ def test_timeout_w_timeout_cancel():
             def f(_: Any) -> None:
                 time.sleep(1e6)
 
-            f_timeout: Callable[[Future[Any]], Future[Any]] = try_eval_f_async_wrapper(
+            f_timeout: Callable[[Future[Any]], Future[Any]] = _try_eval_f_async_wrapper(
                 f,
                 timeout_s=0.5,
                 success_handler=lambda _: "OK",
@@ -205,14 +205,14 @@ def test_logging_for_nested_lift_functions():
                 time.sleep(0.05)
                 return x + 123
 
-            f_inner: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
+            f_inner: Callable[[Future[int]], Future[int]] = _try_eval_f_async_wrapper(
                 f=f,
                 timeout_s=5,
                 success_handler=lambda x: {"inner": x},
                 error_handler=lambda e: "FAIL:" + str(e),
             )
 
-            f_outer: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
+            f_outer: Callable[[Future[int]], Future[int]] = _try_eval_f_async_wrapper(
                 f=lambda x: ray.get(f_inner(ray.put(x))),
                 timeout_s=5,
                 success_handler=lambda x: {"outer": x},
@@ -291,7 +291,7 @@ def test_timeout_w_timeout(
         # We should not get here if the task is canceled by timeout
         state.flip()
 
-    f_timeout = try_eval_f_async_wrapper(
+    f_timeout = _try_eval_f_async_wrapper(
         f,
         timeout_s=task_timeout_s,
         success_handler=lambda _: "RUN OK",

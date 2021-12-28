@@ -124,7 +124,7 @@ class Future(Awaitable[A]):
         return lambda future: Future.map(future, f)
 
 
-def try_eval_f_async_wrapper(
+def _try_eval_f_async_wrapper(
     f: Callable[[A], B],
     timeout_s: Optional[float],
     success_handler: Callable[[B], C],
@@ -198,7 +198,7 @@ def try_f_with_timeout_guard(
     f: Callable[[A], B],
     timeout_s: Optional[float],
 ) -> Callable[[Awaitable[A]], Awaitable[Try[B]]]:
-    return try_eval_f_async_wrapper(
+    return _try_eval_f_async_wrapper(
         f=f,
         timeout_s=timeout_s,
         success_handler=lambda f_result: Try(value=f_result, error=None),

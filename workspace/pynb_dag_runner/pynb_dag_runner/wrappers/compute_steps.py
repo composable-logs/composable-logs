@@ -7,7 +7,7 @@ import ray
 
 #
 from pynb_dag_runner.wrappers.runlog import Runlog
-from pynb_dag_runner.ray_helpers import Future, try_eval_f_async_wrapper, retry_wrapper
+from pynb_dag_runner.ray_helpers import Future, _try_eval_f_async_wrapper, retry_wrapper
 from pynb_dag_runner.helpers import compose, write_json
 
 A = TypeVar("A")
@@ -88,7 +88,7 @@ class AddPythonFunctionCall(TaskFunctionWrapper):
 
     def __call__(self, t: T[Future[Runlog]]) -> T[Future[Runlog]]:
         def eval_f(runlog_future: Future[Runlog]) -> Future[Runlog]:
-            f_result_future = try_eval_f_async_wrapper(
+            f_result_future = _try_eval_f_async_wrapper(
                 f=self.f,
                 timeout_s=self.timeout_s,
                 success_handler=lambda f_result: {

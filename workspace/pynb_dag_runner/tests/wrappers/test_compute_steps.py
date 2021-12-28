@@ -22,7 +22,7 @@ from pynb_dag_runner.wrappers.compute_steps import (
 )
 
 
-# define identity transformation Future[Runlog] -> Future[Runlog]
+# define identity transformation Awaitable[Runlog] -> Awaitable[Runlog]
 id_tf: T[Awaitable[Runlog]] = Future.lift(lambda runlog: runlog)
 
 

@@ -24,7 +24,7 @@ from pynb_dag_runner.wrappers.compute_steps import (
 #
 from pynb_dag_runner.ray_helpers import (
     Future,
-    try_eval_f_async_wrapper,
+    _try_eval_f_async_wrapper,
     retry_wrapper_ot,
 )
 from pynb_dag_runner.helpers import compose
@@ -59,7 +59,7 @@ class PythonFunctionTask_OT(Task[bool]):
 
         f_remote: Callable[
             [Future[RunParameters]], Awaitable[bool]
-        ] = try_eval_f_async_wrapper(
+        ] = _try_eval_f_async_wrapper(
             f=lambda runparameters: f(runparameters),
             timeout_s=timeout_s,
             success_handler=lambda _: True,
