@@ -273,9 +273,7 @@ def _task_from_remote_f(
 
     # TODO: ... rewrite later by refactoring GenTask_OT constructor ...
     async def untry_f(u: U) -> B:
-        # note: here f_remote expects element of Awaitable[A], but
-        # receives an element of A
-        await_u: Awaitable[U] = ray.put(u)
+        await_u: Awaitable[U] = ray.put(u)  # code also works without ray.put here
         try_fu: Try[B] = await f_remote(await_u)
         if try_fu.error is not None:
             raise try_fu.error
