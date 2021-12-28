@@ -180,8 +180,21 @@ def test_timeout_w_timeout_cancel():
                 error_handler=lambda e: "FAIL:" + str(e),
             )
 
+            f_timeout: Callable[
+                [Future[int]], Future[Try[int]]
+            ] = try_f_with_timeout_guard(
+                f,
+                timeout_s=0.5,
+            )
+
             for _ in range(N_calls):
-                assert "FAIL:" in ray.get(f_timeout(ray.put(None)))
+                result = ray.get(f_timeout(ray.put(None)))
+                assert result == Try(
+                    value=None,
+                    error=Exception(
+                        "Timeout error: execution did not finish within timeout limit"
+                    ),
+                )
 
         return rec.spans
 
