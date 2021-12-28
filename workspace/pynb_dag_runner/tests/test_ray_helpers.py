@@ -205,64 +205,37 @@ def test_timeout_w_timeout_cancel():
 # this test has failed randomly (TODO)
 @pytest.mark.parametrize("dummy_loop_parameter", range(1))
 @pytest.mark.parametrize("task_timeout_s", [0.001, 10.0])
-@pytest.mark.parametrize("state_type", ["Actor", "File"])
-def test_timeout_w_timeout(
-    tmp_path: Path, dummy_loop_parameter, state_type, task_timeout_s
-):
-    class State:
-        pass
-
-    class FileState(State):
-        def __init__(self):
-            self.temp_file = tmp_path / f"{uuid4()}.txt"
-
-        def flip(self):
-            return self.temp_file.touch()
-
-        def did_flip(self) -> bool:
-            return self.temp_file.is_file()
-
-    class ActorState(State):
-        def __init__(self):
-            self.state_actor = StateActor.remote()
-
-        def flip(self):
-            return self.state_actor.add.remote(1)
-
-        def did_flip(self) -> bool:
-            return 1 in ray.get(self.state_actor.get.remote())
-
-    assert state_type in ["Actor", "File"]
-    state: State = ActorState() if state_type == "Actor" else FileState()
+def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
+    state_actor = FutureActor.remote()
 
     task_duration_s = 0.2
 
-    def f(dummy):
+    def f(_: Any) -> int:
         time.sleep(task_duration_s)
 
-        # We should not get here if the task is canceled by timeout
-        state.flip()
+        # We should not get here *if* task is canceled by timeout
+        state_actor.set_value.remote("foo")
+        return 123
 
-    f_timeout = _try_eval_f_async_wrapper(
+    f_timeout: Callable[[Future[Any]], Future[Try[int]]] = try_f_with_timeout_guard(
         f,
         timeout_s=task_timeout_s,
-        success_handler=lambda _: "RUN OK",
-        error_handler=lambda e: "FAIL:" + str(e),
     )
 
-    result = ray.get(f_timeout(ray.put("dummy")))
+    result: Try[int] = ray.get(f_timeout(ray.put("dummy")))
 
     # Wait for task to finish
     time.sleep(4.0)
 
+    state_has_flipped: bool = ray.get(state_actor.value_is_set.remote())
+
     if task_timeout_s < task_duration_s:
         # f should have been canceled, and state should not have flipped
-        assert not state.did_flip()  # type: ignore
-        assert result.startswith("FAIL:") and "timeout" in result.lower()
-        assert "timeout" in result.lower()
+        assert not state_has_flipped
+        assert "timeout" in str(result.error)
     else:
-        assert state.did_flip()  # type: ignore
-        assert result == "RUN OK"
+        assert state_has_flipped
+        assert result == Try(123, None)
 
 
 ### ---- tests for retry_wrapper ----
