@@ -129,7 +129,7 @@ def _try_eval_f_async_wrapper(
     timeout_s: Optional[float],
     success_handler: Callable[[B], C],
     error_handler: Callable[[Exception], C],
-    num_cpus: int = 1,
+    num_cpus: int = 0,
 ) -> Callable[[Awaitable[A]], Awaitable[C]]:
     """
     Lift a function f: A -> B and result/error handlers into a function operating

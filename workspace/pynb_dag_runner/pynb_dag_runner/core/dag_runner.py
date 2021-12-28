@@ -287,7 +287,7 @@ def _task_from_remote_f(
 
 def task_from_func(
     f: Callable[[U], B],
-    num_cpus: int = 0,
+    num_cpus: int = 1,
     timeout_s: Optional[float] = None,
     tags: TaskTags = {},
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
