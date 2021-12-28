@@ -8,9 +8,10 @@ import opentelemetry as otel
 import pytest, ray
 
 #
-from pynb_dag_runner.helpers import flatten, range_intersect, one
+from pynb_dag_runner.helpers import flatten, range_intersect, one, Try
 from pynb_dag_runner.ray_helpers import (
     _try_eval_f_async_wrapper,
+    try_f_with_timeout_guard,
     retry_wrapper,
     retry_wrapper_ot,
     Future,
@@ -83,7 +84,7 @@ def test_future_async_lift():
     assert ray.get(Future.lift_async(f)(ray.put(1))) == 2
 
 
-### tests for _try_eval_f_async_wrapper wrapper
+### --- tests for try_f_with_timeout_guard wrapper ---
 
 
 def test_timeout_w_success():
@@ -95,15 +96,15 @@ def test_timeout_w_success():
             def f(x: int) -> int:
                 return x + 1
 
-            f_timeout: Callable[[Future[int]], Future[int]] = _try_eval_f_async_wrapper(
+            f_timeout: Callable[
+                [Future[int]], Future[Try[int]]
+            ] = try_f_with_timeout_guard(
                 f,
                 timeout_s=10,
-                success_handler=lambda x: 2 * x,
-                error_handler=lambda _: None,
             )
 
             for x in range(N_calls):
-                assert ray.get(f_timeout(ray.put(x))) == 2 * (x + 1)
+                assert ray.get(f_timeout(ray.put(x))) == Try(x + 1, None)
 
         return rec.spans
 
@@ -346,3 +347,24 @@ def test_retry_constant_should_succeed(is_success):
             }
 
     validate_spans(get_test_spans())
+
+
+### ---- test Try implementation ----
+
+
+def test_try_both_value_and_error_can_not_be_set():
+    with pytest.raises(Exception):
+        assert Try(1, Exception("foo"))
+
+
+def test_try_equality_checking():
+    assert Try(None, None) == Try(None, None)
+
+    assert Try(12345, None) == Try(12345, None)
+    assert Try(12345, None) != Try(None, None)
+
+    assert Try(None, Exception("foo")) == Try(None, Exception("foo"))
+    assert Try(None, Exception("foo")) != Try(None, Exception("bar"))
+
+    assert Try(123, None) != Exception("!!!")
+    assert Try(123, None) != (lambda x: x - 1)

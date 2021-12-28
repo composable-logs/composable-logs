@@ -113,7 +113,9 @@ def one(xs: Sequence[A]) -> A:
 
 class Try(Generic[A]):
     def __init__(self, value: Optional[A], error: Optional[Exception]):
+        assert error is None or isinstance(error, Exception)
         assert value is None or error is None
+
         self.value = value
         self.error = error
 
@@ -121,3 +123,14 @@ class Try(Generic[A]):
         if self.error is not None:
             raise Exception(f"Try does not contain any value (err={self.error})")
         return self.value  # type: ignore
+
+    def __repr__(self) -> str:
+        return f"Try(value={self.value}, error={self.error})"
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, Try):
+            self_tuple = (self.value, str(self.error))
+            other_tuple = (other.value, str(other.error))
+            return self_tuple == other_tuple
+        else:
+            return False
