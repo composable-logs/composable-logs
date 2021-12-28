@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, TypeVar, List, Sequence, Tuple
+from typing import Any, Generic, TypeVar, List, Sequence, Tuple, Optional
 
 A = TypeVar("A")
 
@@ -109,3 +109,15 @@ def one(xs: Sequence[A]) -> A:
         )
 
     return xs_list[0]
+
+
+class Try(Generic[A]):
+    def __init__(self, value: Optional[A], error: Optional[Exception]):
+        assert value is None or error is None
+        self.value = value
+        self.error = error
+
+    def get(self) -> A:
+        if self.error is not None:
+            raise Exception(f"Try does not contain any value (err={self.error})")
+        return self.value  # type: ignore

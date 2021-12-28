@@ -19,9 +19,15 @@ from opentelemetry.trace.span import format_span_id, Span
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
-from pynb_dag_runner.helpers import one, pairs
+from pynb_dag_runner.helpers import one, pairs, Try
+from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
 from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
-from pynb_dag_runner.ray_helpers import Future, FutureActor, RayMypy
+from pynb_dag_runner.ray_helpers import (
+    Future,
+    FutureActor,
+    RayMypy,
+    try_f_with_timeout_guard,
+)
 from pynb_dag_runner.ray_mypy_helpers import RemoteGetFunction, RemoteSetFunction
 from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid
 
@@ -89,18 +95,6 @@ class TaskOutcome(Generic[A]):
     span_id: SpanId
     return_value: Optional[A]
     error: Optional[Exception]
-
-
-class Try(Generic[A]):
-    def __init__(self, value: Optional[A], error: Optional[Exception]):
-        assert value is None or error is None
-        self.value = value
-        self.error = error
-
-    def get(self) -> A:
-        if self.error is not None:
-            raise Exception(f"Try does not contain any value (err={self.error})")
-        return self.value  # type: ignore
 
 
 X = TypeVar("X", contravariant=True)
@@ -283,17 +277,23 @@ def task_from_remote_f(
 
 
 def task_from_func(
-    f: Callable[[U], TaskOutcome[B]], num_cpus: int = 0, tags: TaskTags = {}
+    f: Callable[[U], B],
+    num_cpus: int = 0,
+    timeout_s: Optional[float] = None,
+    tags: TaskTags = {},
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     """
-    Lift a Python function f(*args: A) -> TaskOutcome[B] into a Task[TaskOutcome[B]].
+    Lift a Python function f(u: U) -> TaskOutcome[B] into a
+    RemoteTaskP[U, TaskOutcome[B]].
 
     Note: this (and task_from_remote_f) are not a class methods for GenTask_OT since
     we return a Task[TaskOutcome[B]] and not a Task[A].
     """
 
+    try_f_remote = try_f_with_timeout_guard(f=f, timeout_s=timeout_s)
+
     @ray.remote(num_cpus=num_cpus)
-    def remote_f(arg: U) -> TaskOutcome[B]:
+    def remote_f(arg: U) -> B:
         return f(arg)
 
     return task_from_remote_f(remote_f.remote, tags=tags)

@@ -1,5 +1,6 @@
 import time
 from pathlib import Path
+from typing import Awaitable
 
 #
 import ray, pytest
@@ -22,7 +23,7 @@ from pynb_dag_runner.wrappers.compute_steps import (
 
 
 # define identity transformation Future[Runlog] -> Future[Runlog]
-id_tf: T[Future[Runlog]] = Future.lift(lambda runlog: runlog)
+id_tf: T[Awaitable[Runlog]] = Future.lift(lambda runlog: runlog)
 
 
 def test_pipeline_no_compute_steps():

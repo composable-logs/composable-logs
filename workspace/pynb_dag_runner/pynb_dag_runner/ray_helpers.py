@@ -6,6 +6,8 @@ import ray
 import opentelemetry as otel
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
+#
+from pynb_dag_runner.helpers import Try
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -77,11 +79,11 @@ class Future(Awaitable[A]):
     """
 
     @staticmethod
-    def value(a: A) -> "Future[A]":
+    def value(a: A) -> Awaitable[A]:
         return ray.put(a)
 
     @staticmethod
-    def map(future: "Future[A]", f: Callable[[A], B]) -> "Future[B]":
+    def map(future: Awaitable[A], f: Callable[[A], B]) -> Awaitable[B]:
         """
         Return a new Future with the value of future mapped through f.
 
@@ -96,8 +98,8 @@ class Future(Awaitable[A]):
 
     @staticmethod
     def lift_async(
-        f: Callable[..., Awaitable[C]], num_cpus: int = 0
-    ) -> Callable[..., Awaitable[C]]:
+        f: Callable[[B], Awaitable[C]], num_cpus: int = 0
+    ) -> Callable[[B], Awaitable[C]]:
         """
         Lift an async Python function f as below
 
@@ -112,13 +114,13 @@ class Future(Awaitable[A]):
         """
 
         @ray.remote(num_cpus=num_cpus)
-        def wrapped_f(*args: B) -> C:
-            return asyncio.get_event_loop().run_until_complete(f(*args))
+        def wrapped_f(arg: B) -> C:
+            return asyncio.get_event_loop().run_until_complete(f(arg))
 
         return wrapped_f.remote
 
     @staticmethod
-    def lift(f: Callable[[B], C]) -> "Callable[[Future[B]], Future[C]]":
+    def lift(f: Callable[[B], C]) -> Callable[[Awaitable[B]], Awaitable[C]]:
         return lambda future: Future.map(future, f)
 
 
@@ -127,7 +129,7 @@ def try_eval_f_async_wrapper(
     timeout_s: Optional[float],
     success_handler: Callable[[B], C],
     error_handler: Callable[[Exception], C],
-) -> Callable[[Future[A]], Future[C]]:
+) -> Callable[[Awaitable[A]], Awaitable[C]]:
     """
     Lift a function f: A -> B and result/error handlers into a function operating
     on futures Future[A] -> Future[C].
@@ -190,6 +192,18 @@ def try_eval_f_async_wrapper(
                 )
 
     return Future.lift(timeout_guard)
+
+
+def try_f_with_timeout_guard(
+    f: Callable[[A], B],
+    timeout_s: Optional[float],
+) -> Callable[[Awaitable[A]], Awaitable[Try[B]]]:
+    return try_eval_f_async_wrapper(
+        f=f,
+        timeout_s=timeout_s,
+        success_handler=lambda f_result: Try(value=f_result, error=None),
+        error_handler=lambda f_exception: Try(value=None, error=f_exception),
+    )
 
 
 RetryCount = int
