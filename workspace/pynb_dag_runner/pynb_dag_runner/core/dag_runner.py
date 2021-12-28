@@ -252,7 +252,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
 
 
 def _task_from_remote_f(
-    f_remote: Callable[[U], Awaitable[B]],
+    f_remote: Callable[[Awaitable[U]], Awaitable[Try[B]]],
     tags: TaskTags = {},
     fail_message: str = "Remote function call failed",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
@@ -271,8 +271,19 @@ def _task_from_remote_f(
 
             return TaskOutcome(span_id=span_id, return_value=None, error=b.error)
 
+    # TODO: ... rewrite later by refactoring GenTask_OT constructor ...
+    async def untry_f(u: U) -> B:
+        # note: here f_remote expects element of Awaitable[A], but
+        # receives an element of A
+        await_u: Awaitable[U] = ray.put(u)
+        try_fu: Try[B] = await f_remote(await_u)
+        if try_fu.error is not None:
+            raise try_fu.error
+        else:
+            return try_fu.value  # type: ignore
+
     return GenTask_OT.remote(
-        f_remote=Future.lift_async(f_remote), combiner=_combiner, tags=tags
+        f_remote=Future.lift_async(untry_f), combiner=_combiner, tags=tags
     )
 
 
@@ -288,13 +299,11 @@ def task_from_func(
 
     """
 
-    try_f_remote = try_f_with_timeout_guard(f=f, timeout_s=timeout_s)
+    try_f_remote: Callable[
+        [Awaitable[U]], Awaitable[Try[B]]
+    ] = try_f_with_timeout_guard(f=f, timeout_s=timeout_s)
 
-    @ray.remote(num_cpus=num_cpus)
-    def remote_f(arg: U) -> B:
-        return f(arg)
-
-    return _task_from_remote_f(remote_f.remote, tags=tags)
+    return _task_from_remote_f(try_f_remote, tags=tags)
 
 
 def _cb_compose_tasks(
