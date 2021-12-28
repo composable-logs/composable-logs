@@ -8,7 +8,7 @@ import opentelemetry as otel
 import pytest, ray
 
 #
-from pynb_dag_runner.helpers import flatten, range_intersect, one, Try
+from pynb_dag_runner.helpers import A, flatten, range_intersect, one, Try
 from pynb_dag_runner.ray_helpers import (
     _try_eval_f_async_wrapper,
     try_f_with_timeout_guard,
@@ -124,21 +124,21 @@ def test_timeout_w_exception():
     def get_test_spans():
         with SpanRecorder() as rec:
 
-            def f(dummy):
-                raise ValueError(f"BOOM{dummy}")
+            def error(dummy: int) -> Exception:
+                return ValueError(f"BOOM{dummy}")
 
-            f_timeout = _try_eval_f_async_wrapper(
+            def f(dummy: int):
+                raise error(dummy)
+
+            f_timeout: Callable[
+                [Future[int]], Future[Try[int]]
+            ] = try_f_with_timeout_guard(
                 f,
                 timeout_s=10,
-                success_handler=lambda _: None,
-                error_handler=lambda x: x,
             )
 
             for x in range(N_calls):
-                try:
-                    _ = ray.get(f_timeout(ray.put(x)))
-                except ValueError as e:
-                    assert f"BOOM{x}" in str(e)
+                assert ray.get(f_timeout(ray.put(x))) == Try(None, error(x))
         return rec.spans
 
     def validate_spans(spans: Spans):
@@ -367,4 +367,4 @@ def test_try_equality_checking():
     assert Try(None, Exception("foo")) != Try(None, Exception("bar"))
 
     assert Try(123, None) != Exception("!!!")
-    assert Try(123, None) != (lambda x: x - 1)
+    assert Try(123, None) != (lambda: None)
