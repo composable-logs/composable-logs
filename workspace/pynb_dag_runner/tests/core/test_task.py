@@ -21,7 +21,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
 @pytest.mark.parametrize("task_fail", [True, False])
 @pytest.mark.parametrize("lift_f", [True, False])
 def test_make_task_from_function_or_remote_function(task_fail: bool, lift_f: bool):
-    def f():
+    def f(_):
         time.sleep(0.125)
         if task_fail:
             raise Exception("kaboom!")
@@ -42,7 +42,7 @@ def test_make_task_from_function_or_remote_function(task_fail: bool, lift_f: boo
             assert ray.get(task.has_completed.remote()) == False
 
             for _ in range(10):
-                task.start.remote()
+                task.start.remote(None)
 
             assert ray.get(task.has_completed.remote()) == False
             assert ray.get(task.has_started.remote()) == True

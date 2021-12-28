@@ -97,7 +97,7 @@ def test_task_run_order(dummy_loop_parameter):
 
 
 def test__task_ot__async_wait_for_task():
-    def f(*args):
+    def f(_):
         time.sleep(0.125)
         return 43
 
@@ -121,9 +121,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
 
-            def f(*args):
-                if len(args) > 0:
-                    raise Exception("f got a paraterer")
+            def f(_):
                 time.sleep(0.125)
                 return 43
 
@@ -202,11 +200,11 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
 
-            def f1():
+            def f1(_):
                 time.sleep(0.1)
                 return 43
 
-            def f2():
+            def f2(_):
                 time.sleep(0.2)
                 return 44
 
@@ -285,17 +283,17 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
 
 
 def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
-    def f(*args):
+    def f(_):
         return 1234
 
-    def g(*args):
+    def g(_):
         raise Exception("Exception from g")
 
-    def h(*args):
+    def h(_):
         return 123
 
     combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g, h]])
-    combined_task.start.remote()
+    combined_task.start.remote(None)
     outcome = ray.get(combined_task.get_task_result.remote())
 
     assert isinstance(outcome, TaskOutcome)
@@ -307,13 +305,13 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
 
-            def f(*args):
+            def f(_):
                 return 1234
 
-            def g(*args):
+            def g(_):
                 return 123
 
-            def h(*args):
+            def h(_):
                 return 12
 
             tasks: List[RemoteTaskP] = [
@@ -322,7 +320,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
                 task_from_func(h, tags={"foo": "h"}),
             ]
             all_tasks = in_parallel(*tasks)  # type: ignore
-            all_tasks.start.remote()
+            all_tasks.start.remote(None)  # type: ignore
 
             outcome = ray.get(all_tasks.get_task_result.remote())
 
