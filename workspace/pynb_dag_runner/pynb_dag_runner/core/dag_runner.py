@@ -145,12 +145,12 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
 
     def __init__(
         self,
-        f_remote: Callable[..., Awaitable[A]],  # ... = [U, ..., U]
+        f_remote: Callable[[U], Awaitable[A]],
         combiner: Callable[[Span, Try[A]], B],
         on_complete_callbacks: List[Callable[[B], Awaitable[None]]] = [],
         tags: TaskTags = {},
     ):
-        self._f_remote: Callable[..., Awaitable[A]] = f_remote
+        self._f_remote: Callable[[U], Awaitable[A]] = f_remote
         self._combiner: Callable[[Span, Try[A]], B] = combiner
         self._span_id_future: FutureActor = FutureActor.remote()  # type: ignore
         self._future_value: FutureActor = FutureActor.remote()  # type: ignore
@@ -176,12 +176,12 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
     def _set_span_id(self, span: Span):
         self._span_id_future.set_value.remote(get_span_hexid(span))  # type: ignore
 
-    def start(self, *args: U) -> None:
+    def start(self, arg: U) -> None:
         """
         Note:
         - Only first method call starts task. Subsequent calls do nothing.
         """
-        assert not any(isinstance(s, ray._raylet.ObjectRef) for s in args)
+        assert not isinstance(arg, ray._raylet.ObjectRef)
 
         # task computation should only be run once. So, if task has started do nothing.
         if self.has_started():
@@ -189,7 +189,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
 
         self._start_called = True
 
-        async def make_call(*_args: U):
+        async def make_call(_arg: U):
             tracer = otel.trace.get_tracer(__name__)  # type: ignore
             with tracer.start_as_current_span("execute-task") as span:
                 try:
@@ -207,7 +207,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
                         span.set_attribute(f"tags.{k}", v)
 
                     # wait for task to finish
-                    f_result: A = await self._f_remote(*_args)
+                    f_result: A = await self._f_remote(_arg)
 
                     # post-task
                     task_result = self._combiner(span, Try(f_result, None))
@@ -221,7 +221,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
                 await cb(task_result)
 
         # Start computation in other (possibly remote) Python process, non-blocking call
-        Future.lift_async(make_call)(*args)
+        Future.lift_async(make_call)(arg)
 
     def has_started(self) -> bool:
         return self._start_called
@@ -258,7 +258,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
 
 
 def task_from_remote_f(
-    f_remote: Callable[..., Awaitable[B]],
+    f_remote: Callable[[U], Awaitable[B]],
     tags: TaskTags = {},
     fail_message: str = "Remote function call failed",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
@@ -283,7 +283,7 @@ def task_from_remote_f(
 
 
 def task_from_func(
-    f: Callable[..., TaskOutcome[B]], num_cpus: int = 0, tags: TaskTags = {}
+    f: Callable[[U], TaskOutcome[B]], num_cpus: int = 0, tags: TaskTags = {}
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     """
     Lift a Python function f(*args: A) -> TaskOutcome[B] into a Task[TaskOutcome[B]].
@@ -293,8 +293,8 @@ def task_from_func(
     """
 
     @ray.remote(num_cpus=num_cpus)
-    def remote_f(*args: A) -> TaskOutcome[B]:
-        return f(*args)
+    def remote_f(arg: U) -> TaskOutcome[B]:
+        return f(arg)
 
     return task_from_remote_f(remote_f.remote, tags=tags)
 
@@ -358,20 +358,20 @@ def in_parallel(
     """
 
     async def run_tasks_in_parallel(
-        *task_arguments: TaskOutcome[A],
+        task_argument: TaskOutcome[A],
     ) -> List[TaskOutcome[A]]:
         for task in tasks:
-            task.start.remote(*task_arguments)
+            task.start.remote(task_argument)
 
         return await asyncio.gather(*[task.get_task_result.remote() for task in tasks])
 
     async def flatten_results(
-        *task_arguments: TaskOutcome[A],
+        task_argument: TaskOutcome[A],
     ) -> TaskOutcome[List[TaskOutcome[A]]]:
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("run-in-parallel") as span:
             task_outcomes: List[TaskOutcome[A]] = await run_tasks_in_parallel(
-                *task_arguments
+                task_argument
             )
 
             span_ids = [task_outcome.span_id for task_outcome in task_outcomes]
@@ -472,6 +472,7 @@ def run_and_await_tasks(
     tasks_to_run: List[RemoteTaskP],
     task_to_await: RemoteTaskP[A, B],
     timeout_s: float = None,
+    arg=None,
 ) -> B:
     """
     Start the provided list of tasks, return when the `task_to_await` task has finished.
@@ -489,7 +490,7 @@ def run_and_await_tasks(
     assert len(tasks_to_run) > 0
 
     for task in tasks_to_run:
-        task.start.remote()
+        task.start.remote(arg)
 
     return ray.get(task_to_await.get_task_result.remote(), timeout=timeout_s)
 
