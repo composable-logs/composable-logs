@@ -173,13 +173,6 @@ def test_timeout_w_timeout_cancel():
             def f(_: Any) -> None:
                 time.sleep(1e6)
 
-            f_timeout: Callable[[Future[Any]], Future[Any]] = _try_eval_f_async_wrapper(
-                f,
-                timeout_s=0.5,
-                success_handler=lambda _: "OK",
-                error_handler=lambda e: "FAIL:" + str(e),
-            )
-
             f_timeout: Callable[
                 [Future[int]], Future[Try[int]]
             ] = try_f_with_timeout_guard(
