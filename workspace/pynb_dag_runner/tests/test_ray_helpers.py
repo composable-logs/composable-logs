@@ -8,9 +8,10 @@ import opentelemetry as otel
 import pytest, ray
 
 #
-from pynb_dag_runner.helpers import flatten, range_intersect, one
+from pynb_dag_runner.helpers import A, flatten, range_intersect, one, Try
 from pynb_dag_runner.ray_helpers import (
-    try_eval_f_async_wrapper,
+    _try_eval_f_async_wrapper,
+    try_f_with_timeout_guard,
     retry_wrapper,
     retry_wrapper_ot,
     Future,
@@ -83,7 +84,7 @@ def test_future_async_lift():
     assert ray.get(Future.lift_async(f)(ray.put(1))) == 2
 
 
-### tests for try_eval_f_async_wrapper wrapper
+### --- tests for try_f_with_timeout_guard wrapper ---
 
 
 def test_timeout_w_success():
@@ -95,15 +96,15 @@ def test_timeout_w_success():
             def f(x: int) -> int:
                 return x + 1
 
-            f_timeout: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
+            f_timeout: Callable[
+                [Future[int]], Future[Try[int]]
+            ] = try_f_with_timeout_guard(
                 f,
                 timeout_s=10,
-                success_handler=lambda x: 2 * x,
-                error_handler=lambda _: None,
             )
 
             for x in range(N_calls):
-                assert ray.get(f_timeout(ray.put(x))) == 2 * (x + 1)
+                assert ray.get(f_timeout(ray.put(x))) == Try(x + 1, None)
 
         return rec.spans
 
@@ -123,21 +124,21 @@ def test_timeout_w_exception():
     def get_test_spans():
         with SpanRecorder() as rec:
 
-            def f(dummy):
-                raise ValueError(f"BOOM{dummy}")
+            def error(dummy: int) -> Exception:
+                return ValueError(f"BOOM{dummy}")
 
-            f_timeout = try_eval_f_async_wrapper(
+            def f(dummy: int):
+                raise error(dummy)
+
+            f_timeout: Callable[
+                [Future[int]], Future[Try[int]]
+            ] = try_f_with_timeout_guard(
                 f,
                 timeout_s=10,
-                success_handler=lambda _: None,
-                error_handler=lambda x: x,
             )
 
             for x in range(N_calls):
-                try:
-                    _ = ray.get(f_timeout(ray.put(x)))
-                except ValueError as e:
-                    assert f"BOOM{x}" in str(e)
+                assert ray.get(f_timeout(ray.put(x))) == Try(None, error(x))
         return rec.spans
 
     def validate_spans(spans: Spans):
@@ -172,15 +173,21 @@ def test_timeout_w_timeout_cancel():
             def f(_: Any) -> None:
                 time.sleep(1e6)
 
-            f_timeout: Callable[[Future[Any]], Future[Any]] = try_eval_f_async_wrapper(
+            f_timeout: Callable[
+                [Future[int]], Future[Try[int]]
+            ] = try_f_with_timeout_guard(
                 f,
                 timeout_s=0.5,
-                success_handler=lambda _: "OK",
-                error_handler=lambda e: "FAIL:" + str(e),
             )
 
             for _ in range(N_calls):
-                assert "FAIL:" in ray.get(f_timeout(ray.put(None)))
+                result = ray.get(f_timeout(ray.put(None)))
+                assert result == Try(
+                    value=None,
+                    error=Exception(
+                        "Timeout error: execution did not finish within timeout limit"
+                    ),
+                )
 
         return rec.spans
 
@@ -195,122 +202,40 @@ def test_timeout_w_timeout_cancel():
     validate_spans(get_test_spans())
 
 
-def test_logging_for_nested_lift_functions():
-    N_calls = 3
-
-    def get_test_spans():
-        with SpanRecorder() as rec:
-
-            def f(x):
-                time.sleep(0.05)
-                return x + 123
-
-            f_inner: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
-                f=f,
-                timeout_s=5,
-                success_handler=lambda x: {"inner": x},
-                error_handler=lambda e: "FAIL:" + str(e),
-            )
-
-            f_outer: Callable[[Future[int]], Future[int]] = try_eval_f_async_wrapper(
-                f=lambda x: ray.get(f_inner(ray.put(x))),
-                timeout_s=5,
-                success_handler=lambda x: {"outer": x},
-                error_handler=lambda e: "FAIL:" + str(e),
-            )
-
-            for x in range(N_calls):
-                tracer = otel.trace.get_tracer(__name__)
-                with tracer.start_as_current_span(f"top-{x}") as t:
-                    assert ray.get(f_outer(ray.put(x))) == {"outer": {"inner": 123 + x}}
-
-        return rec.spans
-
-    def validate_spans(spans: Spans):
-        for x in range(N_calls):
-            top_x = one(spans.filter(["name"], f"top-{x}"))
-
-            spans_under_top_x: Spans = spans.restrict_by_top(top_x)
-
-            g1, g2 = list(
-                spans_under_top_x.filter(["name"], "timeout-guard").sort_by_start_time()
-            )
-            c1, c2 = list(
-                spans_under_top_x.filter(
-                    ["name"], "call-python-function"
-                ).sort_by_start_time()
-            )
-
-            # log also contain spans generated by Ray for actor and function calls
-            assert len(spans_under_top_x) > 4
-
-            # Check span inclusions: g1 <- c1 <- g2 <- c2:
-            assert spans_under_top_x.contains_path(g1, c1, g2, c2)
-
-    validate_spans(get_test_spans())
-
-
 # this test has failed randomly (TODO)
 @pytest.mark.parametrize("dummy_loop_parameter", range(1))
 @pytest.mark.parametrize("task_timeout_s", [0.001, 10.0])
-@pytest.mark.parametrize("state_type", ["Actor", "File"])
-def test_timeout_w_timeout(
-    tmp_path: Path, dummy_loop_parameter, state_type, task_timeout_s
-):
-    class State:
-        pass
-
-    class FileState(State):
-        def __init__(self):
-            self.temp_file = tmp_path / f"{uuid4()}.txt"
-
-        def flip(self):
-            return self.temp_file.touch()
-
-        def did_flip(self) -> bool:
-            return self.temp_file.is_file()
-
-    class ActorState(State):
-        def __init__(self):
-            self.state_actor = StateActor.remote()
-
-        def flip(self):
-            return self.state_actor.add.remote(1)
-
-        def did_flip(self) -> bool:
-            return 1 in ray.get(self.state_actor.get.remote())
-
-    assert state_type in ["Actor", "File"]
-    state: State = ActorState() if state_type == "Actor" else FileState()
+def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
+    state_actor = FutureActor.remote()
 
     task_duration_s = 0.2
 
-    def f(dummy):
+    def f(_: Any) -> int:
         time.sleep(task_duration_s)
 
-        # We should not get here if the task is canceled by timeout
-        state.flip()
+        # We should not get here *if* task is canceled by timeout
+        state_actor.set_value.remote("foo")
+        return 123
 
-    f_timeout = try_eval_f_async_wrapper(
+    f_timeout: Callable[[Future[Any]], Future[Try[int]]] = try_f_with_timeout_guard(
         f,
         timeout_s=task_timeout_s,
-        success_handler=lambda _: "RUN OK",
-        error_handler=lambda e: "FAIL:" + str(e),
     )
 
-    result = ray.get(f_timeout(ray.put("dummy")))
+    result: Try[int] = ray.get(f_timeout(ray.put("dummy")))
 
     # Wait for task to finish
     time.sleep(4.0)
 
+    state_has_flipped: bool = ray.get(state_actor.value_is_set.remote())
+
     if task_timeout_s < task_duration_s:
         # f should have been canceled, and state should not have flipped
-        assert not state.did_flip()  # type: ignore
-        assert result.startswith("FAIL:") and "timeout" in result.lower()
-        assert "timeout" in result.lower()
+        assert not state_has_flipped
+        assert "timeout" in str(result.error)
     else:
-        assert state.did_flip()  # type: ignore
-        assert result == "RUN OK"
+        assert state_has_flipped
+        assert result == Try(123, None)
 
 
 ### ---- tests for retry_wrapper ----
@@ -346,3 +271,24 @@ def test_retry_constant_should_succeed(is_success):
             }
 
     validate_spans(get_test_spans())
+
+
+### ---- test Try implementation ----
+
+
+def test_try_both_value_and_error_can_not_be_set():
+    with pytest.raises(Exception):
+        assert Try(1, Exception("foo"))
+
+
+def test_try_equality_checking():
+    assert Try(None, None) == Try(None, None)
+
+    assert Try(12345, None) == Try(12345, None)
+    assert Try(12345, None) != Try(None, None)
+
+    assert Try(None, Exception("foo")) == Try(None, Exception("foo"))
+    assert Try(None, Exception("foo")) != Try(None, Exception("bar"))
+
+    assert Try(123, None) != Exception("!!!")
+    assert Try(123, None) != (lambda: None)
