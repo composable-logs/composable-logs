@@ -81,24 +81,6 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
         assert ts0 < ts1
 
 
-### ---- Tests for get_task_dependencies ----
-
-
-def test_get_task_dependencies():
-    assert len(get_task_dependencies(TaskDependencies())) == 0
-
-    t0 = PythonFunctionTask_OT(f=lambda _: None, task_id="t0")
-    t1 = PythonFunctionTask_OT(f=lambda _: None, task_id="t1")
-    t2 = PythonFunctionTask_OT(f=lambda _: None, task_id="t2")
-    t3 = PythonFunctionTask_OT(f=lambda _: None, task_id="t3")
-
-    assert get_task_dependencies((t0 >> t1 >> t2) + TaskDependencies(t1 >> t3)) == [
-        {"from": "t0", "to": "t1"},
-        {"from": "t1", "to": "t2"},
-        {"from": "t1", "to": "t3"},
-    ]
-
-
 ### ---- Test PythonFunctionTask evaluation ----
 
 
