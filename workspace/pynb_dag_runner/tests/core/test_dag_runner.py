@@ -15,7 +15,7 @@ from pynb_dag_runner.core.dag_runner import (
     in_parallel,
     fan_in,
     run_tasks,
-    run_and_await_tasks,
+    start_and_await_tasks,
 )
 from pynb_dag_runner.opentelemetry_helpers import (
     SpanId,
@@ -102,7 +102,7 @@ def test__task_ot__async_wait_for_task():
 
     task = task_from_python_function(f, tags={"foo": "f"})
 
-    outcome = run_and_await_tasks([task], task, timeout_s=10)
+    [outcome] = start_and_await_tasks([task], [task], timeout_s=10)
 
     assert isinstance(outcome, TaskOutcome)
     assert outcome.error is None
@@ -153,7 +153,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 assert ray.get(task.has_started.remote()) == False
                 assert ray.get(task.has_completed.remote()) == False
 
-            outcome = run_and_await_tasks([task_f], task_h, timeout_s=10)
+            [outcome] = start_and_await_tasks([task_f], [task_h], timeout_s=10)
 
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
@@ -234,7 +234,9 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
                 assert ray.get(task.has_started.remote()) == False
                 assert ray.get(task.has_completed.remote()) == False
 
-            outcome = run_and_await_tasks([task_1, task_2], task_fan_in, timeout_s=10)
+            [outcome] = start_and_await_tasks(
+                [task_1, task_2], [task_fan_in], timeout_s=10
+            )
 
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None

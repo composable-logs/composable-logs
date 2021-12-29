@@ -25,7 +25,7 @@ from pynb_dag_runner.core.dag_runner import (
     TaskDependencies,
     TaskOutcome,
     run_tasks,
-    run_and_await_tasks,
+    start_and_await_tasks,
     RemoteTaskP,
     task_from_python_function,
 )
@@ -111,8 +111,8 @@ def test__python_function_task__outputs_otel_logs__should_fail_as_parameter(
             task: RemoteTaskP = task_from_python_function(
                 f, tags={"foo": "my_test_func"}
             )
-            outcome: TaskOutcome = run_and_await_tasks(
-                [task], task, timeout_s=10, arg="dummy value"
+            [outcome] = start_and_await_tasks(
+                [task], [task], timeout_s=10, arg="dummy value"
             )
 
             # check Task outcome
@@ -202,8 +202,8 @@ def test__python_function_task__otel_logs_for_stuck_task():
             task: RemoteTaskP = task_from_python_function(
                 f, tags={"id": "stuck_function"}, timeout_s=1.0
             )
-            outcome: TaskOutcome = run_and_await_tasks(
-                [task], task, timeout_s=10, arg="dummy value"
+            [outcome] = start_and_await_tasks(
+                [task], [task], timeout_s=10, arg="dummy value"
             )
 
             # check Task outcome

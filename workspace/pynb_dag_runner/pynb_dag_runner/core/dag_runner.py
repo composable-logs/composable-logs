@@ -479,31 +479,41 @@ def fan_in(
         task.add_callback.remote(task_on_complete_handler)
 
 
-def run_and_await_tasks(
-    tasks_to_run: List[RemoteTaskP],
-    task_to_await: RemoteTaskP[A, B],
+def start_and_await_tasks(
+    tasks_to_start: List[RemoteTaskP[A, A]],
+    tasks_to_await: List[RemoteTaskP[A, A]],
     timeout_s: float = None,
     arg=None,
-) -> B:
+) -> List[A]:
     """
-    Start the provided list of tasks, return when the `task_to_await` task has finished.
+    Start the provided list of tasks and return when the `task_to_await` task has
+    finished.
 
-    Optionally limit compute time with timeout
+    timeout_s: Optionally limit compute time with timeout with values
     None (no timeout), or timeout in seconds
 
     Returns:
-      return value of `task_to_await`
+      return values of tasks in `task_to_await`
 
     Notes:
-    - If task_to_await has on_complete callbacks, then this function may return before
-    those have completed.
+    - TODO check that await tasks have no callbacks. Such callbacks need to start/finish
+    before this function returns.
     """
-    assert len(tasks_to_run) > 0
+    assert isinstance(tasks_to_start, list)
+    assert isinstance(tasks_to_await, list)
 
-    for task in tasks_to_run:
+    if len(tasks_to_start) == 0:
+        raise ValueError("No tasks to start")
+
+    if len(tasks_to_await) == 0:
+        raise ValueError("No tasks to await")
+
+    for task in tasks_to_start:
         task.start.remote(arg)
 
-    return ray.get(task_to_await.get_task_result.remote(), timeout=timeout_s)
+    return ray.get(
+        [task.get_task_result.remote() for task in tasks_to_await], timeout=timeout_s
+    )
 
 
 ## v--- deprecated ---v
