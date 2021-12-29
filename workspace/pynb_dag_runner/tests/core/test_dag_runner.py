@@ -29,7 +29,7 @@ def test__task_ot__async_wait_for_task():
 
     task = task_from_python_function(f, tags={"foo": "f"})
 
-    [outcome] = start_and_await_tasks([task], [task], timeout_s=10)
+    [outcome] = start_and_await_tasks([task], [task], timeout_s=30)
 
     assert isinstance(outcome, TaskOutcome)
     assert outcome.error is None
@@ -80,7 +80,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 assert ray.get(task.has_started.remote()) == False
                 assert ray.get(task.has_completed.remote()) == False
 
-            [outcome] = start_and_await_tasks([task_f], [task_h], timeout_s=10)
+            [outcome] = start_and_await_tasks([task_f], [task_h], timeout_s=30)
 
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
