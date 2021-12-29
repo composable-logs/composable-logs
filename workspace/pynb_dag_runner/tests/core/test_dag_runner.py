@@ -12,7 +12,6 @@ from pynb_dag_runner.core.dag_runner import (
     TaskOutcome,
     TaskDependencies,
     run_in_sequence,
-    in_parallel,
     fan_in,
     run_tasks,
     start_and_await_tasks,

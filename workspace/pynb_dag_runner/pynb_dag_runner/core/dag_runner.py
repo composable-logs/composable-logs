@@ -356,68 +356,6 @@ def run_in_sequence(*tasks: RemoteTaskP[TaskOutcome[A], TaskOutcome[A]]):
             _cb_compose_tasks(task1, task2)
 
 
-def in_parallel(
-    *tasks: RemoteTaskP[TaskOutcome[A], TaskOutcome[B]],
-) -> RemoteTaskP[TaskOutcome[A], TaskOutcome[List[TaskOutcome[B]]]]:
-    """
-    Return new task that runs the provided tasks in parallel (with available resources)
-     - The return value of new task is the list of return values of provided input tasks
-       (see type signature).
-     - Arguments passed to the combined task is passed to all tasks when calling start()
-     - The returned task fails if any of the input tasks fail.
-     - The span_id:s for the tasks run in parallel are logged.
-    """
-
-    async def run_tasks_in_parallel(
-        task_argument: TaskOutcome[A],
-    ) -> List[TaskOutcome[A]]:
-        for task in tasks:
-            task.start.remote(task_argument)
-
-        return await asyncio.gather(*[task.get_task_result.remote() for task in tasks])
-
-    async def flatten_results(
-        task_argument: TaskOutcome[A],
-    ) -> TaskOutcome[List[TaskOutcome[A]]]:
-        tracer = otel.trace.get_tracer(__name__)  # type: ignore
-        with tracer.start_as_current_span("run-in-parallel") as span:
-            task_outcomes: List[TaskOutcome[A]] = await run_tasks_in_parallel(
-                task_argument
-            )
-
-            span_ids = [task_outcome.span_id for task_outcome in task_outcomes]
-            span.set_attribute("span_ids", span_ids)
-
-            assert all(isinstance(s, str) for s in span_ids)
-
-            # check for errors in any of the tasks
-            failed_span_ids = [
-                task_outcome.span_id
-                for task_outcome in task_outcomes
-                if task_outcome.error is not None
-            ]
-            exception: Optional[Exception] = None
-            if len(failed_span_ids) > 0:
-                exception = Exception(
-                    "Failed to run span_id:s " + ",".join(failed_span_ids)
-                )
-                span.record_exception(exception)
-
-            span_id = format_span_id(span.get_span_context().span_id)
-            return TaskOutcome(
-                span_id=span_id,
-                return_value=task_outcomes,
-                error=exception,
-            )
-
-    def _combiner(span: Span, b: Try[TaskOutcome[B]]) -> TaskOutcome[B]:
-        return b.get()
-
-    return GenTask_OT.remote(
-        f_remote=Future.lift_async(flatten_results), combiner=_combiner
-    )
-
-
 def fan_in(
     paralllel_tasks: List[RemoteTaskP[TaskOutcome[A], TaskOutcome[B]]],
     target_task: RemoteTaskP[List[TaskOutcome[B]], TaskOutcome[C]],
