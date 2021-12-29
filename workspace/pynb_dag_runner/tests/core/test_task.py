@@ -5,11 +5,7 @@ import ray, pytest
 
 #
 from pynb_dag_runner.helpers import one
-from pynb_dag_runner.core.dag_runner import (
-    RemoteTaskP,
-    task_from_func,
-    task_from_remote_f,
-)
+from pynb_dag_runner.core.dag_runner import RemoteTaskP, task_from_python_function
 from pynb_dag_runner.opentelemetry_helpers import (
     get_span_exceptions,
     Span,
@@ -19,8 +15,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
 
 
 @pytest.mark.parametrize("task_fail", [True, False])
-@pytest.mark.parametrize("lift_f", [True, False])
-def test_make_task_from_function_or_remote_function(task_fail: bool, lift_f: bool):
+def test_make_task_from_function_or_remote_function(task_fail: bool):
     def f(_):
         time.sleep(0.125)
         if task_fail:
@@ -30,13 +25,9 @@ def test_make_task_from_function_or_remote_function(task_fail: bool, lift_f: boo
 
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
-            # Create task from Python function or Ray remote function?
-            if lift_f:
-                task: RemoteTaskP = task_from_func(f, tags={"foo": "my_test_func"})
-            else:
-                task = task_from_remote_f(
-                    ray.remote(num_cpus=0)(f).remote, tags={"foo": "my_test_func"}
-                )
+            task: RemoteTaskP = task_from_python_function(
+                f, tags={"foo": "my_test_func"}
+            )
 
             assert ray.get(task.has_started.remote()) == False
             assert ray.get(task.has_completed.remote()) == False

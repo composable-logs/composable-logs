@@ -10,7 +10,6 @@ import pytest, ray
 #
 from pynb_dag_runner.helpers import A, flatten, range_intersect, one, Try
 from pynb_dag_runner.ray_helpers import (
-    _try_eval_f_async_wrapper,
     try_f_with_timeout_guard,
     retry_wrapper,
     retry_wrapper_ot,
@@ -84,6 +83,18 @@ def test_future_async_lift():
     assert ray.get(Future.lift_async(f)(ray.put(1))) == 2
 
 
+@pytest.mark.asyncio
+async def test_future_async_lift_w_exception():
+    async def f(_):
+        raise Exception("boom!")
+
+    with pytest.raises(Exception):
+        await Future.lift_async(f)("dummy arg to f")
+
+    with pytest.raises(Exception):
+        ray.get(Future.lift_async(f)("dummy arg to f"))
+
+
 ### --- tests for try_f_with_timeout_guard wrapper ---
 
 
@@ -98,10 +109,7 @@ def test_timeout_w_success():
 
             f_timeout: Callable[
                 [Future[int]], Future[Try[int]]
-            ] = try_f_with_timeout_guard(
-                f,
-                timeout_s=10,
-            )
+            ] = try_f_with_timeout_guard(f, timeout_s=10, num_cpus=1)
 
             for x in range(N_calls):
                 assert ray.get(f_timeout(ray.put(x))) == Try(x + 1, None)
@@ -132,10 +140,7 @@ def test_timeout_w_exception():
 
             f_timeout: Callable[
                 [Future[int]], Future[Try[int]]
-            ] = try_f_with_timeout_guard(
-                f,
-                timeout_s=10,
-            )
+            ] = try_f_with_timeout_guard(f, timeout_s=10, num_cpus=1)
 
             for x in range(N_calls):
                 assert ray.get(f_timeout(ray.put(x))) == Try(None, error(x))
@@ -175,10 +180,7 @@ def test_timeout_w_timeout_cancel():
 
             f_timeout: Callable[
                 [Future[int]], Future[Try[int]]
-            ] = try_f_with_timeout_guard(
-                f,
-                timeout_s=0.5,
-            )
+            ] = try_f_with_timeout_guard(f, timeout_s=0.5, num_cpus=1)
 
             for _ in range(N_calls):
                 result = ray.get(f_timeout(ray.put(None)))
@@ -218,8 +220,7 @@ def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
         return 123
 
     f_timeout: Callable[[Future[Any]], Future[Try[int]]] = try_f_with_timeout_guard(
-        f,
-        timeout_s=task_timeout_s,
+        f, timeout_s=task_timeout_s, num_cpus=1
     )
 
     result: Try[int] = ray.get(f_timeout(ray.put("dummy")))

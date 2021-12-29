@@ -8,8 +8,7 @@ import pytest, ray
 from pynb_dag_runner.core.dag_runner import (
     Task,
     RemoteTaskP,
-    task_from_func,
-    task_from_remote_f,
+    task_from_python_function,
     TaskOutcome,
     TaskDependencies,
     run_in_sequence,
@@ -101,7 +100,7 @@ def test__task_ot__async_wait_for_task():
         time.sleep(0.125)
         return 43
 
-    task = task_from_func(f, tags={"foo": "f"})
+    task = task_from_python_function(f, tags={"foo": "f"})
 
     outcome = run_and_await_tasks([task], task, timeout_s=10)
 
@@ -140,9 +139,9 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 return arg.return_value + 1
 
             tasks: List[RemoteTaskP] = [
-                task_from_func(f, tags={"foo": "f"}),
-                task_from_func(g, tags={"foo": "g"}),
-                task_from_func(h, tags={"foo": "h"}),
+                task_from_python_function(f, tags={"foo": "f"}),
+                task_from_python_function(g, tags={"foo": "g"}),
+                task_from_python_function(h, tags={"foo": "h"}),
             ]
             task_f, task_g, task_h = tasks
 
@@ -221,9 +220,9 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
                 return 45
 
             tasks: List[RemoteTaskP] = [
-                task_from_func(f1, tags={"foo": "f1"}),
-                task_from_func(f2, tags={"foo": "f2"}),
-                task_from_func(f_fan_in, tags={"foo": "fan_in"}),
+                task_from_python_function(f1, tags={"foo": "f1"}),
+                task_from_python_function(f2, tags={"foo": "f2"}),
+                task_from_python_function(f_fan_in, tags={"foo": "fan_in"}),
             ]
             task_1, task_2, task_fan_in = tasks
 
@@ -292,7 +291,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
     def h(_):
         return 123
 
-    combined_task = in_parallel(*[task_from_func(_f) for _f in [f, g, h]])
+    combined_task = in_parallel(*[task_from_python_function(_f) for _f in [f, g, h]])
     combined_task.start.remote(None)
     outcome = ray.get(combined_task.get_task_result.remote())
 
@@ -315,9 +314,9 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
                 return 12
 
             tasks: List[RemoteTaskP] = [
-                task_from_func(f, tags={"foo": "f"}),
-                task_from_func(g, tags={"foo": "g"}),
-                task_from_func(h, tags={"foo": "h"}),
+                task_from_python_function(f, tags={"foo": "f"}),
+                task_from_python_function(g, tags={"foo": "g"}),
+                task_from_python_function(h, tags={"foo": "h"}),
             ]
             all_tasks = in_parallel(*tasks)  # type: ignore
             all_tasks.start.remote(None)  # type: ignore

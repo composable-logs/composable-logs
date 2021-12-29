@@ -251,13 +251,14 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         return await self._future_value.value_is_set.remote()  # type: ignore
 
 
-def task_from_remote_f(
-    f_remote: Callable[[U], Awaitable[B]],
+def _task_from_remote_f(
+    f_remote: Callable[[Awaitable[U]], Awaitable[Try[B]]],
+    task_type: str,
     tags: TaskTags = {},
     fail_message: str = "Remote function call failed",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     """
-    Lift a Ray remote function f_remote(*args: A) -> B into a Task[TaskOutcome[B]].
+    Lift a Ray remote function U -> B into a Task[U, TaskOutcome[B]].
     """
 
     def _combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
@@ -271,14 +272,28 @@ def task_from_remote_f(
 
             return TaskOutcome(span_id=span_id, return_value=None, error=b.error)
 
+    # TODO: ... rewrite later by refactoring GenTask_OT constructor ...
+    async def untry_f(u: U) -> B:
+        await_u: Awaitable[U] = ray.put(u)  # code also works without ray.put here
+        try_fu: Try[B] = await f_remote(await_u)
+        if try_fu.error is not None:
+            raise try_fu.error
+        else:
+            return try_fu.value  # type: ignore
+
+    if "task_type" in tags:
+        raise ValueError("task_type key should not be included in tags")
+
     return GenTask_OT.remote(
-        f_remote=Future.lift_async(f_remote), combiner=_combiner, tags=tags
+        f_remote=Future.lift_async(untry_f),
+        combiner=_combiner,
+        tags={**tags, "task_type": task_type},
     )
 
 
-def task_from_func(
+def task_from_python_function(
     f: Callable[[U], B],
-    num_cpus: int = 0,
+    num_cpus: int = 1,
     timeout_s: Optional[float] = None,
     tags: TaskTags = {},
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
@@ -286,17 +301,13 @@ def task_from_func(
     Lift a Python function f(u: U) -> TaskOutcome[B] into a
     RemoteTaskP[U, TaskOutcome[B]].
 
-    Note: this (and task_from_remote_f) are not a class methods for GenTask_OT since
-    we return a Task[TaskOutcome[B]] and not a Task[A].
     """
 
-    try_f_remote = try_f_with_timeout_guard(f=f, timeout_s=timeout_s)
+    try_f_remote: Callable[
+        [Awaitable[U]], Awaitable[Try[B]]
+    ] = try_f_with_timeout_guard(f=f, timeout_s=timeout_s, num_cpus=num_cpus)
 
-    @ray.remote(num_cpus=num_cpus)
-    def remote_f(arg: U) -> B:
-        return f(arg)
-
-    return task_from_remote_f(remote_f.remote, tags=tags)
+    return _task_from_remote_f(try_f_remote, tags=tags, task_type="Python")
 
 
 def _cb_compose_tasks(
