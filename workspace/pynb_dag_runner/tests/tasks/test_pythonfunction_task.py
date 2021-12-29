@@ -308,8 +308,8 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
             _ = start_and_await_tasks(tasks, tasks, timeout_s=30.0, arg="dummy value")
             end_ts = time.time_ns()
 
-            # Check 1: with only 2 CPU:s running the above tasks with no constraints
-            # should take > 1 secs.
+            # Check 1: with only 2 CPU:s (reserved for unit tests, see ray.init call)
+            # running the above tasks with no constraints should take > 1 secs.
             duration_ms = (end_ts - start_ts) // 1000000
             assert duration_ms >= 1000, duration_ms
         return rec.spans
@@ -322,8 +322,8 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
             for span_id in [f"id#{function_id}" for function_id in range(4)]
         ]
 
-        # Check 2: if tasks are run on 2 CPU:s the intersection of three runtime ranges
-        # should always be empty.
+        # Check 2: since only 2 CPU:s are reserved (for unit tests, see above)
+        # the intersection of three runtime ranges should always be empty.
         for r1, r2, r3 in itertools.combinations(task_runtime_ranges, 3):
             assert range_is_empty(range_intersection(r1, range_intersection(r2, r3)))
 
