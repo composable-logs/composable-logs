@@ -12,10 +12,9 @@ from pynb_dag_runner.core.dag_runner import (
     TaskOutcome,
     TaskDependencies,
     run_in_sequence,
-    in_parallel,
     fan_in,
     run_tasks,
-    run_and_await_tasks,
+    start_and_await_tasks,
 )
 from pynb_dag_runner.opentelemetry_helpers import (
     SpanId,
@@ -102,7 +101,7 @@ def test__task_ot__async_wait_for_task():
 
     task = task_from_python_function(f, tags={"foo": "f"})
 
-    outcome = run_and_await_tasks([task], task, timeout_s=10)
+    [outcome] = start_and_await_tasks([task], [task], timeout_s=10)
 
     assert isinstance(outcome, TaskOutcome)
     assert outcome.error is None
@@ -153,7 +152,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 assert ray.get(task.has_started.remote()) == False
                 assert ray.get(task.has_completed.remote()) == False
 
-            outcome = run_and_await_tasks([task_f], task_h, timeout_s=10)
+            [outcome] = start_and_await_tasks([task_f], [task_h], timeout_s=10)
 
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
@@ -234,7 +233,9 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
                 assert ray.get(task.has_started.remote()) == False
                 assert ray.get(task.has_completed.remote()) == False
 
-            outcome = run_and_await_tasks([task_1, task_2], task_fan_in, timeout_s=10)
+            [outcome] = start_and_await_tasks(
+                [task_1, task_2], [task_fan_in], timeout_s=10
+            )
 
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
@@ -282,50 +283,40 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
 
 
 def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
-    def f(_):
-        return 1234
-
-    def g(_):
-        raise Exception("Exception from g")
-
-    def h(_):
-        return 123
-
-    combined_task = in_parallel(*[task_from_python_function(_f) for _f in [f, g, h]])
-    combined_task.start.remote(None)
-    outcome = ray.get(combined_task.get_task_result.remote())
-
-    assert isinstance(outcome, TaskOutcome)
-    assert outcome.error is not None
-    assert [o.return_value for o in outcome.return_value] == [1234, None, 123]
-
-
-def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
+            test_exception_msg = "f2-exception"
 
-            def f(_):
+            def f1(arg: int):
+                time.sleep(0.25 * random.random())
+                assert arg == 42
                 return 1234
 
-            def g(_):
+            def f2(arg: int):
+                time.sleep(0.25 * random.random())
+                assert arg == 42
+                raise Exception(test_exception_msg)
+
+            def f3(arg: int):
+                time.sleep(0.25 * random.random())
+                assert arg == 42
                 return 123
 
-            def h(_):
-                return 12
-
             tasks: List[RemoteTaskP] = [
-                task_from_python_function(f, tags={"foo": "f"}),
-                task_from_python_function(g, tags={"foo": "g"}),
-                task_from_python_function(h, tags={"foo": "h"}),
+                task_from_python_function(f1, tags={"foo": "f1"}),
+                task_from_python_function(f2, tags={"foo": "f2"}),
+                task_from_python_function(f3, tags={"foo": "f3"}),
             ]
-            all_tasks = in_parallel(*tasks)  # type: ignore
-            all_tasks.start.remote(None)  # type: ignore
 
-            outcome = ray.get(all_tasks.get_task_result.remote())
+            outcomes = start_and_await_tasks(tasks, tasks, timeout_s=10, arg=42)
 
-            assert isinstance(outcome, TaskOutcome)
-            assert outcome.error is None
-            assert [o.return_value for o in outcome.return_value] == [1234, 123, 12]  # type: ignore
+            assert all(isinstance(outcome, TaskOutcome) for outcome in outcomes)
+
+            assert [outcome.return_value for outcome in outcomes] == [1234, None, 123]
+
+            assert outcomes[0].error is None
+            assert test_exception_msg in str(outcomes[1].error)
+            assert outcomes[2].error is None
         return sr.spans
 
     def validate_spans(spans: Spans):

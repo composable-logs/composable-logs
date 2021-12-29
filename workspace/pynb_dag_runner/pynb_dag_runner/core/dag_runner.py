@@ -356,68 +356,6 @@ def run_in_sequence(*tasks: RemoteTaskP[TaskOutcome[A], TaskOutcome[A]]):
             _cb_compose_tasks(task1, task2)
 
 
-def in_parallel(
-    *tasks: RemoteTaskP[TaskOutcome[A], TaskOutcome[B]],
-) -> RemoteTaskP[TaskOutcome[A], TaskOutcome[List[TaskOutcome[B]]]]:
-    """
-    Return new task that runs the provided tasks in parallel (with available resources)
-     - The return value of new task is the list of return values of provided input tasks
-       (see type signature).
-     - Arguments passed to the combined task is passed to all tasks when calling start()
-     - The returned task fails if any of the input tasks fail.
-     - The span_id:s for the tasks run in parallel are logged.
-    """
-
-    async def run_tasks_in_parallel(
-        task_argument: TaskOutcome[A],
-    ) -> List[TaskOutcome[A]]:
-        for task in tasks:
-            task.start.remote(task_argument)
-
-        return await asyncio.gather(*[task.get_task_result.remote() for task in tasks])
-
-    async def flatten_results(
-        task_argument: TaskOutcome[A],
-    ) -> TaskOutcome[List[TaskOutcome[A]]]:
-        tracer = otel.trace.get_tracer(__name__)  # type: ignore
-        with tracer.start_as_current_span("run-in-parallel") as span:
-            task_outcomes: List[TaskOutcome[A]] = await run_tasks_in_parallel(
-                task_argument
-            )
-
-            span_ids = [task_outcome.span_id for task_outcome in task_outcomes]
-            span.set_attribute("span_ids", span_ids)
-
-            assert all(isinstance(s, str) for s in span_ids)
-
-            # check for errors in any of the tasks
-            failed_span_ids = [
-                task_outcome.span_id
-                for task_outcome in task_outcomes
-                if task_outcome.error is not None
-            ]
-            exception: Optional[Exception] = None
-            if len(failed_span_ids) > 0:
-                exception = Exception(
-                    "Failed to run span_id:s " + ",".join(failed_span_ids)
-                )
-                span.record_exception(exception)
-
-            span_id = format_span_id(span.get_span_context().span_id)
-            return TaskOutcome(
-                span_id=span_id,
-                return_value=task_outcomes,
-                error=exception,
-            )
-
-    def _combiner(span: Span, b: Try[TaskOutcome[B]]) -> TaskOutcome[B]:
-        return b.get()
-
-    return GenTask_OT.remote(
-        f_remote=Future.lift_async(flatten_results), combiner=_combiner
-    )
-
-
 def fan_in(
     paralllel_tasks: List[RemoteTaskP[TaskOutcome[A], TaskOutcome[B]]],
     target_task: RemoteTaskP[List[TaskOutcome[B]], TaskOutcome[C]],
@@ -479,31 +417,41 @@ def fan_in(
         task.add_callback.remote(task_on_complete_handler)
 
 
-def run_and_await_tasks(
-    tasks_to_run: List[RemoteTaskP],
-    task_to_await: RemoteTaskP[A, B],
+def start_and_await_tasks(
+    tasks_to_start: List[RemoteTaskP[A, A]],
+    tasks_to_await: List[RemoteTaskP[A, A]],
     timeout_s: float = None,
     arg=None,
-) -> B:
+) -> List[A]:
     """
-    Start the provided list of tasks, return when the `task_to_await` task has finished.
+    Start the provided list of tasks and return when the `task_to_await` task has
+    finished.
 
-    Optionally limit compute time with timeout
+    timeout_s: Optionally limit compute time with timeout with values
     None (no timeout), or timeout in seconds
 
     Returns:
-      return value of `task_to_await`
+      return values of tasks in `task_to_await`
 
     Notes:
-    - If task_to_await has on_complete callbacks, then this function may return before
-    those have completed.
+    - TODO check that await tasks have no callbacks. Such callbacks need to start/finish
+    before this function returns.
     """
-    assert len(tasks_to_run) > 0
+    assert isinstance(tasks_to_start, list)
+    assert isinstance(tasks_to_await, list)
 
-    for task in tasks_to_run:
+    if len(tasks_to_start) == 0:
+        raise ValueError("No tasks to start")
+
+    if len(tasks_to_await) == 0:
+        raise ValueError("No tasks to await")
+
+    for task in tasks_to_start:
         task.start.remote(arg)
 
-    return ray.get(task_to_await.get_task_result.remote(), timeout=timeout_s)
+    return ray.get(
+        [task.get_task_result.remote() for task in tasks_to_await], timeout=timeout_s
+    )
 
 
 ## v--- deprecated ---v
