@@ -284,22 +284,38 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
 
 
 def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
-    def f(_):
+    test_exception_msg = "f2-exception"
+
+    def f1(arg: int):
+        time.sleep(0.25 * random.random())
+        assert arg == 42
         return 1234
 
-    def g(_):
-        raise Exception("Exception from g")
+    def f2(arg: int):
+        time.sleep(0.25 * random.random())
+        assert arg == 42
+        raise Exception(test_exception_msg)
 
-    def h(_):
+    def f3(arg: int):
+        time.sleep(0.25 * random.random())
+        assert arg == 42
         return 123
 
-    combined_task = in_parallel(*[task_from_python_function(_f) for _f in [f, g, h]])
-    combined_task.start.remote(None)
-    outcome = ray.get(combined_task.get_task_result.remote())
+    tasks: List[RemoteTaskP] = [
+        task_from_python_function(f1, tags={"foo": "f1"}),
+        task_from_python_function(f2, tags={"foo": "f2"}),
+        task_from_python_function(f3, tags={"foo": "f3"}),
+    ]
 
-    assert isinstance(outcome, TaskOutcome)
-    assert outcome.error is not None
-    assert [o.return_value for o in outcome.return_value] == [1234, None, 123]
+    outcomes = start_and_await_tasks(tasks, tasks, timeout_s=10, arg=42)
+
+    assert all(isinstance(outcome, TaskOutcome) for outcome in outcomes)
+
+    assert [outcome.return_value for outcome in outcomes] == [1234, None, 123]
+
+    assert outcomes[0].error is None
+    assert test_exception_msg in str(outcomes[1].error)
+    assert outcomes[2].error is None
 
 
 def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
