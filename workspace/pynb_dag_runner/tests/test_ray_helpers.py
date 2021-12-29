@@ -83,6 +83,18 @@ def test_future_async_lift():
     assert ray.get(Future.lift_async(f)(ray.put(1))) == 2
 
 
+@pytest.mark.asyncio
+async def test_future_async_lift_w_exception():
+    async def f(_):
+        raise Exception("boom!")
+
+    with pytest.raises(Exception):
+        await Future.lift_async(f)("dummy arg to f")
+
+    with pytest.raises(Exception):
+        ray.get(Future.lift_async(f)("dummy arg to f"))
+
+
 ### --- tests for try_f_with_timeout_guard wrapper ---
 
 
