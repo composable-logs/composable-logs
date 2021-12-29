@@ -284,38 +284,48 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
 
 
 def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
-    test_exception_msg = "f2-exception"
+    def get_test_spans() -> Spans:
+        with SpanRecorder() as sr:
+            test_exception_msg = "f2-exception"
 
-    def f1(arg: int):
-        time.sleep(0.25 * random.random())
-        assert arg == 42
-        return 1234
+            def f1(arg: int):
+                time.sleep(0.25 * random.random())
+                assert arg == 42
+                return 1234
 
-    def f2(arg: int):
-        time.sleep(0.25 * random.random())
-        assert arg == 42
-        raise Exception(test_exception_msg)
+            def f2(arg: int):
+                time.sleep(0.25 * random.random())
+                assert arg == 42
+                raise Exception(test_exception_msg)
 
-    def f3(arg: int):
-        time.sleep(0.25 * random.random())
-        assert arg == 42
-        return 123
+            def f3(arg: int):
+                time.sleep(0.25 * random.random())
+                assert arg == 42
+                return 123
 
-    tasks: List[RemoteTaskP] = [
-        task_from_python_function(f1, tags={"foo": "f1"}),
-        task_from_python_function(f2, tags={"foo": "f2"}),
-        task_from_python_function(f3, tags={"foo": "f3"}),
-    ]
+            tasks: List[RemoteTaskP] = [
+                task_from_python_function(f1, tags={"foo": "f1"}),
+                task_from_python_function(f2, tags={"foo": "f2"}),
+                task_from_python_function(f3, tags={"foo": "f3"}),
+            ]
 
-    outcomes = start_and_await_tasks(tasks, tasks, timeout_s=10, arg=42)
+            outcomes = start_and_await_tasks(tasks, tasks, timeout_s=10, arg=42)
 
-    assert all(isinstance(outcome, TaskOutcome) for outcome in outcomes)
+            assert all(isinstance(outcome, TaskOutcome) for outcome in outcomes)
 
-    assert [outcome.return_value for outcome in outcomes] == [1234, None, 123]
+            assert [outcome.return_value for outcome in outcomes] == [1234, None, 123]
 
-    assert outcomes[0].error is None
-    assert test_exception_msg in str(outcomes[1].error)
-    assert outcomes[2].error is None
+            assert outcomes[0].error is None
+            assert test_exception_msg in str(outcomes[1].error)
+            assert outcomes[2].error is None
+        return sr.spans
+
+    def validate_spans(spans: Spans):
+        # TODO: no dependency information is now logged from parallel tasks
+        deps = spans.filter(["name"], "task-dependency").sort_by_start_time()
+        assert len(deps) == 0
+
+    validate_spans(get_test_spans())
 
 
 def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
