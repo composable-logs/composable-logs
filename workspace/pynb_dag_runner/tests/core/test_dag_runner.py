@@ -6,106 +6,34 @@ import pytest, ray
 
 #
 from pynb_dag_runner.core.dag_runner import (
-    Task,
     RemoteTaskP,
-    task_from_python_function,
     TaskOutcome,
-    TaskDependencies,
+    task_from_python_function,
     run_in_sequence,
     fan_in,
-    run_tasks,
     start_and_await_tasks,
 )
 from pynb_dag_runner.opentelemetry_helpers import (
     SpanId,
     get_span_id,
-    has_keys,
-    read_key,
-    is_parent_child,
-    get_duration_s,
-    iso8601_to_epoch_s,
-    get_duration_range_us,
-    get_span_exceptions,
-    Span,
     SpanDict,
     Spans,
     SpanRecorder,
 )
 from pynb_dag_runner.helpers import A, one
 
-#
-from tests.test_ray_helpers import StateActor
-
-
-@pytest.mark.parametrize(
-    "task_dependencies",
-    [
-        "[]",
-        "[task0 >> task1]",
-        "[task1 >> task0]",
-        "[task1 >> task0, task1 >> task2]",
-        "[task0 >> task1, task1 >> task2]",
-        "[task0 >> task1, task1 >> task2, task0 >> task2]",
-    ],
-)
-def test_all_tasks_are_run(task_dependencies):
-    def make_task(sleep_secs: float, return_value: int) -> Task[int]:
-        @ray.remote(num_cpus=0)
-        def f(_):
-            time.sleep(sleep_secs)
-            return return_value
-
-        return Task(f.remote)
-
-    task0 = make_task(sleep_secs=0.05, return_value=0)
-    task1 = make_task(sleep_secs=0.01, return_value=1)
-    task2 = make_task(sleep_secs=0.025, return_value=2)
-
-    result = run_tasks(
-        [task0, task1, task2], TaskDependencies(*eval(task_dependencies))
-    )
-    assert len(result) == 3 and set(result) == set([0, 1, 2])
-
-
-@pytest.mark.parametrize("dummy_loop_parameter", range(1))
-def test_task_run_order(dummy_loop_parameter):
-    state_actor = StateActor.remote()
-
-    def make_task(i: int) -> Task[int]:
-        @ray.remote(num_cpus=0)
-        def f(_):
-            time.sleep(random.random() * 0.10)
-            state_actor.add.remote(i)
-
-        return Task(f.remote)
-
-    task0, task1, task2 = [make_task(i) for i in range(3)]
-
-    _ = run_tasks(
-        [task0, task1, task2], TaskDependencies(task1 >> task0, task2 >> task0)
-    )
-
-    state = ray.get(state_actor.get.remote())
-    assert len(state) == 3
-
-    # task0 should run last while run order of task1 and task2 is random
-    assert state[0] in [1, 2]
-    assert state[1] in [1, 2]
-    assert state[2] == 0
-
 
 def test__task_ot__async_wait_for_task():
     def f(_):
-        time.sleep(0.125)
-        return 43
+        return 42
 
     task = task_from_python_function(f, tags={"foo": "f"})
 
-    [outcome] = start_and_await_tasks([task], [task], timeout_s=10)
+    [outcome] = start_and_await_tasks([task], [task], timeout_s=30)
 
     assert isinstance(outcome, TaskOutcome)
     assert outcome.error is None
-    assert outcome.return_value == 43
+    assert outcome.return_value == 42
 
 
 def dependency_span__to__from_to_ids(dep_span: SpanDict) -> Tuple[SpanId, SpanId]:
@@ -152,7 +80,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 assert ray.get(task.has_started.remote()) == False
                 assert ray.get(task.has_completed.remote()) == False
 
-            [outcome] = start_and_await_tasks([task_f], [task_h], timeout_s=10)
+            [outcome] = start_and_await_tasks([task_f], [task_h], timeout_s=30)
 
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
@@ -320,7 +248,6 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
         return sr.spans
 
     def validate_spans(spans: Spans):
-        # TODO: no dependency information is now logged from parallel tasks
         deps = spans.filter(["name"], "task-dependency").sort_by_start_time()
         assert len(deps) == 0
 
