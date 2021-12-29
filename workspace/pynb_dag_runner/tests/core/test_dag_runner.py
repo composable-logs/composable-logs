@@ -6,27 +6,16 @@ import pytest, ray
 
 #
 from pynb_dag_runner.core.dag_runner import (
-    Task,
     RemoteTaskP,
-    task_from_python_function,
     TaskOutcome,
-    TaskDependencies,
+    task_from_python_function,
     run_in_sequence,
     fan_in,
-    run_tasks,
     start_and_await_tasks,
 )
 from pynb_dag_runner.opentelemetry_helpers import (
     SpanId,
     get_span_id,
-    has_keys,
-    read_key,
-    is_parent_child,
-    get_duration_s,
-    iso8601_to_epoch_s,
-    get_duration_range_us,
-    get_span_exceptions,
-    Span,
     SpanDict,
     Spans,
     SpanRecorder,
