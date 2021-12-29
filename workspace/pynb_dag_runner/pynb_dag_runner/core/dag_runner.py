@@ -253,6 +253,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
 
 def _task_from_remote_f(
     f_remote: Callable[[Awaitable[U]], Awaitable[Try[B]]],
+    task_type: str,
     tags: TaskTags = {},
     fail_message: str = "Remote function call failed",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
@@ -280,12 +281,17 @@ def _task_from_remote_f(
         else:
             return try_fu.value  # type: ignore
 
+    if "task_type" in tags:
+        raise ValueError("task_type key should not be included in tags")
+
     return GenTask_OT.remote(
-        f_remote=Future.lift_async(untry_f), combiner=_combiner, tags=tags
+        f_remote=Future.lift_async(untry_f),
+        combiner=_combiner,
+        tags={**tags, "task_type": task_type},
     )
 
 
-def task_from_func(
+def task_from_python_function(
     f: Callable[[U], B],
     num_cpus: int = 1,
     timeout_s: Optional[float] = None,
@@ -301,7 +307,7 @@ def task_from_func(
         [Awaitable[U]], Awaitable[Try[B]]
     ] = try_f_with_timeout_guard(f=f, timeout_s=timeout_s, num_cpus=num_cpus)
 
-    return _task_from_remote_f(try_f_remote, tags=tags)
+    return _task_from_remote_f(try_f_remote, tags=tags, task_type="Python")
 
 
 def _cb_compose_tasks(
