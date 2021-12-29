@@ -326,39 +326,3 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
         assert len(deps) == 0
 
     validate_spans(get_test_spans())
-
-
-def test__task_ot__task_orchestration__run_three_tasks_in_parallel__success():
-    def get_test_spans() -> Spans:
-        with SpanRecorder() as sr:
-
-            def f(_):
-                return 1234
-
-            def g(_):
-                return 123
-
-            def h(_):
-                return 12
-
-            tasks: List[RemoteTaskP] = [
-                task_from_python_function(f, tags={"foo": "f"}),
-                task_from_python_function(g, tags={"foo": "g"}),
-                task_from_python_function(h, tags={"foo": "h"}),
-            ]
-            all_tasks = in_parallel(*tasks)  # type: ignore
-            all_tasks.start.remote(None)  # type: ignore
-
-            outcome = ray.get(all_tasks.get_task_result.remote())
-
-            assert isinstance(outcome, TaskOutcome)
-            assert outcome.error is None
-            assert [o.return_value for o in outcome.return_value] == [1234, 123, 12]  # type: ignore
-        return sr.spans
-
-    def validate_spans(spans: Spans):
-        # TODO: no dependency information is now logged from parallel tasks
-        deps = spans.filter(["name"], "task-dependency").sort_by_start_time()
-        assert len(deps) == 0
-
-    validate_spans(get_test_spans())
