@@ -242,44 +242,95 @@ def test__python_function_task__otel_logs_for_stuck_task():
     validate_spans(get_test_spans())
 
 
-def _get_time_range(spans: Spans, span_id: str):
+def _get_time_range(spans: Spans, function_id: str, inner: bool):
     task_top_span = one(
-        spans.filter(["name"], "invoke-task")
+        spans.filter(["name"], "execute-task")
         # -
-        .filter(["attributes", "task_id"], span_id)
+        .filter(["attributes", "tags.function_id"], function_id)
     )
 
-    return get_duration_range_us(task_top_span)
+    task_spans = spans.restrict_by_top(task_top_span)
+
+    inner_flag_to_span_dict = {
+        # inner=True: return time range for span used for (inner) python
+        # function call; this is where task cpu resources are reserved.
+        True: one(task_spans.filter(["name"], "call-python-function")),
+        # inner=False: return time range for top span of entire task
+        False: task_top_span,
+    }
+
+    return get_duration_range_us(inner_flag_to_span_dict[inner])
 
 
 def test_tasks_run_in_parallel():
     def get_test_spans():
         with SpanRecorder() as rec:
-            dependencies = TaskDependencies()
+            tasks = [
+                task_from_python_function(
+                    lambda _: time.sleep(1.0),
+                    tags={"function_id": f"id#{function_id}"},
+                    timeout_s=10.0,
+                )
+                for function_id in range(2)
+            ]
 
-            run_tasks(
-                [
-                    PythonFunctionTask_OT(lambda _: time.sleep(1.0), task_id="t0"),
-                    PythonFunctionTask_OT(lambda _: time.sleep(1.0), task_id="t1"),
-                ],
-                dependencies,
-            )
+            _ = start_and_await_tasks(tasks, tasks, timeout_s=10.0, arg="dummy value")
 
-        return rec.spans, get_task_dependencies(dependencies)
+        return rec.spans
 
-    def validate_spans(spans: Spans, task_dependencies):
-        assert len(spans.filter(["name"], "invoke-task")) == 2
+    def validate_spans(spans: Spans):
+        assert len(spans.filter(["name"], "execute-task")) == 2
 
-        t0_us_range = _get_time_range(spans, "t0")
-        t1_us_range = _get_time_range(spans, "t1")
+        t0_us_range = _get_time_range(spans, "id#0", inner=False)
+        t1_us_range = _get_time_range(spans, "id#1", inner=False)
 
         # Check: since there are no order constraints, the time ranges should
         # overlap provided tests are run on 2+ CPUs
         assert range_intersect(t0_us_range, t1_us_range)
 
-        assert_compatibility(spans, task_dependencies)
+        # assert_compatibility(spans)
 
-    validate_spans(*get_test_spans())
+    validate_spans(get_test_spans())
+
+
+def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
+    def get_test_spans():
+        with SpanRecorder() as rec:
+            tasks = [
+                task_from_python_function(
+                    lambda _: time.sleep(0.5),
+                    tags={"function_id": f"id#{function_id}"},
+                    timeout_s=10.0,
+                )
+                for function_id in range(4)
+            ]
+
+            start_ts = time.time_ns()
+            _ = start_and_await_tasks(tasks, tasks, timeout_s=10.0, arg="dummy value")
+            end_ts = time.time_ns()
+
+            # Check 1: with only 2 CPU:s running the above tasks with no constraints
+            # should take > 1 secs.
+            duration_ms = (end_ts - start_ts) // 1000000
+            assert duration_ms >= 1000, duration_ms
+        return rec.spans
+
+    def validate_spans(spans: Spans):
+        assert len(spans.filter(["name"], "execute-task")) == 4
+
+        task_runtime_ranges = [
+            _get_time_range(spans, span_id, inner=True)
+            for span_id in [f"id#{function_id}" for function_id in range(4)]
+        ]
+
+        # Check 2: if tasks are run on 2 CPU:s the intersection of three runtime ranges
+        # should always be empty.
+        for r1, r2, r3 in itertools.combinations(task_runtime_ranges, 3):
+            assert range_is_empty(range_intersection(r1, range_intersection(r2, r3)))
+
+        # assert_compatibility(spans)
+
+    validate_spans(get_test_spans())
 
 
 def test_always_failing_task():
@@ -310,48 +361,6 @@ def test_always_failing_task():
 
         run_spans = spans.filter(["name"], "task-run")
         assert len(run_spans) == 10
-
-        assert_compatibility(spans, task_dependencies)
-
-    validate_spans(*get_test_spans())
-
-
-def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
-    def get_test_spans():
-        with SpanRecorder() as rec:
-            start_ts = time.time_ns()
-
-            dependencies = TaskDependencies()
-            run_tasks(
-                [
-                    PythonFunctionTask_OT(lambda _: time.sleep(0.5), task_id="t0"),
-                    PythonFunctionTask_OT(lambda _: time.sleep(0.5), task_id="t1"),
-                    PythonFunctionTask_OT(lambda _: time.sleep(0.5), task_id="t2"),
-                    PythonFunctionTask_OT(lambda _: time.sleep(0.5), task_id="t3"),
-                ],
-                dependencies,
-            )
-
-            end_ts = time.time_ns()
-
-            # Check 1: with only 2 CPU:s running the above tasks with no constraints
-            # should take > 1 secs.
-            duration_ms = (end_ts - start_ts) // 1000000
-            assert duration_ms >= 1000, duration_ms
-
-        return rec.spans, get_task_dependencies(dependencies)
-
-    def validate_spans(spans: Spans, task_dependencies):
-        assert len(spans.filter(["name"], "invoke-task")) == 4
-
-        task_runtime_ranges = [
-            _get_time_range(spans, span_id) for span_id in ["t0", "t1", "t2", "t3"]
-        ]
-
-        # Check 2: if tasks are run on 2 CPU:s the intersection of three runtime ranges
-        # should always be empty.
-        for r1, r2, r3 in itertools.combinations(task_runtime_ranges, 3):
-            assert range_is_empty(range_intersection(r1, range_intersection(r2, r3)))
 
         assert_compatibility(spans, task_dependencies)
 
