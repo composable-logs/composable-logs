@@ -2,22 +2,28 @@ import glob
 from pathlib import Path
 from typing import Any, List
 
-# Note "from opentelemetry import trace" fails mypy
-import opentelemetry as ot
-from opentelemetry import context, baggage
+# Note eg "from opentelemetry import trace" fails mypy
+import opentelemetry as otel
 from opentelemetry.trace.span import format_span_id, Span
 import dateutil.parser as dp  # type: ignore
+from opentelemetry import context, baggage  # type: ignore
 
 #
 from pynb_dag_runner.helpers import pairs, flatten, read_jsonl, one
 
 
-# ---- baggage ----
+# ---- baggage helpers ----
 
 
 def otel_add_baggage(key: str, value: Any):
-    # See:
-    # https://github.com/open-telemetry/opentelemetry-python/blob/main/opentelemetry-api/tests/baggage/test_baggage.py
+    """
+    Add key=value to baggage (propagated also downstreams).
+
+    Note: baggage content is not stored to logged Span:s.
+
+    See:
+    https://github.com/open-telemetry/opentelemetry-python/blob/main/opentelemetry-api/tests/baggage/test_baggage.py
+    """
     _ = context.attach(baggage.set_baggage(key, value))
 
 
@@ -216,7 +222,7 @@ class SpanRecorder:
         pass
 
     def __enter__(self):
-        assert ot.trace.get_tracer_provider().force_flush()
+        assert otel.trace.get_tracer_provider().force_flush()
 
         # get all span_id:s that exist before we start recording (inside with block)
         self._all_span_ids_pre_run = [get_span_id(s) for s in _get_all_spans()]
@@ -224,7 +230,7 @@ class SpanRecorder:
         return self
 
     def __exit__(self, type, value, traceback):
-        assert ot.trace.get_tracer_provider().force_flush()
+        assert otel.trace.get_tracer_provider().force_flush()
 
         # get new spans after test has run
         self.spans = Spans(
