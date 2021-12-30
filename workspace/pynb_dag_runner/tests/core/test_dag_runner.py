@@ -162,7 +162,7 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
                 assert ray.get(task.has_completed.remote()) == False
 
             [outcome] = start_and_await_tasks(
-                [task_1, task_2], [task_fan_in], timeout_s=10
+                [task_1, task_2], [task_fan_in], timeout_s=100
             )
 
             assert isinstance(outcome, TaskOutcome)
@@ -236,7 +236,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
                 task_from_python_function(f3, tags={"foo": "f3"}),
             ]
 
-            outcomes = start_and_await_tasks(tasks, tasks, timeout_s=10, arg=42)
+            outcomes = start_and_await_tasks(tasks, tasks, timeout_s=100, arg=42)
 
             assert all(isinstance(outcome, TaskOutcome) for outcome in outcomes)
 
