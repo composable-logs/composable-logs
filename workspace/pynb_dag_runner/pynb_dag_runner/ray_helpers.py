@@ -234,7 +234,7 @@ def retry_wrapper(
 
 
 def retry_wrapper_ot(
-    f_task_remote: Callable[[A], Coroutine[A, None, bool]],
+    f_task_remote: Callable[[A], Awaitable[bool]],
     retry_arguments: List[A],
 ) -> Awaitable[bool]:
     @ray.remote(num_cpus=0)
