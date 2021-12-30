@@ -273,7 +273,7 @@ def test_tasks_run_in_parallel():
                 for function_id in range(2)
             ]
 
-            _ = start_and_await_tasks(tasks, tasks, timeout_s=30.0, arg="dummy value")
+            _ = start_and_await_tasks(tasks, tasks, timeout_s=100, arg="dummy value")
 
         return rec.spans
 
@@ -305,7 +305,7 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
             ]
 
             start_ts = time.time_ns()
-            _ = start_and_await_tasks(tasks, tasks, timeout_s=30.0, arg="dummy value")
+            _ = start_and_await_tasks(tasks, tasks, timeout_s=100, arg="dummy value")
             end_ts = time.time_ns()
 
             # Check 1: with only 2 CPU:s (reserved for unit tests, see ray.init call)
