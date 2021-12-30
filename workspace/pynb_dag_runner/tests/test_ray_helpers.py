@@ -282,6 +282,12 @@ def test_try_both_value_and_error_can_not_be_set():
         assert Try(1, Exception("foo"))
 
 
+def test_try_is_success_method():
+    assert Try(None, None).is_success() == True
+    assert Try(12345, None).is_success() == True
+    assert Try(None, Exception("Foo")).is_success() == False
+
+
 def test_try_equality_checking():
     assert Try(None, None) == Try(None, None)
 

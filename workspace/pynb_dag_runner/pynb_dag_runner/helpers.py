@@ -124,6 +124,9 @@ class Try(Generic[A]):
             raise Exception(f"Try does not contain any value (err={self.error})")
         return self.value  # type: ignore
 
+    def is_success(self) -> bool:
+        return self.error is None
+
     def __repr__(self) -> str:
         return f"Try(value={self.value}, error={self.error})"
 
