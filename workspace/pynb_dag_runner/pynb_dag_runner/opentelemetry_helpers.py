@@ -10,6 +10,18 @@ import dateutil.parser as dp  # type: ignore
 #
 from pynb_dag_runner.helpers import pairs, flatten, read_jsonl, one
 
+
+# ---- baggage ----
+
+# from opentelemetry import baggage, context
+
+
+def otel_add_baggage(key: str, value: Any):
+    # See:
+    # https://github.com/open-telemetry/opentelemetry-python/blob/main/opentelemetry-api/tests/baggage/test_baggage.py
+    _ = ot.context.attach(ot.baggage.set_baggage(key, value))
+
+
 # ---- helper functions to read OpenTelemetry span dictionaries ----
 
 

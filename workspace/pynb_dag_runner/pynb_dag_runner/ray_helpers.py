@@ -8,6 +8,7 @@ from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
 from pynb_dag_runner.helpers import Try
+from pynb_dag_runner.opentelemetry_helpers import otel_add_baggage
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -145,6 +146,10 @@ def _try_eval_f_async_wrapper(
 
             # Execute function in separate OpenTelemetry span.
             with tracer.start_as_current_span("call-python-function") as span:
+
+                span.set_attribute("num_cpus", num_cpus)
+                otel_add_baggage("num_cpus", num_cpus)
+
                 try:
                     result = success_handler(f(*args))
                     span.set_status(Status(StatusCode.OK))
@@ -167,6 +172,7 @@ def _try_eval_f_async_wrapper(
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("timeout-guard") as span:
             span.set_attribute("timeout_s", timeout_s)
+            otel_add_baggage("timeout_s", timeout_s)
 
             work_actor = ExecActor.remote()  # type: ignore
             future = work_actor.call.remote(a)

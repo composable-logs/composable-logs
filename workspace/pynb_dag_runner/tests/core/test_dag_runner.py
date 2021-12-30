@@ -22,12 +22,18 @@ from pynb_dag_runner.opentelemetry_helpers import (
 )
 from pynb_dag_runner.helpers import A, one
 
+import opentelemetry as otel
 
-def test__task_ot__async_wait_for_task():
+
+def test__task__can_access_otel_baggage_and_returns_outcome():
     def f(_):
+        # check that we can access OpenTelemetry baggage with task
+        # compute context
+        assert otel.baggage.get_all() == {"timeout_s": "12.3", "num_cpus": 1}
+
         return 42
 
-    task = task_from_python_function(f, tags={"foo": "f"})
+    task = task_from_python_function(f, tags={"foo": "f"}, timeout_s=12.3)
 
     [outcome] = start_and_await_tasks([task], [task], timeout_s=100)
 
@@ -95,6 +101,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
         return sr.spans
 
     def validate_spans(spans: Spans):
+
         deps = spans.filter(["name"], "task-dependency").sort_by_start_time()
         assert len(deps) == 2
         dep_fg, dep_gh = deps
