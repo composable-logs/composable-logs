@@ -277,6 +277,7 @@ async def test_retry_wrapper_with_random_outcome(dummy_repeat):
     assert await retry_wrapper_ot(f=f, max_nr_retries=1000)(100) == try_success
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "args",
     [
@@ -300,7 +301,7 @@ async def test_retry_wrapper_with_random_outcome(dummy_repeat):
         },
     ],
 )
-def test_retry_wrapper_ot(args):
+async def test_retry_wrapper_ot(args):
     N_failures: int = args["N_failures"]
     N_max_retries: int = args["N_max_retries"]
     N_expected_calls: int = args["N_expected_calls"]
@@ -324,20 +325,20 @@ def test_retry_wrapper_ot(args):
             return try_success
         return try_fail
 
-    def get_test_spans():
+    async def get_test_spans():
         with SpanRecorder() as rec:
             f_retry = retry_wrapper_ot(f=f, max_nr_retries=N_max_retries)
 
-            f_retry_eval = Future.lift_async(f_retry)(100)
+            f_retry_eval = await Future.lift_async(f_retry)(100)
             if should_finally_succeed:
-                assert ray.get(f_retry_eval) == try_success
+                assert f_retry_eval == try_success
             else:
-                assert ray.get(f_retry_eval) == try_fail
+                assert f_retry_eval == try_fail
 
-            baggage_list = ray.get(state.get.remote())
+            baggage_list = await state.get.remote()
             assert baggage_list == [
-                {"max_nr_retries": N_max_retries, "retry_nr": it}
-                for it in range(N_expected_calls)
+                {"max_nr_retries": N_max_retries, "retry_nr": k}
+                for k in range(N_expected_calls)
             ]
 
         return rec.spans
@@ -363,7 +364,7 @@ def test_retry_wrapper_ot(args):
                 "status_code": "ERROR",
             }
 
-    validate_spans(get_test_spans())
+    validate_spans(await get_test_spans())
 
 
 ### ---- test Try implementation ----
