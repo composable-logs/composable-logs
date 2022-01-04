@@ -59,10 +59,10 @@ make [test|build|clean]
 
 ## Contact
 
-Please note that this is experimental and 🚧🚧🚧🚧🚧.
+Please note that this is experimental and 🚧🚧🚧🚧.
 
 A motivation for this work is to make it easier to set up and work together (on pipelines). If you would like to discuss an idea or question, please raise an [issue](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline/issues) or contact me via email.
 
 ## License
 
-(c) Matias Dahl 2021, MIT, see [LICENSE.md](./LICENSE.md).
+(c) Matias Dahl 2021-2022, MIT, see [LICENSE.md](./LICENSE.md).
