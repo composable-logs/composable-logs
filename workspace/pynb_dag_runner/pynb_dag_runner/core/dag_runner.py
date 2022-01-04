@@ -27,6 +27,7 @@ from pynb_dag_runner.ray_helpers import (
     FutureActor,
     RayMypy,
     try_f_with_timeout_guard,
+    retry_wrapper_ot,
 )
 from pynb_dag_runner.ray_mypy_helpers import RemoteGetFunction, RemoteSetFunction
 from pynb_dag_runner.opentelemetry_helpers import (
@@ -293,60 +294,6 @@ def _task_from_remote_f(
         combiner=_combiner,
         tags={**tags, "task_type": task_type},
     )
-
-
-def retry_wrapper_ot(
-    f_task_remote: Callable[[A], Awaitable[Try[B]]],
-    max_nr_retries: int,
-) -> Callable[[A], Awaitable[Try[B]]]:
-    """
-    Retry wrapper for remote function A -> Try[B]. Tries to run function
-    `max_nr_retries` times.
-
-     - The
-
-    """
-    assert max_nr_retries > 0
-
-    async def do_retries(a: A) -> Try[B]:
-        tracer = otel.trace.get_tracer(__name__)  # type: ignore
-        with tracer.start_as_current_span("retry-wrapper") as span:
-            for retry_nr in range(max_nr_retries):
-                otel_add_baggage("retry_nr", retry_nr)
-                otel_add_baggage("max_nr_retries", max_nr_retries)
-
-                try_b: Try[B] = await f_task_remote(a)
-                if try_b.is_success():
-                    span.set_status(Status(StatusCode.OK))
-                    return try_b
-
-            span.set_status(
-                Status(
-                    StatusCode.ERROR,
-                    f"Task retried {max_nr_retries} times; all failed!",
-                )
-            )
-            return try_b
-
-    # ------------------------
-    # Strangely (?!) this will fail with 44 != 45 in the test
-    # test__task_ot__task_orchestration__run_three_tasks_in_sequence
-    #
-    # Note: without with the last lambda (which is not logically needed) we get
-    # errors like: "TypeError: cannot create weak reference to 'NoneType' object"
-    #
-    # @ray.remote(num_cpus=0)
-    # class RetryActor:
-    #     async def call(self, a: A) -> Try[B]:
-    #         return await do_retries(a)
-
-    # retry_actor = RetryActor.remote()  # type: ignore
-    # return lambda a: retry_actor.call.remote(a)
-    # ------------------------
-
-    # But the below works:
-    fut = Future.lift_async(do_retries)
-    return compose(fut, ray.put)
 
 
 def task_from_python_function(
