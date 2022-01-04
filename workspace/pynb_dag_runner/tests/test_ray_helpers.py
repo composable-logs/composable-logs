@@ -247,6 +247,36 @@ def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
 ### ---- tests for retry_wrapper ----
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "outcome",
+    [Try(value="success", error=None), Try(value=None, error=ValueError("fail"))],
+)
+async def test_retry_wrapper_with_constant_outcome(outcome):
+    async def f(arg):
+        assert arg == 100
+        return outcome
+
+    assert (
+        await f(100) == await retry_wrapper_ot(f=f, max_nr_retries=10)(100) == outcome
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dummy_repeat", range(5))
+async def test_retry_wrapper_with_random_outcome(dummy_repeat):
+    try_success = Try(value="success", error=None)
+    try_fail = Try(value=None, error=ValueError("fail"))
+
+    async def f(arg):
+        assert arg == 100
+        if random.random() < 0.25:
+            return try_success
+        return try_fail
+
+    assert await retry_wrapper_ot(f=f, max_nr_retries=1000)(100) == try_success
+
+
 @pytest.mark.parametrize(
     "args",
     [
