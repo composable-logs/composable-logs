@@ -3,6 +3,7 @@ from typing import List
 
 #
 import pytest
+import opentelemetry as otel
 
 #
 from pynb_dag_runner.tasks.tasks import (
@@ -227,7 +228,7 @@ def test__python_function_task__otel_logs_for_stuck_task():
             "status_code": "ERROR",
         }
 
-        # --- check call-python-function span ---
+        # --- check call-python-function span, this should exist but is not logged ---
         assert len(spans.filter(["name"], "call-python-function")) == 0
 
         # check nesting of above spans
@@ -335,35 +336,76 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
 def test_always_failing_task():
     def get_test_spans():
         with SpanRecorder() as rec:
-            dependencies = TaskDependencies()
 
-            def fail_f(runparameters: RunParameters):
-                if runparameters["retry.nr"] <= 2:
+            def f(arg):
+                baggage = otel.baggage.get_all()
+                if int(baggage["retry_nr"]) <= 2:
                     time.sleep(1e6)
                 else:
                     raise Exception("Failed to run")
 
-            t0 = PythonFunctionTask_OT(
-                fail_f, task_id="always_failing_task", timeout_s=5, n_max_retries=10
-            )
+            tasks = [
+                task_from_python_function(
+                    f=f,
+                    tags={"function_id": "foo"},
+                    max_nr_retries=10,
+                    timeout_s=1.0,
+                )
+            ]
 
-            run_tasks([t0], dependencies)
+            _ = start_and_await_tasks(tasks, tasks, timeout_s=100, arg="dummy value")
 
-        return rec.spans, get_task_dependencies(dependencies)
+        return rec.spans
 
-    def validate_spans(spans: Spans, task_dependencies):
-        top_span = one(spans.filter(["name"], "invoke-task"))
-        assert top_span["status"] == {
-            "description": "Task failed",
+    def validate_spans(spans: Spans):
+        for s in spans:
+            if ".remote" not in s["name"]:
+                print(s["name"])
+
+        top_task_span = one(spans.filter(["name"], "execute-task"))
+        assert top_task_span["status"] == {
+            "description": "Remote function call failed",
             "status_code": "ERROR",
         }
 
-        run_spans = spans.filter(["name"], "task-run")
-        assert len(run_spans) == 10
+        top_retry_span = one(spans.filter(["name"], "retry-wrapper"))
+        assert spans.contains_path(top_task_span, top_retry_span)
+        assert read_key(top_retry_span, ["attributes", "max_nr_retries"]) == 10
 
-        assert_compatibility(spans, task_dependencies)
+        retry_call_spans = spans.filter(["name"], "retry-call")
+        assert len(retry_call_spans) == 10
 
-    validate_spans(*get_test_spans())
+        for retry_span in retry_call_spans:
+            retry_subspans = spans.restrict_by_top(retry_span)
+
+            timeout_span: SpanDict = one(
+                retry_subspans.filter(["name"], "timeout-guard")
+            )
+            call_python_function_spans = retry_subspans.filter(
+                ["name"], "call-python-function"
+            )
+
+            if read_key(retry_span, ["attributes", "retry_nr"]) <= 2:
+                assert timeout_span["status"] == {
+                    "description": "Timeout",
+                    "status_code": "ERROR",
+                }
+                assert len(call_python_function_spans) == 0
+            else:
+                assert timeout_span["status"] == {"status_code": "OK"}
+
+                assert len(call_python_function_spans) == 1
+
+            assert spans.contains_path(
+                top_task_span,
+                top_retry_span,
+                timeout_span,
+                *call_python_function_spans,
+            )
+
+        # assert_compatibility(spans)
+
+    validate_spans(get_test_spans())
 
 
 ### ---- test order dependence for PythonFunctionTask:s ----
