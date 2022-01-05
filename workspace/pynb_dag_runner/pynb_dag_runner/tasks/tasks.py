@@ -25,7 +25,7 @@ from pynb_dag_runner.wrappers.compute_steps import (
 from pynb_dag_runner.ray_helpers import (
     Future,
     _try_eval_f_async_wrapper,
-    retry_wrapper_ot,
+    retry_wrapper_ot_deprecated,
 )
 from pynb_dag_runner.helpers import compose
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook
@@ -103,8 +103,7 @@ class PythonFunctionTask_OT(Task[bool]):
                 for retry_nr in range(n_max_retries)
             ]
 
-            # TODO: retry_wrapper_ot logic could be moved here?
-            return await retry_wrapper_ot(task_run, retry_arguments)
+            return await retry_wrapper_ot_deprecated(task_run, retry_arguments)
 
         async def invoke_task(runparameters: RunParameters) -> bool:
             tracer = otel.trace.get_tracer(__name__)  # type: ignore

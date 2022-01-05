@@ -19,7 +19,7 @@ from opentelemetry.trace.span import format_span_id, Span
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
-from pynb_dag_runner.helpers import one, pairs, Try
+from pynb_dag_runner.helpers import one, pairs, Try, compose
 from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
 from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
 from pynb_dag_runner.ray_helpers import (
@@ -27,9 +27,14 @@ from pynb_dag_runner.ray_helpers import (
     FutureActor,
     RayMypy,
     try_f_with_timeout_guard,
+    retry_wrapper_ot,
 )
 from pynb_dag_runner.ray_mypy_helpers import RemoteGetFunction, RemoteSetFunction
-from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid
+from pynb_dag_runner.opentelemetry_helpers import (
+    SpanId,
+    get_span_hexid,
+    otel_add_baggage,
+)
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -252,18 +257,14 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
 
 
 def _task_from_remote_f(
-    f_remote: Callable[[Awaitable[U]], Awaitable[Try[B]]],
+    f_remote: Callable[[U], Awaitable[Try[B]]],
     task_type: str,
     tags: TaskTags = {},
     fail_message: str = "Remote function call failed",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
-    """
-    Lift a Ray remote function U -> B into a Task[U, TaskOutcome[B]].
-    """
-
     def _combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
         span_id = get_span_hexid(span)
-        if b.error is None:
+        if b.is_success():
             span.set_status(Status(StatusCode.OK))
             return TaskOutcome(span_id=span_id, return_value=b.value, error=None)
         else:
@@ -274,12 +275,11 @@ def _task_from_remote_f(
 
     # TODO: ... rewrite later by refactoring GenTask_OT constructor ...
     async def untry_f(u: U) -> B:
-        await_u: Awaitable[U] = ray.put(u)  # code also works without ray.put here
-        try_fu: Try[B] = await f_remote(await_u)
-        if try_fu.error is not None:
-            raise try_fu.error
+        try_fu: Try[B] = await f_remote(u)
+        if try_fu.is_success():
+            return try_fu.get()
         else:
-            return try_fu.value  # type: ignore
+            raise try_fu.error  # type: ignore
 
     if "task_type" in tags:
         raise ValueError("task_type key should not be included in tags")
@@ -294,20 +294,24 @@ def _task_from_remote_f(
 def task_from_python_function(
     f: Callable[[U], B],
     num_cpus: int = 1,
+    max_nr_retries: int = 1,
     timeout_s: Optional[float] = None,
     tags: TaskTags = {},
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     """
-    Lift a Python function f(u: U) -> TaskOutcome[B] into a
-    RemoteTaskP[U, TaskOutcome[B]].
-
+    Lift a Python function f (U -> B) into a Task.
     """
-
     try_f_remote: Callable[
         [Awaitable[U]], Awaitable[Try[B]]
     ] = try_f_with_timeout_guard(f=f, timeout_s=timeout_s, num_cpus=num_cpus)
 
-    return _task_from_remote_f(try_f_remote, tags=tags, task_type="Python")
+    try_f_remote_put: Callable[[U], Awaitable[Try[B]]] = compose(try_f_remote, ray.put)
+
+    try_f_remote_wrapped: Callable[[U], Awaitable[Try[B]]] = retry_wrapper_ot(
+        try_f_remote_put, max_nr_retries=max_nr_retries
+    )
+
+    return _task_from_remote_f(try_f_remote_wrapped, tags=tags, task_type="Python")
 
 
 def _cb_compose_tasks(

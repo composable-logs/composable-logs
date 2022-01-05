@@ -8,6 +8,7 @@ from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
 from pynb_dag_runner.helpers import Try
+from pynb_dag_runner.opentelemetry_helpers import otel_add_baggage
 
 A = TypeVar("A")
 B = TypeVar("B")
@@ -145,6 +146,10 @@ def _try_eval_f_async_wrapper(
 
             # Execute function in separate OpenTelemetry span.
             with tracer.start_as_current_span("call-python-function") as span:
+
+                span.set_attribute("num_cpus", num_cpus)
+                otel_add_baggage("num_cpus", num_cpus)
+
                 try:
                     result = success_handler(f(*args))
                     span.set_status(Status(StatusCode.OK))
@@ -167,6 +172,7 @@ def _try_eval_f_async_wrapper(
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("timeout-guard") as span:
             span.set_attribute("timeout_s", timeout_s)
+            otel_add_baggage("timeout_s", timeout_s)
 
             work_actor = ExecActor.remote()  # type: ignore
             future = work_actor.call.remote(a)
@@ -233,10 +239,11 @@ def retry_wrapper(
     return retry_actor.make_retry_calls.remote()
 
 
-def retry_wrapper_ot(
-    f_task_remote: Callable[[A], Coroutine[A, None, bool]],
+def retry_wrapper_ot_deprecated(
+    f_task_remote: Callable[[A], Awaitable[bool]],
     retry_arguments: List[A],
 ) -> Awaitable[bool]:
+    # -- deprecated --
     @ray.remote(num_cpus=0)
     class RetryActor:
         async def make_retry_calls(self):
@@ -257,3 +264,73 @@ def retry_wrapper_ot(
 
     retry_actor = RetryActor.remote()  # type: ignore
     return retry_actor.make_retry_calls.remote()
+
+
+def retry_wrapper_ot(
+    f: Callable[[A], Awaitable[Try[B]]],
+    max_nr_retries: int,
+) -> Callable[[A], Awaitable[Try[B]]]:
+    """
+    Retry wrapper for async function A -> Try[B].
+
+    Returns async function with same signature that executes input function at most
+    `max_nr_retries` times, and returns either the first successful return value, or
+    the last return value (which may be success or failure).
+
+    Execution is logged to OpenTelemetry spans and iteration parameters are set as
+    baggage.
+    """
+    assert max_nr_retries > 0
+
+    async def do_retries(a: A) -> Try[B]:
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("retry-wrapper") as top_span:
+            otel_add_baggage("max_nr_retries", max_nr_retries)
+            top_span.set_attribute("max_nr_retries", max_nr_retries)
+
+            for retry_nr in range(max_nr_retries):
+                with tracer.start_as_current_span("retry-call") as iteration_span:
+                    otel_add_baggage("retry_nr", retry_nr)
+                    iteration_span.set_attribute("retry_nr", retry_nr)
+
+                    try_b: Try[B] = await f(a)
+
+                    # Note: status not set for iteration_span for now
+
+                    if try_b.is_success():
+                        top_span.set_status(Status(StatusCode.OK))
+                        return try_b
+
+            top_span.set_status(
+                Status(
+                    StatusCode.ERROR,
+                    f"Function called retried {max_nr_retries} times; all failed!",
+                )
+            )
+            return try_b
+
+    return do_retries
+
+    # ------------------------
+    # Strangely (!) this function will fail with a 44 != 45 error in the test
+    # test__task_ot__task_orchestration__run_three_tasks_in_sequence if last line is
+    # replaced with the below (although the code should be equivalent?)
+    #
+    # @ray.remote(num_cpus=0)
+    # class RetryActor:
+    #     async def call(self, a: A) -> Try[B]:
+    #         return await do_retries(a)
+    #
+    # retry_actor = RetryActor.remote()  # type: ignore
+    # return lambda a: retry_actor.call.remote(a)
+    #
+    # Note also: without with the last lambda (which is not logically needed) we get
+    # errors like: "TypeError: cannot create weak reference to 'NoneType' object"
+    # Maybe the last lambda hides some metadata/attributes attached to the function,
+    # and this leads to the wrong result.
+    #
+    # Alternatively, the below works:
+    #
+    # fut = Future.lift_async(do_retries)
+    # return compose(fut, ray.put)
+    # ------------------------

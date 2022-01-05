@@ -22,12 +22,22 @@ from pynb_dag_runner.opentelemetry_helpers import (
 )
 from pynb_dag_runner.helpers import A, one
 
+import opentelemetry as otel
 
-def test__task_ot__async_wait_for_task():
+
+def test__task__can_access_otel_baggage_and_returns_outcome():
     def f(_):
+        # check access to OpenTelemetry baggage
+        assert otel.baggage.get_all() == {
+            "timeout_s": "12.3",
+            "num_cpus": 1,
+            "retry_nr": "0",
+            "max_nr_retries": "1",
+        }
+
         return 42
 
-    task = task_from_python_function(f, tags={"foo": "f"})
+    task = task_from_python_function(f, tags={"foo": "f"}, timeout_s=12.3)
 
     [outcome] = start_and_await_tasks([task], [task], timeout_s=100)
 
@@ -95,6 +105,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
         return sr.spans
 
     def validate_spans(spans: Spans):
+
         deps = spans.filter(["name"], "task-dependency").sort_by_start_time()
         assert len(deps) == 2
         dep_fg, dep_gh = deps
@@ -128,11 +139,11 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
 
             def f1(_):
                 time.sleep(0.1)
-                return 43
+                return 143
 
             def f2(_):
                 time.sleep(0.2)
-                return 44
+                return 144
 
             def f_fan_in(arg):
                 # argument should be list of TaskOutcome:s from f1 and f2
@@ -141,10 +152,10 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
                 for fan_in_outcome in arg:
                     assert isinstance(fan_in_outcome, TaskOutcome)
                     assert fan_in_outcome.error is None
-                    assert fan_in_outcome.return_value in [43, 44]
+                    assert fan_in_outcome.return_value in [143, 144]
 
                 time.sleep(0.3)
-                return 45
+                return 145
 
             tasks: List[RemoteTaskP] = [
                 task_from_python_function(f1, tags={"foo": "f1"}),
@@ -167,7 +178,7 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
 
             assert isinstance(outcome, TaskOutcome)
             assert outcome.error is None
-            assert outcome.return_value == 45
+            assert outcome.return_value == 145
 
             # all tasks have completed, and we can query results repeatedly
             for task in 10 * tasks:
