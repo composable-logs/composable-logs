@@ -279,7 +279,7 @@ def _task_from_remote_f(
         if try_fu.is_success():
             return try_fu.get()
         else:
-            raise try_fu.error
+            raise try_fu.error  # type: ignore
 
     if "task_type" in tags:
         raise ValueError("task_type key should not be included in tags")
