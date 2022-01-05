@@ -262,13 +262,9 @@ def _task_from_remote_f(
     tags: TaskTags = {},
     fail_message: str = "Remote function call failed",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
-    """
-    Lift a Ray remote function U -> B into a Task[U, TaskOutcome[B]].
-    """
-
     def _combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
         span_id = get_span_hexid(span)
-        if b.error is None:
+        if b.is_success():
             span.set_status(Status(StatusCode.OK))
             return TaskOutcome(span_id=span_id, return_value=b.value, error=None)
         else:
@@ -279,12 +275,11 @@ def _task_from_remote_f(
 
     # TODO: ... rewrite later by refactoring GenTask_OT constructor ...
     async def untry_f(u: U) -> B:
-        # await_u: Awaitable[U] = ray.put(u)  # code also works without ray.put here
         try_fu: Try[B] = await f_remote(u)
-        if try_fu.error is not None:
-            raise try_fu.error
+        if try_fu.is_success():
+            return try_fu.get()
         else:
-            return try_fu.value  # type: ignore
+            raise try_fu.error
 
     if "task_type" in tags:
         raise ValueError("task_type key should not be included in tags")
@@ -299,14 +294,12 @@ def _task_from_remote_f(
 def task_from_python_function(
     f: Callable[[U], B],
     num_cpus: int = 1,
+    max_nr_retries: int = 1,
     timeout_s: Optional[float] = None,
     tags: TaskTags = {},
-    max_nr_retries: int = 1,
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     """
-    Lift a Python function f(u: U) -> TaskOutcome[B] into a
-    RemoteTaskP[U, TaskOutcome[B]].
-
+    Lift a Python function f (U -> B) into a Task.
     """
     try_f_remote: Callable[
         [Awaitable[U]], Awaitable[Try[B]]
