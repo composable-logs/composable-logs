@@ -20,6 +20,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
 )
+from pynb_dag_runner.tasks.extract import extract_task_dependencies
 from pynb_dag_runner.helpers import A, one
 
 import opentelemetry as otel
@@ -105,29 +106,29 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
         return sr.spans
 
     def validate_spans(spans: Spans):
-
-        deps = spans.filter(["name"], "task-dependency").sort_by_start_time()
-        assert len(deps) == 2
-        dep_fg, dep_gh = deps
-
         def lookup_task_span_id(func_name: str) -> SpanId:
             return get_span_id(one(spans.filter(["attributes", "tags.foo"], func_name)))
 
+        dependencies: Set[Tuple[SpanId, SpanId]] = extract_task_dependencies(spans)
+
         # Check that span_id:s referenced in task relationships are found. This may
-        # fail if span_id:s are not correctly formatted (eg. with 0x prefix).
-        for d in [dep_fg, dep_gh]:
-            for k in ["from_task_span_id", "to_task_span_id"]:
-                assert spans.contains_span_id(d["attributes"][k])
+        # fail if logged span_id:s are not correctly formatted (eg. with 0x prefix).
+        for span_ids in dependencies:
+            for span_id in span_ids:
+                assert spans.contains_span_id(span_id)
 
-        # check that dependency relations correspond to "f -> g" and "g -> h"
-        assert dependency_span__to__from_to_ids(dep_fg) == (
-            lookup_task_span_id(func_name="f"),
-            lookup_task_span_id(func_name="g"),
-        )
-
-        assert dependency_span__to__from_to_ids(dep_gh) == (
-            lookup_task_span_id(func_name="g"),
-            lookup_task_span_id(func_name="h"),
+        # check that logged dependency relations correspond to "f -> g" and "g -> h"
+        assert dependencies == set(
+            [
+                (
+                    lookup_task_span_id(func_name="f"),
+                    lookup_task_span_id(func_name="g"),
+                ),
+                (
+                    lookup_task_span_id(func_name="g"),
+                    lookup_task_span_id(func_name="h"),
+                ),
+            ]
         )
 
     validate_spans(get_test_spans())

@@ -383,6 +383,9 @@ def fan_in(
     if len(paralllel_tasks) == 0:
         raise ValueError("Called with zero length task list.")
 
+    if target_task in paralllel_tasks:
+        raise ValueError("Task listed in both arguments of fan_in")
+
     @ray.remote(num_cpus=0)
     class TargetTaskTrigger:
         def __init__(self):
