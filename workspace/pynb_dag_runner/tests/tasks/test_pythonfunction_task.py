@@ -339,7 +339,7 @@ def test_always_failing_task():
 
             def f(arg):
                 baggage = otel.baggage.get_all()
-                if int(baggage["retry_nr"]) <= 2:
+                if int(baggage["retry_nr"]) <= 1:
                     time.sleep(1e6)
                 else:
                     raise Exception("Failed to run")
@@ -349,7 +349,7 @@ def test_always_failing_task():
                     f=f,
                     tags={"function_id": "foo"},
                     max_nr_retries=10,
-                    timeout_s=1.0,
+                    timeout_s=3.0,
                 )
             ]
 
@@ -358,9 +358,7 @@ def test_always_failing_task():
         return rec.spans
 
     def validate_spans(spans: Spans):
-        for s in spans:
-            if ".remote" not in s["name"]:
-                print(s["name"])
+        assert len(spans.filter(["name"], "task-dependency")) == 0
 
         top_task_span = one(spans.filter(["name"], "execute-task"))
         assert top_task_span["status"] == {
@@ -385,7 +383,7 @@ def test_always_failing_task():
                 ["name"], "call-python-function"
             )
 
-            if read_key(retry_span, ["attributes", "retry_nr"]) <= 2:
+            if read_key(retry_span, ["attributes", "retry_nr"]) <= 1:
                 assert timeout_span["status"] == {
                     "description": "Timeout",
                     "status_code": "ERROR",
@@ -412,48 +410,80 @@ def test__task_retries__task_is_retried_until_success():
     def get_test_spans():
         with SpanRecorder() as rec:
 
-            def sleep_f(runparameters: RunParameters):
-                if runparameters["retry.nr"] <= 2:
-                    raise Exception("Failed to run")
-                if runparameters["retry.nr"] in [3]:
+            def f(arg):
+                baggage = otel.baggage.get_all()
+                if int(baggage["retry_nr"]) in [0, 1, 2]:
                     time.sleep(1e6)
-                return True
+                elif int(baggage["retry_nr"]) == 3:
+                    raise Exception("Unable to run when retry_nr=3")
+                else:
+                    pass  # success on index >= 4 (5th call)
 
-            t0 = PythonFunctionTask_OT(
-                sleep_f, task_id="test_task", timeout_s=5, n_max_retries=10
-            )
+            tasks = [
+                task_from_python_function(
+                    f=f,
+                    tags={"function_id": "test_task"},
+                    max_nr_retries=10,  # 5 retries is needed for success
+                    timeout_s=1.5,
+                )
+            ]
 
-            dependencies = TaskDependencies()
-            run_tasks([t0], dependencies)
+            _ = start_and_await_tasks(tasks, tasks, timeout_s=100, arg="dummy value")
 
-        return rec.spans, get_task_dependencies(dependencies)
+        return rec.spans
 
-    def validate_spans(spans: Spans, task_dependencies):
-        assert_compatibility(spans, task_dependencies)
+    def validate_spans(spans: Spans):
+        # assert_compatibility(spans)
 
         # Top task span is success
-        top_span = one(spans.filter(["name"], "invoke-task"))
-        assert top_span["attributes"]["task_id"] == "test_task"
-        assert top_span["status"] == {"status_code": "OK"}
-
-        spans_under_top: Spans = spans.restrict_by_top(top_span).sort_by_start_time()
-
-        # Check statuses of timeout spans
-        statuses = [
-            span["status"]
-            for span in spans_under_top.filter(
-                ["name"], "timeout-guard"
-            ).sort_by_start_time()
-        ]
-
-        assert len(statuses) == 5
-        assert statuses == (
-            3 * [{"status_code": "OK"}]
-            + [{"status_code": "ERROR", "description": "Timeout"}]
-            + [{"status_code": "OK"}]
+        top_task_span = one(spans.filter(["name"], "execute-task"))
+        assert (
+            read_key(top_task_span, ["attributes", "tags.function_id"]) == "test_task"
         )
+        assert read_key(top_task_span, ["attributes", "tags.task_type"]) == "Python"
+        assert top_task_span["status"] == {"status_code": "OK"}
 
-    validate_spans(*get_test_spans())
+        retry_call_spans = spans.filter(["name"], "retry-call")
+        assert len(retry_call_spans) == 5
+
+        for top_retry_span in retry_call_spans:
+            retry_subspans = spans.restrict_by_top(top_retry_span)
+
+            timeout_span: SpanDict = one(
+                retry_subspans.filter(["name"], "timeout-guard")
+            )
+            call_python_function_spans = retry_subspans.filter(
+                ["name"], "call-python-function"
+            )
+
+            if read_key(top_retry_span, ["attributes", "retry_nr"]) in [0, 1, 2]:
+                assert timeout_span["status"] == {
+                    "description": "Timeout",
+                    "status_code": "ERROR",
+                }
+                assert len(call_python_function_spans) == 0
+            elif read_key(top_retry_span, ["attributes", "retry_nr"]) == 3:
+                assert timeout_span["status"] == {"status_code": "OK"}
+                assert one(call_python_function_spans)["status"] == {
+                    "status_code": "ERROR",
+                    "description": "Failure",
+                }
+            elif read_key(top_retry_span, ["attributes", "retry_nr"]) == 4:
+                assert timeout_span["status"] == {"status_code": "OK"}
+                assert one(call_python_function_spans)["status"] == {
+                    "status_code": "OK"
+                }
+            else:
+                assert False
+
+            assert spans.contains_path(
+                top_task_span,
+                top_retry_span,
+                timeout_span,
+                *call_python_function_spans,
+            )
+
+    validate_spans(get_test_spans())
 
 
 ### ---- test order dependence for PythonFunctionTask:s ----
