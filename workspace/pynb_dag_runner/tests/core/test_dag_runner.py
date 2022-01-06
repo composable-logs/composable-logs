@@ -47,13 +47,6 @@ def test__task__can_access_otel_baggage_and_returns_outcome():
     assert outcome.return_value == 42
 
 
-def dependency_span__to__from_to_ids(dep_span: SpanDict) -> Tuple[SpanId, SpanId]:
-    return (
-        dep_span["attributes"]["from_task_span_id"],
-        dep_span["attributes"]["to_task_span_id"],
-    )
-
-
 def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
@@ -109,16 +102,16 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
         def lookup_task_span_id(func_name: str) -> SpanId:
             return get_span_id(one(spans.filter(["attributes", "tags.foo"], func_name)))
 
-        dependencies: Set[Tuple[SpanId, SpanId]] = extract_task_dependencies(spans)
+        log_dependencies: Set[Tuple[SpanId, SpanId]] = extract_task_dependencies(spans)
 
         # Check that span_id:s referenced in task relationships are found. This may
         # fail if logged span_id:s are not correctly formatted (eg. with 0x prefix).
-        for span_ids in dependencies:
+        for span_ids in log_dependencies:
             for span_id in span_ids:
                 assert spans.contains_span_id(span_id)
 
         # check that logged dependency relations correspond to "f -> g" and "g -> h"
-        assert dependencies == set(
+        assert log_dependencies == set(
             [
                 (
                     lookup_task_span_id(func_name="f"),
@@ -190,16 +183,7 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
         return sr.spans
 
     def validate_spans(spans: Spans):
-        deps = spans.filter(["name"], "task-dependency")
-        assert len(deps) == 2
-        dep_a, dep_b = deps
-
-        logged_dependencies: Set[Tuple[SpanId, SpanId]] = set(
-            [
-                dependency_span__to__from_to_ids(dep_a),
-                dependency_span__to__from_to_ids(dep_b),
-            ]
-        )
+        log_dependencies: Set[Tuple[SpanId, SpanId]] = extract_task_dependencies(spans)
 
         def lookup_task_span_id(func_name: str) -> SpanId:
             return get_span_id(one(spans.filter(["attributes", "tags.foo"], func_name)))
@@ -217,7 +201,7 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
             ]
         )
 
-        assert expected_dependencies == logged_dependencies
+        assert expected_dependencies == log_dependencies
 
     validate_spans(get_test_spans())
 
@@ -260,7 +244,6 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
         return sr.spans
 
     def validate_spans(spans: Spans):
-        deps = spans.filter(["name"], "task-dependency").sort_by_start_time()
-        assert len(deps) == 0
+        assert len(extract_task_dependencies(spans)) == 0
 
     validate_spans(get_test_spans())
