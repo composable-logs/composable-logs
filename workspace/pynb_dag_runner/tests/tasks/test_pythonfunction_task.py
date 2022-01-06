@@ -1,18 +1,13 @@
 import time, random, itertools
-from typing import List
+from typing import List, Set, Tuple
 
 #
 import pytest
 import opentelemetry as otel
 
 #
-from pynb_dag_runner.tasks.tasks import (
-    PythonFunctionTask_OT,
-    RunParameters,
-    get_task_dependencies,
-)
-
-#
+from pynb_dag_runner.opentelemetry_helpers import SpanId, Spans
+from pynb_dag_runner.tasks.extract import extract_task_dependencies
 from pynb_dag_runner.helpers import (
     one,
     pairs,
@@ -22,9 +17,10 @@ from pynb_dag_runner.helpers import (
     range_is_empty,
 )
 from pynb_dag_runner.core.dag_runner import (
-    TaskDependencies,
     TaskOutcome,
     run_tasks,
+    fan_in,
+    run_in_sequence,
     start_and_await_tasks,
     RemoteTaskP,
     task_from_python_function,
@@ -32,6 +28,7 @@ from pynb_dag_runner.core.dag_runner import (
 from pynb_dag_runner.opentelemetry_helpers import (
     get_duration_range_us,
     read_key,
+    get_span_id,
     get_span_exceptions,
     Spans,
     SpanDict,
@@ -490,37 +487,74 @@ def test__task_retries__task_is_retried_until_success():
 
 
 @pytest.mark.parametrize(
-    "dependencies_list",
+    "arg",
     [
-        [],
+        #
+        # --------------------------- Graphs without fan-in ----------------------------
+        #
+        # <empty graph, no dependencies>
+        #
+        {
+            "tasks_to_start": [0, 1, 2, 3, 4],
+            "tasks_to_await": [0, 1, 2, 3, 4],
+            "in_seqs": [],
+            "fan_ins": [],
+        },
         #
         #  t0  --->  t1
         #
-        ["t0 >> t1"],
+        {
+            "tasks_to_start": [0, 2, 3, 4],
+            "tasks_to_await": [1, 2, 3, 4],
+            "in_seqs": [(0, 1)],
+            "fan_ins": [],
+        },
         #
         #  t0  --->  t1
         #
         #  t2  --->  t3  --->  t4
         #
-        ["t0 >> t1", "t2 >> t3", "t3 >> t4"],
-        # same as above, but one constraint repeated
-        ["t0 >> t1", "t2 >> t3", "t3 >> t4", "t3 >> t4"],
+        {
+            "tasks_to_start": [0, 2],
+            "tasks_to_await": [1, 4],
+            "in_seqs": [(0, 1), (2, 3, 4)],
+            "fan_ins": [],
+        },
+        {
+            "tasks_to_start": [0, 2],
+            "tasks_to_await": [1, 4],
+            # same as above but with some duplicate in_seq:s
+            "in_seqs": [(0, 1), (2, 3, 4), (2, 3), (2, 3, 4)],
+            "fan_ins": [],
+        },
         #
-        #  t0  --->  t1  ---\
-        #                    v
-        #  t2  --->  t3  ---> t4
+        #  t0  --->  t1  --->  t2  --->  t3  --->  t4
         #
-        ["t0 >> t1", "t1 >> t4", "t2 >> t3", "t3 >> t4"],
+        {
+            "tasks_to_start": [0],
+            "tasks_to_await": [4],
+            "in_seqs": [(0, 1, 2, 3, 4)],
+            "fan_ins": [],
+        },
         #
         #      --->  t0  --->  t1
         #     /
         #  t2  --->  t3  --->  t4
         #
-        ["t2 >> t0", "t2 >> t3", "t0 >> t1", "t3 >> t4"],
+        {
+            "tasks_to_start": [2],
+            "tasks_to_await": [1, 4],
+            "in_seqs": [(2, 0, 1), (2, 3, 4)],
+            "fan_ins": [],
+        },
         #
-        #  t0  --->  t1  --->  t2  --->  t3  --->  t4
+        # ----------------------------- Graphs with fan-in -----------------------------
         #
-        ["t0 >> t1", "t1 >> t2", "t2 >> t3", "t3 >> t4"],
+        #  t0  --->  t1  ---\
+        #                    v
+        #  t2  --->  t3  ---> t4
+        #
+        ["(t0, t1)", "(t2, t3)", "(t1, t3, t4)"],
         #
         #       --->  t1  ---\
         #      /              v
@@ -529,12 +563,10 @@ def test__task_retries__task_is_retried_until_success():
         #       --->  t3  ---/
         #
         [
-            "t0 >> t1",
-            "t0 >> t2",
-            "t0 >> t3",
-            "t1 >> t4",
-            "t2 >> t4",
-            "t3 >> t4",
+            "(t0, t1)",
+            "(t0, t2)",
+            "(t0, t3)",
+            "(t1, t2, t3, t4)",
         ],
         #
         #  t0  ---\
@@ -545,9 +577,9 @@ def test__task_retries__task_is_retried_until_success():
         #                    ^
         #  t3  -------------/
         #
-        ["t0 >> t1", "t2 >> t1", "t1 >> t4", "t3 >> t4"],
+        ["(t0, t2, t1)", "(t3, t1, t4)"],
         # same as above, and two redundant constraints
-        ["t0 >> t1", "t2 >> t1", "t1 >> t4", "t3 >> t4", "t0 >> t4", "t2 >> t4"],
+        ["(t0, t1)", "(t2, t1)", "(t1, t4)", "(t3, t4)", "(t0, t4)", "(t2, t4)"],
         #
         #  t0  ------>  t1  --->  t2
         #      \             \ ^
@@ -555,36 +587,68 @@ def test__task_retries__task_is_retried_until_success():
         #        \           / v
         #         --->  t3  --->  t4
         #
-        ["t0 >> t1", "t0 >> t3", "t1 >> t2", "t3 >> t4", "t1 >> t4", "t3 >> t2"],
-    ],
+        ["(t0, t1)", "(t0, t3)", "(t1, t2)", "(t3, t4)", "(t1, t4)", "(t3, t2)"],
+    ][:6],
 )
-def test_random_sleep_tasks_with_order_dependencies(dependencies_list):
+def test_random_sleep_tasks_with_order_dependencies(arg):
+
+    arg_tasks_to_start: List[int] = arg["tasks_to_start"]
+    arg_tasks_to_await: List[int] = arg["tasks_to_await"]
+    arg_in_seqs: List[List[int]] = arg["in_seqs"]
+    arg_fan_ins: List[Tuple[List[int], int]] = arg["fan_ins"]
+
     def get_test_spans():
         with SpanRecorder() as rec:
 
-            def sleep_f():
-                sleep_ms = random.randint(10, 100)
-                return lambda _: time.sleep(sleep_ms / 1000)
+            def random_sleep(arg):
+                time.sleep(random.randint(10, 100) / 1000)
 
-            # local variables t0, .., t4 need to be defined for dependencies
-            t0 = PythonFunctionTask_OT(sleep_f(), task_id="t0")
-            t1 = PythonFunctionTask_OT(sleep_f(), task_id="t1")
-            t2 = PythonFunctionTask_OT(sleep_f(), task_id="t2")
-            t3 = PythonFunctionTask_OT(sleep_f(), task_id="t3")
-            t4 = PythonFunctionTask_OT(sleep_f(), task_id="t4")
+            tasks = [
+                task_from_python_function(
+                    f=random_sleep,
+                    tags={"task_id": f"t{k}"},
+                )
+                for k in range(5)
+            ]
 
-            # See https://stackoverflow.com/questions/55084171
-            f_locals = locals()
-            dependencies = TaskDependencies(
-                *[eval(d, f_locals) for d in dependencies_list]
+            for in_seq in arg_in_seqs:
+                run_in_sequence(*[tasks[k] for k in in_seq])
+
+            for tasks_dep, task_target in arg_fan_ins:
+                fan_in(tasks_dep, task_target)
+
+            _ = start_and_await_tasks(
+                tasks_to_start=[tasks[k] for k in arg_tasks_to_start],
+                tasks_to_await=[tasks[k] for k in arg_tasks_to_await],
+                timeout_s=100,
+                arg="dummy value",
             )
-            run_tasks([t0, t1, t2, t3, t4], dependencies)
 
-        return rec.spans, get_task_dependencies(dependencies)
+        return rec.spans
 
-    def validate_spans(spans: Spans, task_dependencies):
-        assert len(spans.filter(["name"], "invoke-task")) == 5
+    def validate_spans(spans: Spans):
+        assert len(spans.filter(["name"], "execute-task")) == 5
 
-        assert_compatibility(spans, task_dependencies)
+        def lookup_task_span_id(task_nr: int) -> SpanId:
+            assert task_nr in range(5)
+            return get_span_id(
+                one(
+                    spans.filter(["name"], "execute-task")
+                    #
+                    .filter(["attributes", "tags.task_id"], f"t{task_nr}")
+                )
+            )
 
-    validate_spans(*get_test_spans())
+        expected_dependencies: List[Tuple[SpanId, SpanId]] = [
+            (lookup_task_span_id(a), lookup_task_span_id(b))
+            for entry in arg_in_seqs
+            for a, b in pairs(entry)
+        ]
+
+        log_dependencies: Set[Tuple[SpanId, SpanId]] = extract_task_dependencies(spans)
+
+        assert set(expected_dependencies) == log_dependencies
+
+        # assert_compatibility(spans)
+
+    validate_spans(get_test_spans())
