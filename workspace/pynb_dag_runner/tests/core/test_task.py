@@ -15,7 +15,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
 
 
 @pytest.mark.parametrize("task_fail", [True, False])
-def test_make_task_from_function_or_remote_function(task_fail: bool):
+def disable_test_make_task_from_function_or_remote_function(task_fail: bool):
     def f(_):
         time.sleep(0.125)
         if task_fail:

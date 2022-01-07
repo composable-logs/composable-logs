@@ -1,7 +1,7 @@
 import time, random
 from pathlib import Path
 from uuid import uuid4
-from typing import Any, Callable
+from typing import Any, Awaitable, Callable
 
 #
 import opentelemetry as otel
@@ -103,21 +103,22 @@ async def test_future_async_lift_w_exception():
 ### --- tests for try_f_with_timeout_guard wrapper ---
 
 
-def test_timeout_w_success():
+@pytest.mark.asyncio
+async def test_timeout_w_success():
     N_calls = 3
 
-    def get_test_spans():
+    async def get_test_spans():
         with SpanRecorder() as rec:
 
             def f(x: int) -> int:
                 return x + 1
 
-            f_timeout: Callable[
-                [Future[int]], Future[Try[int]]
-            ] = try_f_with_timeout_guard(f, timeout_s=10, num_cpus=1)
+            f_timeout: Callable[[int], Awaitable[Try[int]]] = try_f_with_timeout_guard(
+                f, timeout_s=10, num_cpus=1
+            )
 
             for x in range(N_calls):
-                assert ray.get(f_timeout(ray.put(x))) == Try(x + 1, None)
+                assert await f_timeout(x) == Try(x + 1, None)
 
         return rec.spans
 
@@ -128,13 +129,14 @@ def test_timeout_w_success():
         for span in func_call_spans:
             assert read_key(span, ["status", "status_code"]) == "OK"
 
-    validate_spans(get_test_spans())
+    validate_spans(await get_test_spans())
 
 
-def test_timeout_w_exception():
+@pytest.mark.asyncio
+async def test_timeout_w_exception():
     N_calls = 3
 
-    def get_test_spans():
+    async def get_test_spans():
         with SpanRecorder() as rec:
 
             def error(dummy: int) -> Exception:
@@ -143,12 +145,12 @@ def test_timeout_w_exception():
             def f(dummy: int):
                 raise error(dummy)
 
-            f_timeout: Callable[
-                [Future[int]], Future[Try[int]]
-            ] = try_f_with_timeout_guard(f, timeout_s=10, num_cpus=1)
+            f_timeout: Callable[[int], Awaitable[Try[int]]] = try_f_with_timeout_guard(
+                f, timeout_s=10, num_cpus=1
+            )
 
             for x in range(N_calls):
-                assert ray.get(f_timeout(ray.put(x))) == Try(None, error(x))
+                assert await f_timeout(x) == Try(None, error(x))
         return rec.spans
 
     def validate_spans(spans: Spans):
@@ -171,24 +173,25 @@ def test_timeout_w_exception():
             )
             assert read_key(event, ["attributes", "exception.type"]) == "ValueError"
 
-    validate_spans(get_test_spans())
+    validate_spans(await get_test_spans())
 
 
-def test_timeout_w_timeout_cancel():
+@pytest.mark.asyncio
+async def test_timeout_w_timeout_cancel():
     N_calls = 3
 
-    def get_test_spans():
+    async def get_test_spans():
         with SpanRecorder() as rec:
 
             def f(_: Any) -> None:
                 time.sleep(1e6)
 
-            f_timeout: Callable[
-                [Future[int]], Future[Try[int]]
-            ] = try_f_with_timeout_guard(f, timeout_s=0.5, num_cpus=1)
+            f_timeout: Callable[[int], Awaitable[Try[int]]] = try_f_with_timeout_guard(
+                f, timeout_s=0.5, num_cpus=1
+            )
 
             for _ in range(N_calls):
-                result = ray.get(f_timeout(ray.put(None)))
+                result = await f_timeout("argument-to-function-f")
                 assert result == Try(
                     value=None,
                     error=Exception(
@@ -206,13 +209,14 @@ def test_timeout_w_timeout_cancel():
             assert read_key(span, ["attributes", "timeout_s"]) == 0.5
             assert span["status"] == {"status_code": "ERROR", "description": "Timeout"}
 
-    validate_spans(get_test_spans())
+    validate_spans(await get_test_spans())
 
 
 # this test has failed randomly (TODO)
+@pytest.mark.asyncio
 @pytest.mark.parametrize("dummy_loop_parameter", range(1))
 @pytest.mark.parametrize("task_timeout_s", [0.001, 10.0])
-def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
+async def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
     state_actor = FutureActor.remote()
 
     task_duration_s = 0.2
@@ -224,16 +228,16 @@ def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
         state_actor.set_value.remote("foo")
         return 123
 
-    f_timeout: Callable[[Future[Any]], Future[Try[int]]] = try_f_with_timeout_guard(
+    f_timeout: Callable[[Any], Awaitable[Try[int]]] = try_f_with_timeout_guard(
         f, timeout_s=task_timeout_s, num_cpus=1
     )
 
-    result: Try[int] = ray.get(f_timeout(ray.put("dummy")))
+    result: Try[int] = await f_timeout("dummy")
 
     # Wait for task to finish
     time.sleep(4.0)
 
-    state_has_flipped: bool = ray.get(state_actor.value_is_set.remote())
+    state_has_flipped: bool = await state_actor.value_is_set.remote()
 
     if task_timeout_s < task_duration_s:
         # f should have been canceled, and state should not have flipped

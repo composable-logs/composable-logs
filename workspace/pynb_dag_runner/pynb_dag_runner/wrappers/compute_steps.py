@@ -88,20 +88,22 @@ class AddPythonFunctionCall(TaskFunctionWrapper):
 
     def __call__(self, t: T[Future[Runlog]]) -> T[Future[Runlog]]:
         def eval_f(runlog_future: Future[Runlog]) -> Future[Runlog]:
-            f_result_future = _try_eval_f_async_wrapper(
-                f=self.f,
-                timeout_s=self.timeout_s,
-                success_handler=lambda f_result: {
-                    "out.status": "SUCCESS",
-                    "out.result": f_result,
-                    "out.error": None,
-                },
-                error_handler=lambda exception: {
-                    "out.status": "FAILURE",
-                    "out.result": None,
-                    "out.error": str(exception),
-                },
-            )(runlog_future)
+            f_result_future = _try_eval_f_async_wrapper(  # type: ignore
+                f=self.f,  # type: ignore
+                timeout_s=self.timeout_s,  # type: ignore
+                success_handler=lambda f_result: {  # type: ignore
+                    "out.status": "SUCCESS",  # type: ignore
+                    "out.result": f_result,  # type: ignore
+                    "out.error": None,  # type: ignore
+                },  # type: ignore
+                error_handler=lambda exception: {  # type: ignore
+                    "out.status": "FAILURE",  # type: ignore
+                    "out.result": None,  # type: ignore
+                    "out.error": str(exception),  # type: ignore
+                },  # type: ignore
+            )(  # type: ignore
+                runlog_future  # type: ignore
+            )  # type: ignore
 
             @ray.remote(num_cpus=0)
             def add_keys(runlog: Runlog, new_values: Dict) -> Runlog:
