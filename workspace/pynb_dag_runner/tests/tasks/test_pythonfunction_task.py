@@ -602,7 +602,7 @@ def test__task_retries__task_is_retried_until_success():
             "in_seqs": [(0, 1), (0, 3)],
             "fan_ins": [([1, 3], 2), ([1, 3], 4)],
         },
-    ][:1],
+    ][:2],
 )
 async def test_random_sleep_tasks_with_order_dependencies(arg):
 
