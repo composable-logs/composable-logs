@@ -19,7 +19,7 @@ def _ray_init():
     )
 
 
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def init_ray_before_all_tests():
     # Clean up any spans from previous runs
     shutil.rmtree("/tmp/spans", ignore_errors=True)
@@ -27,6 +27,14 @@ def init_ray_before_all_tests():
     _ray_init()
     yield
     ray.shutdown()
+
+
+@pytest.fixture
+def re_init_ray():
+    ray.shutdown()
+    _ray_init()
+    yield
+    pass
 
 
 # _NR_RAY = 0

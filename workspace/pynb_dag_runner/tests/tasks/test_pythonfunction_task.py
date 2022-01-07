@@ -604,7 +604,7 @@ def test__task_retries__task_is_retried_until_success():
         },
     ][:7],
 )
-async def test_random_sleep_tasks_with_order_dependencies(arg):
+async def test_random_sleep_tasks_with_order_dependencies(arg, re_init_ray):
 
     arg_tasks_to_start: List[int] = arg["tasks_to_start"]
     arg_tasks_to_await: List[int] = arg["tasks_to_await"]
@@ -631,7 +631,7 @@ async def test_random_sleep_tasks_with_order_dependencies(arg):
             for tasks_dep, task_target in arg_fan_ins:
                 fan_in([tasks[k] for k in tasks_dep], tasks[task_target])
 
-            time.sleep(0.5)  # does this matter?
+            time.sleep(0.5)  # test if this changes outcome
 
             _ = start_and_await_tasks(
                 tasks_to_start=[tasks[k] for k in arg_tasks_to_start],
