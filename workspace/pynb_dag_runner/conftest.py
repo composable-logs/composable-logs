@@ -29,14 +29,6 @@ def init_ray_before_all_tests():
     ray.shutdown()
 
 
-@pytest.fixture
-def re_init_ray():
-    ray.shutdown()
-    _ray_init()
-    yield
-    pass
-
-
 # _NR_RAY = 0
 
 

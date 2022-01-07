@@ -604,7 +604,7 @@ def test__task_retries__task_is_retried_until_success():
         },
     ][:7],
 )
-async def test_random_sleep_tasks_with_order_dependencies(arg, re_init_ray):
+async def test_random_sleep_tasks_with_order_dependencies(arg):
 
     arg_tasks_to_start: List[int] = arg["tasks_to_start"]
     arg_tasks_to_await: List[int] = arg["tasks_to_await"]
