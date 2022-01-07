@@ -285,7 +285,7 @@ def _task_from_remote_f(
         raise ValueError("task_type key should not be included in tags")
 
     return GenTask_OT.remote(
-        f_remote=untry_f,  # Future.lift_async(untry_f),
+        f_remote=Future.lift_async(untry_f),
         combiner=_combiner,
         tags={**tags, "task_type": task_type},
     )
@@ -341,7 +341,7 @@ def _cb_compose_tasks(
             span.set_attribute("from_task_span_id", task1_span_id)
             span.set_attribute("to_task_span_id", task2_span_id)
 
-    task1.add_callback.remote(task1_on_complete_handler)
+    ray.get(task1.add_callback.remote(task1_on_complete_handler))  # type: ignore
 
 
 def run_in_sequence(*tasks: RemoteTaskP[TaskOutcome[A], TaskOutcome[A]]):
