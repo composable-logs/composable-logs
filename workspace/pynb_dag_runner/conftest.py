@@ -31,7 +31,10 @@ def init_ray_before_all_tests():
 @pytest.fixture(scope="function", autouse=True)
 def func_wrapper():
     gc.collect()
+    ray.shutdown()
+    _ray_init()
     yield
+    ray.shutdown()
     gc.collect()
 
 
