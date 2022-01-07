@@ -28,14 +28,28 @@ def init_ray_before_all_tests():
     ray.shutdown()
 
 
+_NR_RAY = 0
+
+
 @pytest.fixture(scope="function", autouse=True)
 def func_wrapper():
-    gc.collect()
-    ray.shutdown()
-    _ray_init()
-    yield
-    ray.shutdown()
-    gc.collect()
+    global _NR_RAY
+
+    _NR_RAY += 1
+
+    if _NR_RAY % 10 == 0:
+        # reinit Ray on every 10th tests
+        gc.collect()
+        ray.shutdown()
+        _ray_init()
+        yield
+        ray.shutdown()
+        gc.collect()
+    else:
+        # otherwise just do gargabe collection
+        gc.collect()
+        yield
+        gc.collect()
 
 
 # @pytest.fixture(scope="module", autouse=True)
