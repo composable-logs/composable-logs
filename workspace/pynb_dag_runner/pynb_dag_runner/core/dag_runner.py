@@ -285,7 +285,7 @@ def _task_from_remote_f(
         raise ValueError("task_type key should not be included in tags")
 
     return GenTask_OT.remote(
-        f_remote=Future.lift_async(untry_f),
+        f_remote=untry_f,  # Future.lift_async(untry_f),
         combiner=_combiner,
         tags={**tags, "task_type": task_type},
     )
