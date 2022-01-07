@@ -486,6 +486,7 @@ def test__task_retries__task_is_retried_until_success():
 ### ---- test order dependence for PythonFunctionTask:s ----
 
 
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "arg",
     [
@@ -554,7 +555,12 @@ def test__task_retries__task_is_retried_until_success():
         #                    v
         #  t2  --->  t3  ---> t4
         #
-        ["(t0, t1)", "(t2, t3)", "(t1, t3, t4)"],
+        {
+            "tasks_to_start": [0, 2],
+            "tasks_to_await": [4],
+            "in_seqs": [(0, 1), (2, 3)],
+            "fan_ins": [([1, 3], 4)],
+        },
         #
         #       --->  t1  ---\
         #      /              v
@@ -562,12 +568,12 @@ def test__task_retries__task_is_retried_until_success():
         #      \              ^
         #       --->  t3  ---/
         #
-        [
-            "(t0, t1)",
-            "(t0, t2)",
-            "(t0, t3)",
-            "(t1, t2, t3, t4)",
-        ],
+        {
+            "tasks_to_start": [0],
+            "tasks_to_await": [4],
+            "in_seqs": [(0, 1), (0, 2), (0, 3)],
+            "fan_ins": [([1, 2, 3], 4)],
+        },
         #
         #  t0  ---\
         #          v
@@ -577,9 +583,12 @@ def test__task_retries__task_is_retried_until_success():
         #                    ^
         #  t3  -------------/
         #
-        ["(t0, t2, t1)", "(t3, t1, t4)"],
-        # same as above, and two redundant constraints
-        ["(t0, t1)", "(t2, t1)", "(t1, t4)", "(t3, t4)", "(t0, t4)", "(t2, t4)"],
+        {
+            "tasks_to_start": [0, 2, 3],
+            "tasks_to_await": [4],
+            "in_seqs": [],
+            "fan_ins": [([0, 2], 1), ([1, 3], 4)],
+        },
         #
         #  t0  ------>  t1  --->  t2
         #      \             \ ^
@@ -587,17 +596,22 @@ def test__task_retries__task_is_retried_until_success():
         #        \           / v
         #         --->  t3  --->  t4
         #
-        ["(t0, t1)", "(t0, t3)", "(t1, t2)", "(t3, t4)", "(t1, t4)", "(t3, t2)"],
-    ][:6],
+        {
+            "tasks_to_start": [0],
+            "tasks_to_await": [2, 4],
+            "in_seqs": [(0, 1), (0, 3)],
+            "fan_ins": [([1, 3], 2), ([1, 3], 4)],
+        },
+    ],
 )
-def test_random_sleep_tasks_with_order_dependencies(arg):
+async def test_random_sleep_tasks_with_order_dependencies(arg):
 
     arg_tasks_to_start: List[int] = arg["tasks_to_start"]
     arg_tasks_to_await: List[int] = arg["tasks_to_await"]
     arg_in_seqs: List[List[int]] = arg["in_seqs"]
     arg_fan_ins: List[Tuple[List[int], int]] = arg["fan_ins"]
 
-    def get_test_spans():
+    async def get_test_spans():
         with SpanRecorder() as rec:
 
             def random_sleep(arg):
@@ -615,7 +629,7 @@ def test_random_sleep_tasks_with_order_dependencies(arg):
                 run_in_sequence(*[tasks[k] for k in in_seq])
 
             for tasks_dep, task_target in arg_fan_ins:
-                fan_in(tasks_dep, task_target)
+                fan_in([tasks[k] for k in tasks_dep], tasks[task_target])
 
             _ = start_and_await_tasks(
                 tasks_to_start=[tasks[k] for k in arg_tasks_to_start],
@@ -623,6 +637,10 @@ def test_random_sleep_tasks_with_order_dependencies(arg):
                 timeout_s=100,
                 arg="dummy value",
             )
+
+            # assert all tasks have completed
+            for task in tasks:
+                assert await task.has_completed.remote() == True
 
         return rec.spans
 
@@ -645,10 +663,16 @@ def test_random_sleep_tasks_with_order_dependencies(arg):
             for a, b in pairs(entry)
         ]
 
+        for target_dep_list, target_task in arg_fan_ins:
+            for dependency in target_dep_list:
+                expected_dependencies += [
+                    (lookup_task_span_id(dependency), lookup_task_span_id(target_task))
+                ]
+
         log_dependencies: Set[Tuple[SpanId, SpanId]] = extract_task_dependencies(spans)
 
         assert set(expected_dependencies) == log_dependencies
 
         # assert_compatibility(spans)
 
-    validate_spans(get_test_spans())
+    validate_spans(await get_test_spans())
