@@ -16,4 +16,3 @@ ENV MYPY_CACHE_DIR=/home/host_user/.cache/mypy
 RUN mkdir -p $MYPY_CACHE_DIR
 
 ENV PYTEST_ADDOPTS="-vvv -o cache_dir=/home/host_user/.cache/pytest"
-ENV RAY_DISABLE_MEMORY_MONITOR=1

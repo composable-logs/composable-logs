@@ -1,4 +1,4 @@
-import shutil
+import gc, shutil
 
 # location of this file (conftest.py) indicates root for pytest
 import pytest, ray
@@ -18,3 +18,10 @@ def init_ray_before_all_tests():
         # enable tracing and write traces to /tmp/spans/<pid>.txt in JSONL format
         _tracing_startup_hook="ray.util.tracing.setup_local_tmp_tracing:setup_tracing",
     )
+
+
+@pytest.fixture(autouse=True)
+def setup_and_teardown():
+    gc.collect()
+    yield  # test is run
+    gc.collect()
