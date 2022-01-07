@@ -42,7 +42,7 @@ def func_wrapper():
         ray.shutdown()
         _ray_init()
         yield
-        ray.shutdown()
+        pass
 
 
 # @pytest.fixture(scope="module", autouse=True)
