@@ -29,23 +29,23 @@ def init_ray_before_all_tests():
     ray.shutdown()
 
 
-_NR_RAY = 0
+# _NR_RAY = 0
 
 
-@pytest.fixture(scope="function", autouse=True)
-def func_wrapper():
-    global _NR_RAY
+# @pytest.fixture(scope="function", autouse=True)
+# def func_wrapper():
+#     global _NR_RAY
 
-    _NR_RAY += 1
+#     _NR_RAY += 1
 
-    if _NR_RAY % 10 == 0:
-        # reinit Ray on every 10th tests
-        ray.shutdown()
-        _ray_init()
+#     if _NR_RAY % 10 == 0:
+#         # reinit Ray on every 10th tests
+#         ray.shutdown()
+#         _ray_init()
 
-    yield
+#     yield
 
-    pass
+#     pass
 
 
 # @pytest.fixture(scope="module", autouse=True)
