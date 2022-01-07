@@ -35,9 +35,9 @@ def func_wrapper():
     gc.collect()
 
 
-@pytest.fixture(scope="module", autouse=True)
-def module_wrapper():
-    ray.shutdown()
-    _ray_init()
-    yield
-    ray.shutdown()
+# @pytest.fixture(scope="module", autouse=True)
+# def module_wrapper():
+#     ray.shutdown()
+#     _ray_init()
+#     yield
+#     ray.shutdown()
