@@ -13,6 +13,7 @@ def _ray_init():
     """
     ray.init(
         num_cpus=2,
+        ignore_reinit_error=True,
         # enable tracing and write traces to /tmp/spans/<pid>.txt in JSONL format
         _tracing_startup_hook="ray.util.tracing.setup_local_tmp_tracing:setup_tracing",
     )
@@ -41,8 +42,10 @@ def func_wrapper():
         # reinit Ray on every 10th tests
         ray.shutdown()
         _ray_init()
-        yield
-        pass
+
+    yield
+
+    pass
 
 
 # @pytest.fixture(scope="module", autouse=True)
