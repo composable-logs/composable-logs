@@ -631,6 +631,8 @@ async def test_random_sleep_tasks_with_order_dependencies(arg):
             for tasks_dep, task_target in arg_fan_ins:
                 fan_in([tasks[k] for k in tasks_dep], tasks[task_target])
 
+            time.sleep(0.5)  # does this matter?
+
             _ = start_and_await_tasks(
                 tasks_to_start=[tasks[k] for k in arg_tasks_to_start],
                 tasks_to_await=[tasks[k] for k in arg_tasks_to_await],
