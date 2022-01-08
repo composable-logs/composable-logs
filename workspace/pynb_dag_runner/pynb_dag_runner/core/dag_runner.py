@@ -175,7 +175,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
     def _set_span_id(self, span: Span):
         self._span_id_future.set_value.remote(get_span_hexid(span))  # type: ignore
 
-    def start(self, arg: U) -> None:
+    async def start(self, arg: U):
         """
         Note:
         - Only first method call starts task. Subsequent calls do nothing.
@@ -188,39 +188,34 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
 
         self._start_called = True
 
-        async def make_call(_arg: U):
-            tracer = otel.trace.get_tracer(__name__)  # type: ignore
-            with tracer.start_as_current_span("execute-task") as span:
-                try:
-                    # Note:
-                    # This function is run as a remote Ray function with self being a
-                    # copy of the Task actor; Thus, any changes like self.x = 123 will
-                    # not update the main actor.
-                    #
-                    # Reading self is possible, and updating state on remote actors
-                    # referenced from self works, as done one the next line.
-                    self._set_span_id(span)
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("execute-task") as span:
+            try:
+                # Note:
+                # This function is run as a remote Ray function with self being a
+                # copy of the Task actor; Thus, any changes like self.x = 123 will
+                # not update the main actor.
+                #
+                # Reading self is possible, and updating state on remote actors
+                # referenced from self works, as done one the next line.
+                self._set_span_id(span)
 
-                    # pre-task
-                    for k, v in self._tags.items():
-                        span.set_attribute(f"tags.{k}", v)
+                # pre-task
+                for k, v in self._tags.items():
+                    span.set_attribute(f"tags.{k}", v)
 
-                    # wait for task to finish
-                    f_result: A = await self._f_remote(_arg)
+                # wait for task to finish
+                f_result: A = await self._f_remote(arg)
 
-                    # post-task
-                    task_result = self._combiner(span, Try(f_result, None))
-                except Exception as e:
-                    task_result = self._combiner(span, Try(None, e))
+                # post-task
+                task_result = self._combiner(span, Try(f_result, None))
+            except Exception as e:
+                task_result = self._combiner(span, Try(None, e))
 
-            # note, result is set before callbacks are called
-            self._set_result(task_result)
+        # note, result is set before callbacks are called
+        self._set_result(task_result)
 
-            for cb in self._on_complete_callbacks:
-                await cb(task_result)
-
-        # Start computation in other (possibly remote) Python process, non-blocking call
-        Future.lift_async(make_call)(arg)
+        await asyncio.gather(*[cb(task_result) for cb in self._on_complete_callbacks])
 
     def has_started(self) -> bool:
         return self._start_called
@@ -329,7 +324,7 @@ def _cb_compose_tasks(
         assert await task1.has_completed.remote() == True
 
         task1_span_id = await task1.get_span_id.remote()
-        task2.start.remote(task1_result)
+        task2_result = task2.start.remote(task1_result)  # type: ignore
         task2_span_id = await task2.get_span_id.remote()
 
         # After span_id:s of Task1 and Task2 are known, log that these have a
@@ -338,6 +333,8 @@ def _cb_compose_tasks(
         with tracer.start_as_current_span("task-dependency") as span:
             span.set_attribute("from_task_span_id", task1_span_id)
             span.set_attribute("to_task_span_id", task2_span_id)
+
+        await task2_result
 
     ray.get(task1.add_callback.remote(task1_on_complete_handler))  # type: ignore
 
@@ -419,7 +416,7 @@ def fan_in(
         async def task_on_complete_handler(task_result: TaskOutcome[B]) -> None:
             await target_task_trigger.record_completed_task.remote(task)
 
-        task.add_callback.remote(task_on_complete_handler)
+        ray.get(task.add_callback.remote(task_on_complete_handler))  # type: ignore
 
 
 def start_and_await_tasks(
