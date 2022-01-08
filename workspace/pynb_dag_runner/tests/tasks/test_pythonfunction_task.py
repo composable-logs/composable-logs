@@ -644,12 +644,6 @@ async def test_random_sleep_tasks_with_order_dependencies(arg):
             for task in tasks:
                 assert await task.has_completed.remote() == True
 
-                del task
-
-            import gc
-
-            gc.collect()
-
         return rec.spans
 
     def validate_spans(spans: Spans):
