@@ -1,4 +1,4 @@
-import time, random, itertools
+import gc, time, random, itertools
 from typing import List, Set, Tuple
 
 #
@@ -487,7 +487,7 @@ def test__task_retries__task_is_retried_until_success():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("dummy_loop_parameter", range(1))
+@pytest.mark.parametrize("dummy_loop_parameter", range(3))
 @pytest.mark.parametrize(
     "arg",
     [
@@ -644,6 +644,9 @@ async def test_random_sleep_tasks_with_order_dependencies(dummy_loop_parameter, 
             # assert all tasks have completed
             for task in tasks:
                 assert await task.has_completed.remote() == True
+
+            del tasks
+            gc.collect()
 
         return rec.spans
 
