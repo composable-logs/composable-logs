@@ -151,13 +151,15 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
     ):
         self._f_remote: Callable[[U], Awaitable[A]] = f_remote
         self._combiner: Callable[[Span, Try[A]], B] = combiner
-        self._span_id_future: FutureActor = FutureActor.remote()  # type: ignore
         self._future_value: FutureActor = FutureActor.remote()  # type: ignore
         self._on_complete_callbacks: List[
             Callable[[B], Awaitable[None]]
         ] = on_complete_callbacks
         self._tags: TaskTags = tags
         self._start_called = False
+        self._future_span_id: Awaitable[
+            str
+        ] = asyncio.get_running_loop().create_future()
 
     def add_callback(self, cb: Callable[[B], Awaitable[None]]) -> None:
         """
@@ -173,7 +175,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         self._future_value.set_value.remote(value)  # type: ignore
 
     def _set_span_id(self, span: Span):
-        self._span_id_future.set_value.remote(get_span_hexid(span))  # type: ignore
+        self._future_span_id.set_result(get_span_hexid(span))  # type: ignore
 
     async def start(self, arg: U):
         """
@@ -230,7 +232,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         Notes:
         - Method can be called either before or after the task has started.
         """
-        return await self._span_id_future.wait.remote()  # type: ignore
+        return await self._future_span_id
 
     async def has_completed(self) -> bool:
         """
