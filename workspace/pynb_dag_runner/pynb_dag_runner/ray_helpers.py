@@ -148,7 +148,7 @@ def _try_eval_f_async_wrapper(
             if len(refs_done) == 1:
                 assert refs_done == [future]
                 span.set_status(Status(StatusCode.OK))
-                return ray.get(future)
+                return await future
             else:
                 assert refs_not_done == [future]
                 span.set_status(Status(StatusCode.ERROR, "Timeout"))
