@@ -10,7 +10,7 @@ endif
 test-pytest:
 	echo ">> Running unit tests ..."
 	$(CMD_PREFIX) pytest \
-	    -k "test_random_sleep$(PYTEST_FILTER)" \
+	    -k "$(PYTEST_FILTER)" \
 	    --durations=10 \
 	    --continue-on-collection-errors tests
 
