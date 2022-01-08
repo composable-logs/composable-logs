@@ -131,7 +131,7 @@ def _try_eval_f_async_wrapper(
     success_handler: Callable[[B], C],
     error_handler: Callable[[Exception], C],
     num_cpus: int = 0,
-) -> Callable[[Awaitable[A]], Awaitable[C]]:
+) -> Callable[[A], Awaitable[C]]:
     """
     Lift a function f: A -> B and result/error handlers into a function operating
     on futures Future[A] -> Future[C].
@@ -161,7 +161,7 @@ def _try_eval_f_async_wrapper(
 
             return result
 
-    def timeout_guard(a: A) -> C:
+    async def timeout_guard(a: A) -> C:
         """
         See also Ray issues:
          - "Support timeout option in Ray tasks",
@@ -198,12 +198,12 @@ def _try_eval_f_async_wrapper(
                     )
                 )
 
-    return Future.lift(timeout_guard)
+    return timeout_guard
 
 
 def try_f_with_timeout_guard(
     f: Callable[[A], B], timeout_s: Optional[float], num_cpus: int
-) -> Callable[[Awaitable[A]], Awaitable[Try[B]]]:
+) -> Callable[[A], Awaitable[Try[B]]]:
     return _try_eval_f_async_wrapper(
         f=f,
         timeout_s=timeout_s,

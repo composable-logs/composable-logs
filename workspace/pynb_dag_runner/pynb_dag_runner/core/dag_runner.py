@@ -285,7 +285,7 @@ def _task_from_remote_f(
         raise ValueError("task_type key should not be included in tags")
 
     return GenTask_OT.remote(
-        f_remote=Future.lift_async(untry_f),
+        f_remote=untry_f,
         combiner=_combiner,
         tags={**tags, "task_type": task_type},
     )
@@ -301,14 +301,12 @@ def task_from_python_function(
     """
     Lift a Python function f (U -> B) into a Task.
     """
-    try_f_remote: Callable[
-        [Awaitable[U]], Awaitable[Try[B]]
-    ] = try_f_with_timeout_guard(f=f, timeout_s=timeout_s, num_cpus=num_cpus)
-
-    try_f_remote_put: Callable[[U], Awaitable[Try[B]]] = compose(try_f_remote, ray.put)
+    try_f_remote: Callable[[U], Awaitable[Try[B]]] = try_f_with_timeout_guard(
+        f=f, timeout_s=timeout_s, num_cpus=num_cpus
+    )
 
     try_f_remote_wrapped: Callable[[U], Awaitable[Try[B]]] = retry_wrapper_ot(
-        try_f_remote_put, max_nr_retries=max_nr_retries
+        try_f_remote, max_nr_retries=max_nr_retries
     )
 
     return _task_from_remote_f(try_f_remote_wrapped, tags=tags, task_type="Python")
@@ -341,7 +339,7 @@ def _cb_compose_tasks(
             span.set_attribute("from_task_span_id", task1_span_id)
             span.set_attribute("to_task_span_id", task2_span_id)
 
-    task1.add_callback.remote(task1_on_complete_handler)
+    ray.get(task1.add_callback.remote(task1_on_complete_handler))  # type: ignore
 
 
 def run_in_sequence(*tasks: RemoteTaskP[TaskOutcome[A], TaskOutcome[A]]):
@@ -382,6 +380,9 @@ def fan_in(
     """
     if len(paralllel_tasks) == 0:
         raise ValueError("Called with zero length task list.")
+
+    if target_task in paralllel_tasks:
+        raise ValueError("Task listed in both arguments of fan_in")
 
     @ray.remote(num_cpus=0)
     class TargetTaskTrigger:
