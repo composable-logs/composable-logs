@@ -191,13 +191,6 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("execute-task") as span:
             try:
-                # Note:
-                # This function is run as a remote Ray function with self being a
-                # copy of the Task actor; Thus, any changes like self.x = 123 will
-                # not update the main actor.
-                #
-                # Reading self is possible, and updating state on remote actors
-                # referenced from self works, as done one the next line.
                 self._set_span_id(span)
 
                 # pre-task
@@ -212,7 +205,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
             except Exception as e:
                 task_result = self._combiner(span, Try(None, e))
 
-        # note, result is set before callbacks are called
+        # note that result is set before callbacks are called
         self._set_result(task_result)
 
         await asyncio.gather(*[cb(task_result) for cb in self._on_complete_callbacks])
