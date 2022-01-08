@@ -38,6 +38,7 @@ def prefix_keys(prefix: str, a_dict: RunParameters) -> RunParameters:
 
 
 class PythonFunctionTask_OT(Task[bool]):
+    # -- deprecated, to be deleted --
     def __init__(
         self,
         f: Callable[[RunParameters], Any],
@@ -58,7 +59,7 @@ class PythonFunctionTask_OT(Task[bool]):
         self.task_id = task_id
 
         f_remote: Callable[
-            [Future[RunParameters]], Awaitable[bool]
+            [RunParameters], Awaitable[bool]
         ] = _try_eval_f_async_wrapper(
             f=lambda runparameters: f(runparameters),
             timeout_s=timeout_s,
