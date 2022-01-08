@@ -26,6 +26,7 @@ from pynb_dag_runner.wrappers.compute_steps import (
 id_tf: T[Awaitable[Runlog]] = Future.lift(lambda runlog: runlog)
 
 
+@pytest.mark.skip(reason="old-implmentation-to-be-deleted")
 def test_pipeline_no_compute_steps():
     # check expected output for task that does nothing to runlog
 
@@ -44,6 +45,7 @@ def test_pipeline_no_compute_steps():
 ###
 
 
+@pytest.mark.skip(reason="old-implmentation-to-be-deleted")
 def test_pipeline_run_parameters():
     task1 = Task(AddParameters(first_parameter=42, another_parameter="foobar")(id_tf))
     task2 = Task(
@@ -61,6 +63,7 @@ def test_pipeline_run_parameters():
         )
 
 
+@pytest.mark.skip(reason="old-implmentation-to-be-deleted")
 def test_pipeline_dynamic_run_parameter():
     task = Task(
         compose(
@@ -80,6 +83,7 @@ def test_pipeline_dynamic_run_parameter():
 ###
 
 
+@pytest.mark.skip(reason="old-implmentation-to-be-deleted")
 def test_add_python_function_call_success():
     for timeout_s in [None, 10, 20]:
 
@@ -101,6 +105,7 @@ def test_add_python_function_call_success():
         )
 
 
+@pytest.mark.skip(reason="old-implmentation-to-be-deleted")
 def test_add_python_function_call_exception_handling():
     def failing_function(runlog: Runlog):
         raise Exception("BOOM!")
@@ -118,6 +123,7 @@ def test_add_python_function_call_exception_handling():
     )
 
 
+@pytest.mark.skip(reason="old-implmentation-to-be-deleted")
 def test_add_python_function_call_timeout():
     def f_fail(_: Runlog):
         time.sleep(1)
@@ -140,6 +146,7 @@ def test_add_python_function_call_timeout():
         )
 
 
+@pytest.mark.skip(reason="old-implmentation-to-be-deleted")
 def test_add_python_function_call_func_can_depend_on_runlog_content():
     def f(runlog: Runlog):
         assert runlog.as_dict() == {
@@ -167,6 +174,7 @@ def test_add_python_function_call_func_can_depend_on_runlog_content():
 ###
 
 
+@pytest.mark.skip(reason="old-implmentation-to-be-deleted")
 def test_pipeline_add_timing_wrapper():
     def f_wait(_: Runlog):
         time.sleep(0.3)
@@ -200,6 +208,7 @@ def test_pipeline_add_timing_wrapper():
 ###
 
 
+@pytest.mark.skip(reason="old-implmentation-to-be-deleted")
 def test_pipeline_add_retries():
     # Note: this test becomes slow for larger retry counts
     n_max_retries: int = 3
@@ -252,6 +261,7 @@ def test_pipeline_add_retries():
 ###
 
 
+@pytest.mark.skip(reason="old-implmentation-to-be-deleted")
 @pytest.mark.parametrize("should_succeed", [True, False])
 def test_pipeline_persist_runlog(tmp_path: Path, should_succeed: bool):
     def f(runlog: Runlog):
