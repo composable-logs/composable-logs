@@ -24,7 +24,6 @@ from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
 from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
 from pynb_dag_runner.ray_helpers import (
     Future,
-    FutureActor,
     RayMypy,
     try_f_with_timeout_guard,
     retry_wrapper_ot,
@@ -151,13 +150,17 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
     ):
         self._f_remote: Callable[[U], Awaitable[A]] = f_remote
         self._combiner: Callable[[Span, Try[A]], B] = combiner
-        self._span_id_future: FutureActor = FutureActor.remote()  # type: ignore
-        self._future_value: FutureActor = FutureActor.remote()  # type: ignore
         self._on_complete_callbacks: List[
             Callable[[B], Awaitable[None]]
         ] = on_complete_callbacks
         self._tags: TaskTags = tags
         self._start_called = False
+        self._future_span_id: asyncio.Future[
+            SpanId
+        ] = asyncio.get_running_loop().create_future()
+        self._future_result: asyncio.Future[
+            B
+        ] = asyncio.get_running_loop().create_future()
 
     def add_callback(self, cb: Callable[[B], Awaitable[None]]) -> None:
         """
@@ -170,10 +173,10 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         self._on_complete_callbacks.append(cb)
 
     def _set_result(self, value: B):
-        self._future_value.set_value.remote(value)  # type: ignore
+        self._future_result.set_result(value)  # type: ignore
 
     def _set_span_id(self, span: Span):
-        self._span_id_future.set_value.remote(get_span_hexid(span))  # type: ignore
+        self._future_span_id.set_result(get_span_hexid(span))  # type: ignore
 
     async def start(self, arg: U):
         """
@@ -220,7 +223,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         Notes:
         - Method can be called either before or after the task has started.
         """
-        return await self._future_value.wait.remote()  # type: ignore
+        return await self._future_result
 
     async def get_span_id(self) -> str:
         """
@@ -230,9 +233,9 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         Notes:
         - Method can be called either before or after the task has started.
         """
-        return await self._span_id_future.wait.remote()  # type: ignore
+        return await self._future_span_id
 
-    async def has_completed(self) -> bool:
+    def has_completed(self) -> bool:
         """
         Returns True/False whether task has completed.
 
@@ -241,7 +244,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         or finished.
         - Method can be called either before or after the task has started.
         """
-        return await self._future_value.value_is_set.remote()  # type: ignore
+        return self._future_result.done()
 
 
 def _task_from_remote_f(
