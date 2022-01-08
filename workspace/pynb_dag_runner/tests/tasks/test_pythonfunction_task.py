@@ -487,6 +487,7 @@ def test__task_retries__task_is_retried_until_success():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("dummy_retry", range(3))
 @pytest.mark.parametrize(
     "arg",
     [
@@ -604,7 +605,7 @@ def test__task_retries__task_is_retried_until_success():
         },
     ],
 )
-async def test_random_sleep_tasks_with_order_dependencies(arg):
+async def test_random_sleep_tasks_with_order_dependencies(dummy_retry, arg):
 
     arg_tasks_to_start: List[int] = arg["tasks_to_start"]
     arg_tasks_to_await: List[int] = arg["tasks_to_await"]
