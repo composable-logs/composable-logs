@@ -156,10 +156,12 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         ] = on_complete_callbacks
         self._tags: TaskTags = tags
         self._start_called = False
-        self._future_span_id: Awaitable[
+        self._future_span_id: asyncio.Future[
             SpanId
         ] = asyncio.get_running_loop().create_future()
-        self._future_result: Awaitable[B] = asyncio.get_running_loop().create_future()
+        self._future_result: asyncio.Future[
+            B
+        ] = asyncio.get_running_loop().create_future()
 
     def add_callback(self, cb: Callable[[B], Awaitable[None]]) -> None:
         """
