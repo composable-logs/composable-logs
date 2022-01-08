@@ -4,7 +4,7 @@ import shutil
 import pytest, ray
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="module", autouse=True)
 def init_ray_before_all_tests():
     # Clean up any spans from previous runs
     shutil.rmtree("/tmp/spans", ignore_errors=True)
@@ -18,3 +18,5 @@ def init_ray_before_all_tests():
         # enable tracing and write traces to /tmp/spans/<pid>.txt in JSONL format
         _tracing_startup_hook="ray.util.tracing.setup_local_tmp_tracing:setup_tracing",
     )
+    yield
+    ray.shutdown()
