@@ -24,7 +24,6 @@ from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
 from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
 from pynb_dag_runner.ray_helpers import (
     Future,
-    FutureActor,
     RayMypy,
     try_f_with_timeout_guard,
     retry_wrapper_ot,

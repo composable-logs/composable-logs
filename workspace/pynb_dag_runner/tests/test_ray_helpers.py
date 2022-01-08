@@ -14,7 +14,6 @@ from pynb_dag_runner.ray_helpers import (
     retry_wrapper,
     retry_wrapper_ot,
     Future,
-    FutureActor,
 )
 from pynb_dag_runner.opentelemetry_helpers import (
     SpanDict,
@@ -34,28 +33,6 @@ class StateActor:
 
     def get(self):
         return self._state
-
-
-### Test FutureActor
-
-
-def test_future_actor():
-    future_value = FutureActor.remote()
-
-    future_value.set_value.remote("foo")
-
-    for _ in range(10):
-        assert ray.get(future_value.wait.remote()) == "foo"
-
-
-@pytest.mark.asyncio
-async def test_future_actor_async():
-    future_value = FutureActor.remote()
-
-    future_value.set_value.remote("bar")
-
-    for _ in range(10):
-        assert (await future_value.wait.remote()) == "bar"
 
 
 ### Test Future static functions
@@ -217,7 +194,7 @@ async def test_timeout_w_timeout_cancel():
 @pytest.mark.parametrize("dummy_loop_parameter", range(1))
 @pytest.mark.parametrize("task_timeout_s", [0.001, 10.0])
 async def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
-    state_actor = FutureActor.remote()
+    state_actor = StateActor.remote()
 
     task_duration_s = 0.2
 
@@ -225,7 +202,7 @@ async def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
         time.sleep(task_duration_s)
 
         # We should not get here *if* task is canceled by timeout
-        state_actor.set_value.remote("foo")
+        state_actor.add.remote("foo")
         return 123
 
     f_timeout: Callable[[Any], Awaitable[Try[int]]] = try_f_with_timeout_guard(
@@ -237,7 +214,7 @@ async def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
     # Wait for task to finish
     time.sleep(4.0)
 
-    state_has_flipped: bool = await state_actor.value_is_set.remote()
+    state_has_flipped: bool = "foo" in await state_actor.get.remote()
 
     if task_timeout_s < task_duration_s:
         # f should have been canceled, and state should not have flipped
