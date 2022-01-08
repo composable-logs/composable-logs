@@ -487,7 +487,7 @@ def test__task_retries__task_is_retried_until_success():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("dummy_loop_parameter", range(3))
+@pytest.mark.parametrize("dummy_loop_parameter", range(4))
 @pytest.mark.parametrize(
     "arg",
     [
