@@ -3,14 +3,30 @@ Data types for representing tasks extracted from OpenTelemetry traces
 emitted by pynb-dag-runner and Ray.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Tuple, Set
 import dataclasses
 from dataclasses import dataclass
 
 #
 from pynb_dag_runner.tasks.tasks import RunParameters
-from pynb_dag_runner.opentelemetry_helpers import Spans, SpanDict
+from pynb_dag_runner.opentelemetry_helpers import Spans, SpanDict, SpanId
 from pynb_dag_runner.opentelemetry_helpers import get_duration_s
+
+
+def extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
+    """
+    From recorded Spans, extract any logged task dependencies as a set of from-to
+    SpanID tuples.
+    """
+    return set(
+        [
+            (
+                span["attributes"]["from_task_span_id"],
+                span["attributes"]["to_task_span_id"],
+            )
+            for span in spans.filter(["name"], "task-dependency")
+        ]
+    )
 
 
 class _To_Dict:
