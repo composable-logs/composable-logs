@@ -324,7 +324,7 @@ def _cb_compose_tasks(
         assert await task1.has_completed.remote() == True
 
         task1_span_id = await task1.get_span_id.remote()
-        task2_result = task2.start.remote(task1_result)  # type: ignore
+        task2_awaitable = task2.start.remote(task1_result)  # type: ignore
         task2_span_id = await task2.get_span_id.remote()
 
         # After span_id:s of Task1 and Task2 are known, log that these have a
@@ -334,7 +334,7 @@ def _cb_compose_tasks(
             span.set_attribute("from_task_span_id", task1_span_id)
             span.set_attribute("to_task_span_id", task2_span_id)
 
-        await task2_result
+        await task2_awaitable
 
     ray.get(task1.add_callback.remote(task1_on_complete_handler))  # type: ignore
 
@@ -386,11 +386,11 @@ def fan_in(
         def __init__(self):
             self._completed_tasks = []
 
-        async def start_target_task(self):
+        async def _start_target_task(self):
             parallel_tasks_results: List[TaskOutcome[B]] = [
                 await task.get_task_result.remote() for task in paralllel_tasks
             ]
-            target_task.start.remote(parallel_tasks_results)
+            target_task_awaitable = target_task.start.remote(parallel_tasks_results)  # type: ignore
 
             target_span_id = await target_task.get_span_id.remote()
 
@@ -403,11 +403,13 @@ def fan_in(
                     )
                     span.set_attribute("to_task_span_id", target_span_id)
 
+            await target_task_awaitable
+
         async def record_completed_task(self, task):
             self._completed_tasks.append(task)
 
             if len(self._completed_tasks) == len(paralllel_tasks):
-                await self.start_target_task()
+                await self._start_target_task()
 
     target_task_trigger = TargetTaskTrigger.remote()  # type: ignore
 
