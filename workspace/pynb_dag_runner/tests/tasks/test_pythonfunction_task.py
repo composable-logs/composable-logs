@@ -142,14 +142,14 @@ def test__python_function_task__outputs_otel_logs__should_fail_as_parameter(
             assert len(error_spans) == 0
             assert top_task_span["status"] == {"status_code": "OK"}
 
-        # --- check retry-wrapper span (TODO) ---
-        # retries_span = one(spans.filter(["name"], "retry-wrapper"))
-        # run_span = one(spans.filter(["name"], "task-run"))
-        # assert read_key(run_span, ["attributes", "retry.max_retries"]) == 1
-        # assert read_key(run_span, ["attributes", "retry.nr"]) == 0
-        # assert run_span["attributes"].keys() == set(
-        #     ["task_id", "retry.max_retries", "retry.nr"]
-        # )
+        # --- check retry spans ---
+        retry_wrapper_span = one(spans.filter(["name"], "retry-wrapper"))
+        assert spans.contains_path(top_task_span, retry_wrapper_span)
+        assert read_key(retry_wrapper_span, ["attributes", "max_nr_retries"]) == 1
+
+        retry_span = one(spans.filter(["name"], "retry-call"))
+        assert spans.contains_path(top_task_span, retry_wrapper_span, retry_span)
+        assert read_key(retry_span, ["attributes", "retry_nr"]) == 0
 
         # --- check timeout-guard span ---
         timeout_span: SpanDict = one(spans.filter(["name"], "timeout-guard"))
@@ -178,8 +178,8 @@ def test__python_function_task__outputs_otel_logs__should_fail_as_parameter(
         # check nesting of above spans
         assert spans.contains_path(
             top_task_span,
-            # retries_span,
-            # run_span,
+            retry_wrapper_span,
+            retry_span,
             timeout_span,
             call_function_span,
         )
@@ -608,7 +608,10 @@ def test__task_retries__task_is_retried_until_success():
 async def test_random_sleep_tasks_with_order_dependencies(
     dummy_loop_parameter, arg, ray_reinit
 ):
-
+    """
+    This test is memory sensitive. If we do not reinit Ray cluster before every
+    test, we may run out of memory (!)
+    """
     arg_tasks_to_start: List[int] = arg["tasks_to_start"]
     arg_tasks_to_await: List[int] = arg["tasks_to_await"]
     arg_in_seqs: List[List[int]] = arg["in_seqs"]
