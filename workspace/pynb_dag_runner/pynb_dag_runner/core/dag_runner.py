@@ -98,7 +98,7 @@ TaskTags = Mapping[str, str]
 class TaskOutcome(Generic[A]):
     span_id: SpanId
     return_value: Optional[A]
-    error: Optional[Exception]
+    error: Optional[BaseException]
 
 
 X = TypeVar("X", contravariant=True)
