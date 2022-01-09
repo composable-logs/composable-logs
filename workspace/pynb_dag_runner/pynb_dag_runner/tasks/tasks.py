@@ -219,7 +219,7 @@ def make_jupytext_task(
             notebook.evaluate(
                 output=evaluated_notebook, parameters={"P": runparameters}
             )
-        except Exception as e:
+        except BaseException as e:
             raise e
         finally:
             log_artefact("notebook.ipynb", evaluated_notebook.filepath.read_text())
