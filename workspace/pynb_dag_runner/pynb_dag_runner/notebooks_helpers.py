@@ -129,21 +129,30 @@ class JupytextNotebook:
         """
         Evaluate a Jupytext notebook, and inject provided parameters using Papermill.
 
-        Exceptions thrown from any cell in the notebook are propagated and thrown by
+        Exceptions thrown (eg from a cell) in the notebook are propagated and thrown by
         this function.
         """
-        # Convert input Jupytext notebook to a random ipynb file in output directory
-        tmp_notebook_ipynb = JupyterIpynbNotebook.temp(output.filepath.parent)
+        try:
+            # Convert input Jupytext notebook to a random ipynb file in output directory
+            tmp_notebook_ipynb = JupyterIpynbNotebook.temp(output.filepath.parent)
 
-        # try:
-        assert self.filepath.is_file()
-        # assert not output.filepath.is_file()
+            assert self.filepath.is_file()
+            # assert not output.filepath.is_file()
 
-        self.to_ipynb(output=tmp_notebook_ipynb)
+            self.to_ipynb(output=tmp_notebook_ipynb)
 
-        tmp_notebook_ipynb.evaluate(
-            output=output,
-            # Run with jupytext notebook directory as current directory
-            cwd=self.filepath.parent,
-            parameters=parameters,
-        )
+            tmp_notebook_ipynb.evaluate(
+                output=output,
+                # Run with jupytext notebook directory as current directory
+                cwd=self.filepath.parent,
+                parameters=parameters,
+            )
+        except BaseException as e:
+            # Convert Papermill custom exceptions into a standard Python
+            # Exception-class, see
+            #
+            # https://github.com/nteract/papermill/blob/main/papermill/exceptions.py
+            #
+            # Otherwise, we get problems with Ray not able to serialize/deserialize
+            # the Exception
+            raise Exception(str(e))

@@ -56,6 +56,9 @@ def test_jupytext_run_ok_notebook():
         return rec.spans
 
     def validate_spans(spans: Spans):
+        for span in spans:
+            assert "exception" not in str(span).lower()
+
         jupytext_span = one(
             spans.filter(["name"], "execute-task")
             #
