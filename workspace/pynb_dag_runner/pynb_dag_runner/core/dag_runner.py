@@ -205,7 +205,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
 
                 # post-task
                 task_result = self._combiner(span, Try(f_result, None))
-            except Exception as e:
+            except BaseException as e:
                 task_result = self._combiner(span, Try(None, e))
 
         # note that result is set before callbacks are called
