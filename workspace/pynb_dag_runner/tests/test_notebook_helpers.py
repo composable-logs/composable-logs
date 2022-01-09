@@ -25,6 +25,24 @@ def write_test_jupytext_notebook(path: Path) -> JupytextNotebook:
     return JupytextNotebook(output_path)
 
 
+def write_failing_test_jupytext_notebook(path: Path) -> JupytextNotebook:
+    output_path = path / "failing_notebook.py"
+
+    fail_jupytext_notebook = """# %%
+# %% tags=["parameters"]
+# %%
+# Example comment
+print(1234 + 234 + 54 + 6)
+# %%
+raise Exception("Failed notebook")
+# %%
+"""
+    output_path.write_text(fail_jupytext_notebook)
+
+    assert os.path.getsize(output_path) == len(fail_jupytext_notebook)
+    return JupytextNotebook(output_path)
+
+
 def test_can_convert_jupytext_notebook_to_ipynb_and_html(tmp_path: Path):
     notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
 
@@ -80,3 +98,24 @@ def test_evaluate_jupytext_notebook(tmp_path: Path):
     assert output_ipynb.filepath.is_file()
     assert str(output_ipynb.filepath).startswith(str(output_path))
     assert "variable_a=baz" in output_ipynb.filepath.read_text()
+
+
+def test_evaluate_jupytext_notebook_that_fails(tmp_path: Path):
+    output_path = tmp_path / "output"
+    output_path.mkdir()
+
+    notebook_py: JupytextNotebook = write_failing_test_jupytext_notebook(tmp_path)
+
+    output_ipynb = JupyterIpynbNotebook(output_path / "foo.ipynb")
+
+    try:
+        evaluated_notebook: JupyterIpynbNotebook = notebook_py.evaluate(
+            output=output_ipynb,
+            parameters={"variable_a": "baz"},
+        )
+
+    except BaseException as e:
+        assert "Failed notebook" in str(e)
+
+        assert output_ipynb.filepath.is_file()
+        assert str(1234 + 234 + 54 + 6) in output_ipynb.filepath.read_text()

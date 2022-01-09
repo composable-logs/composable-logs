@@ -37,7 +37,7 @@ def make_test_nb_task(nb_name: str, max_nr_retries: int, task_parameters={}):
     return make_jupytext_task_ot(
         notebook=JupytextNotebook(nb_path / nb_name),
         tmp_dir=nb_path,
-        timeout_s=5,
+        timeout_s=30,
         max_nr_retries=max_nr_retries,
         task_parameters=task_parameters,
     )
@@ -48,7 +48,7 @@ def test_jupytext_run_ok_notebook():
         with SpanRecorder() as rec:
             jupytext_task = make_test_nb_task(
                 nb_name="notebook_ok.py",
-                max_nr_retries=1,
+                max_nr_retries=2,
                 task_parameters={"variable_a": "task-value"},
             )
             _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
@@ -74,44 +74,67 @@ def test_jupytext_run_ok_notebook():
 
         spans.contains_path(jupytext_span, artefact_span)
 
-    def validate_recover_tasks_from_spans(spans: Spans):
-        extracted_task = one(get_tasks(spans))
+    validate_spans(get_test_spans())
 
-        assert isinstance(extracted_task, LoggedJupytextTask)
-        assert extracted_task.is_success == True
-        assert extracted_task.error is None
 
-        run = one(extracted_task.runs)
-        assert isinstance(run, LoggedTaskRun)
-        assert run.is_success == True
-        assert run.error is None
-        assert run.run_parameters == {
-            "retry.max_retries": 5,
-            "retry.nr": 0,
-            "task_id": "notebook_ok.py-task-render-notebook",
-            "task_parameter.variable_a": "task-value",
+def test__jupytext_notebook__always_fail():
+    N_retries = 3
+
+    def get_test_spans():
+        with SpanRecorder() as rec:
+            jupytext_task = make_test_nb_task(
+                nb_name="notebook_always_fail.py",
+                max_nr_retries=N_retries,
+                task_parameters={},
+            )
+            _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
+
+        return rec.spans
+
+    def validate_spans(spans: Spans):
+        top_task_span = one(
+            spans.filter(["name"], "execute-task")
+            #
+            .filter(["attributes", "tags.task_type"], "jupytext")
+        )
+        assert top_task_span["status"] == {
+            "status_code": "ERROR",
+            "description": "Remote function call failed",
         }
 
-        # all runs should have logged the evaluated ipynb notebook
-        assert one(run.artefacts).name == "notebook.ipynb"
-        for content in [str(1 + 12 + 123), "variable_a=task-value"]:
-            assert content in one(run.artefacts).content
+        assert (
+            read_key(top_task_span, ["attributes", "tags.notebook"])
+            == str((Path(__file__).parent))
+            + "/jupytext_test_notebooks/notebook_always_fail.py"
+        )
 
-    spans = get_test_spans()
-    validate_spans(spans)
-    # validate_recover_tasks_from_spans(spans)
+        top_retry_span = one(spans.filter(["name"], "retry-wrapper"))
+        assert spans.contains_path(top_task_span, top_retry_span)
+        assert read_key(top_retry_span, ["attributes", "max_nr_retries"]) == N_retries
+
+        retry_call_spans = spans.filter(["name"], "retry-call")
+        assert len(retry_call_spans) == N_retries
+
+        # artefact_span = one(spans.filter(["name"], "artefact"))
+        # for content in [str(1 + 12 + 123), "variable_a=task-value"]:
+        #    assert content in artefact_span["attributes"]["content"]
+
+        # spans.contains_path(jupytext_span, artefact_span)
+
+    validate_spans(get_test_spans())
 
 
-@pytest.mark.parametrize("N_retries", [2, 10])
-def disable_test_jupytext_exception_throwing_notebook(N_retries):
+# @pytest.mark.parametrize("N_retries", [2, 10])
+@pytest.mark.parametrize("N_retries", [20])
+def xtest_jupytext_exception_throwing_notebook(N_retries):
     def get_test_spans():
         with SpanRecorder() as rec:
             jupytext_task = make_test_nb_task(
                 nb_name="notebook_exception.py",
-                n_max_retries=N_retries,
-                task_parameters={},
+                max_nr_retries=N_retries,
+                task_parameters={"variable_a": "task-value"},
             )
-            run_tasks([jupytext_task], TaskDependencies())
+            _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
         return rec.spans
 
@@ -129,20 +152,34 @@ def disable_test_jupytext_exception_throwing_notebook(N_retries):
         else:
             return [0, 1, 2]
 
-    def validate_spans(spans: Spans):
-        jupytext_span = one(
-            spans.filter(["name"], "invoke-task").filter(
-                ["attributes", "task_type"], "jupytext"
-            )
-        )
-        if len(ok_indices()) > 0:
-            assert jupytext_span["status"] == {"status_code": "OK"}
+    def nr_notebook_executions():
+        if N_retries == 2:
+            return 2
         else:
-            assert jupytext_span["status"] == {
-                "status_code": "ERROR",
-                "description": "Jupytext notebook task failed",
-            }
+            return 4
 
+    def validate_spans(spans: Spans):
+        top_task_span = one(
+            spans.filter(["name"], "execute-task")
+            #
+            .filter(["attributes", "tags.task_type"], "jupytext")
+        )
+
+        top_retry_span = one(spans.filter(["name"], "retry-wrapper"))
+        assert spans.contains_path(top_task_span, top_retry_span)
+        assert read_key(top_retry_span, ["attributes", "max_nr_retries"]) == N_retries
+
+        retry_call_spans = spans.filter(["name"], "retry-call")
+        assert len(retry_call_spans) == nr_notebook_executions()
+
+        if len(ok_indices()) > 0:
+            assert top_task_span["status"] == {"status_code": "OK"}
+        else:
+            assert top_task_span["status"] == {
+                "status_code": "ERROR",
+                "description": "Remote function call failed",
+            }
+        return
         run_spans = spans.filter(["name"], "task-run").sort_by_start_time()
         assert len(run_spans) == len(ok_indices()) + len(failed_indices())
 
@@ -207,7 +244,7 @@ def disable_test_jupytext_exception_throwing_notebook(N_retries):
 
     spans = get_test_spans()
     validate_spans(spans)
-    validate_recover_tasks_from_spans(spans)
+    # validate_recover_tasks_from_spans(spans)
 
 
 def disable_test_jupytext_stuck_notebook():

@@ -128,24 +128,22 @@ class JupytextNotebook:
     def evaluate(self, output: JupyterIpynbNotebook, parameters: Dict[str, Any] = {}):
         """
         Evaluate a Jupytext notebook, and inject provided parameters using Papermill.
+
+        Exceptions thrown from any cell in the notebook are propagated and thrown by
+        this function.
         """
         # Convert input Jupytext notebook to a random ipynb file in output directory
         tmp_notebook_ipynb = JupyterIpynbNotebook.temp(output.filepath.parent)
 
-        try:
-            assert self.filepath.is_file()
-            # assert not output.filepath.is_file()
+        # try:
+        assert self.filepath.is_file()
+        # assert not output.filepath.is_file()
 
-            self.to_ipynb(output=tmp_notebook_ipynb)
+        self.to_ipynb(output=tmp_notebook_ipynb)
 
-            tmp_notebook_ipynb.evaluate(
-                output=output,
-                # Run with jupytext notebook directory as current directory
-                cwd=self.filepath.parent,
-                parameters=parameters,
-            )
-        finally:
-            # Note: this may not run if the Python process is cancelled by Ray
-            # (eg by timeout)
-            if tmp_notebook_ipynb.filepath.is_file():
-                os.remove(tmp_notebook_ipynb.filepath)
+        tmp_notebook_ipynb.evaluate(
+            output=output,
+            # Run with jupytext notebook directory as current directory
+            cwd=self.filepath.parent,
+            parameters=parameters,
+        )

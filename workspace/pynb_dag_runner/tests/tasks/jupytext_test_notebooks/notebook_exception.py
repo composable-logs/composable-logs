@@ -12,9 +12,9 @@ print(P)
 # %%
 # An example comment
 
-if P["retry.nr"] in [0, 1, 2]:
+if int(P["retry_nr"]) in [0, 1, 2]:
     raise Exception("Thrown from notebook!")
 else:
-    print(f"success run at retry {P['retry.nr']}!")
+    print(f"success run at retry {P['retry_nr']}!")
 # %%
 # %%

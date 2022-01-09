@@ -270,18 +270,20 @@ def make_jupytext_task_ot(
     tags: Any = {},
 ):
     def run_notebook(arg):
+        # raise Exception("!!")
         tmp_filepath: Path = (tmp_dir / notebook.filepath.name).with_suffix(".ipynb")
         evaluated_notebook = JupyterIpynbNotebook(tmp_filepath)
 
-        try:
-            notebook.evaluate(
-                output=evaluated_notebook,
-                parameters={"P": prefix_keys("task_parameter", task_parameters)},
-            )
-        except Exception as e:
-            raise e
-        finally:
-            log_artefact("notebook.ipynb", evaluated_notebook.filepath.read_text())
+        baggage = otel.baggage.get_all()
+
+        notebook.evaluate(
+            output=evaluated_notebook,
+            parameters={
+                "P": {**baggage, **prefix_keys("task_parameter", task_parameters)}
+            },
+        )
+        # finally:
+        #    log_artefact("notebook.ipynb", evaluated_notebook.filepath.read_text())
 
     return task_from_python_function(
         f=run_notebook,
