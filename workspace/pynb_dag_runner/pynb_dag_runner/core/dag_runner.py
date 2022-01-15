@@ -21,9 +21,7 @@ from opentelemetry.trace import StatusCode, Status  # type: ignore
 #
 from pynb_dag_runner.helpers import one, pairs, Try, compose
 from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
-from pynb_dag_runner.core.dag_syntax import Node, Edge, Edges
 from pynb_dag_runner.ray_helpers import (
-    Future,
     RayMypy,
     try_f_with_timeout_guard,
     retry_wrapper_ot,
@@ -41,54 +39,6 @@ C = TypeVar("C")
 U = TypeVar("U")
 V = TypeVar("V")
 W = TypeVar("W")
-
-
-class Task(Node, Generic[A]):
-    # --- deprecated ---
-    # all below methods are non-blocking
-
-    def __init__(self, f_remote: Callable[..., Future[A]]):
-        self._f_remote = f_remote
-        self._future_or_none: Optional[Future[A]] = None
-
-    def start(self, *args: Any) -> None:
-        """
-        Start execution of task and return
-        """
-        if self.has_started():
-            raise Exception(f"Task has already started")
-
-        self._future_or_none = self._f_remote(*args)
-
-    def get_ref(self) -> Future[A]:
-        if not self.has_started():
-            raise Exception(f"Task has not started")
-
-        return self._future_or_none  # type: ignore
-
-    def has_started(self) -> bool:
-        return self._future_or_none is not None
-
-    def has_completed(self) -> bool:
-        if not self.has_started():
-            return False
-
-        # See: https://docs.ray.io/en/master/package-ref.html#ray-wait
-        finished_refs, not_finished_refs = ray.wait([self.get_ref()], timeout=0)
-        assert len(finished_refs) + len(not_finished_refs) == 1
-
-        return len(finished_refs) == 1
-
-    def result(self) -> A:
-        """
-        Get result if task has already completed. Otherwise raise an exception.
-        """
-        if not self.has_completed():
-            raise Exception(
-                "Result has not finished. Calling ray.get would block execution"
-            )
-
-        return ray.get(self.get_ref())
 
 
 TaskTags = Mapping[str, str]
