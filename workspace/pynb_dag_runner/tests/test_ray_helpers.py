@@ -11,7 +11,6 @@ import pytest, ray
 from pynb_dag_runner.helpers import A, flatten, range_intersect, one, Try
 from pynb_dag_runner.ray_helpers import (
     try_f_with_timeout_guard,
-    retry_wrapper,
     retry_wrapper_ot,
     Future,
 )
