@@ -1,6 +1,4 @@
 import time, random
-from pathlib import Path
-from uuid import uuid4
 from typing import Any, Awaitable, Callable
 
 #
@@ -8,7 +6,7 @@ import opentelemetry as otel
 import pytest, ray
 
 #
-from pynb_dag_runner.helpers import A, flatten, range_intersect, one, Try
+from pynb_dag_runner.helpers import A, one, Try
 from pynb_dag_runner.ray_helpers import (
     try_f_with_timeout_guard,
     retry_wrapper_ot,

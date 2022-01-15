@@ -15,11 +15,11 @@ from typing import (
 #
 import ray
 import opentelemetry as otel
-from opentelemetry.trace.span import format_span_id, Span
+from opentelemetry.trace.span import Span
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
-from pynb_dag_runner.helpers import one, pairs, Try, compose
+from pynb_dag_runner.helpers import pairs, Try
 from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
 from pynb_dag_runner.ray_helpers import (
     RayMypy,
@@ -27,11 +27,7 @@ from pynb_dag_runner.ray_helpers import (
     retry_wrapper_ot,
 )
 from pynb_dag_runner.ray_mypy_helpers import RemoteGetFunction, RemoteSetFunction
-from pynb_dag_runner.opentelemetry_helpers import (
-    SpanId,
-    get_span_hexid,
-    otel_add_baggage,
-)
+from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid
 
 A = TypeVar("A")
 B = TypeVar("B")

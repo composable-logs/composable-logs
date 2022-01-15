@@ -1,8 +1,8 @@
 import time, random
-from typing import List, Set, Dict, Tuple, Optional, Any, Callable
+from typing import List, Set, Dict, Tuple
 
 #
-import pytest, ray
+import ray
 
 #
 from pynb_dag_runner.core.dag_runner import (
@@ -16,7 +16,6 @@ from pynb_dag_runner.core.dag_runner import (
 from pynb_dag_runner.opentelemetry_helpers import (
     SpanId,
     get_span_id,
-    SpanDict,
     Spans,
     SpanRecorder,
 )
