@@ -127,8 +127,7 @@ def test__jupytext_notebook_task__always_fail():
     validate_spans(get_test_spans())
 
 
-# @pytest.mark.parametrize("N_retries", [2, 10])
-@pytest.mark.parametrize("N_retries", [20])
+@pytest.mark.parametrize("N_retries", [2, 10])
 def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
     def get_test_spans():
         with SpanRecorder() as rec:
@@ -182,8 +181,7 @@ def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
                 "status_code": "ERROR",
                 "description": "Remote function call failed",
             }
-        return
-        run_spans = spans.filter(["name"], "task-run").sort_by_start_time()
+        run_spans = spans.filter(["name"], "retry-call").sort_by_start_time()
         assert len(run_spans) == len(ok_indices()) + len(failed_indices())
 
         for idx in ok_indices():
@@ -210,44 +208,8 @@ def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
             assert artefact_span["attributes"]["name"] == "notebook.ipynb"
             assert str(1 + 12 + 123) in artefact_span["attributes"]["content"]
 
-    def validate_recover_tasks_from_spans(spans: Spans):
-        extracted_task = one(get_tasks(spans))
-
-        assert isinstance(extracted_task, LoggedJupytextTask)
-
-        if len(ok_indices()) > 0:
-            assert extracted_task.is_success == True
-            assert extracted_task.error is None
-        else:
-            assert extracted_task.is_success == False
-            assert extracted_task.error == "Jupytext notebook task failed"
-
-        runs = extracted_task.runs
-        assert len(runs) == len(failed_indices() + ok_indices())
-
-        for run in runs:
-            assert isinstance(run, LoggedTaskRun)
-            assert run.run_parameters.keys() == {
-                "retry.max_retries",
-                "retry.nr",
-                "task_id",
-            }
-            # all runs should have logged partially evaluated ipynb notebook
-            artefact = one(run.artefacts)
-            assert artefact.name == "notebook.ipynb"
-            assert str(1 + 12 + 123) in artefact.content
-
-        for idx in ok_indices():
-            assert runs[idx].is_success == True
-            assert runs[idx].error is None
-
-        for idx in failed_indices():
-            assert runs[idx].is_success == False
-            assert runs[idx].error == "Run failed"
-
     spans = get_test_spans()
     validate_spans(spans)
-    # validate_recover_tasks_from_spans(spans)
 
 
 def skip__test__jupytext_notebook_task__stuck_notebook():

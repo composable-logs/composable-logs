@@ -275,13 +275,20 @@ def make_jupytext_task_ot(
 
         baggage = otel.baggage.get_all()
 
-        notebook.evaluate(
-            output=evaluated_notebook,
-            parameters={
-                "P": {**baggage, **prefix_keys("task_parameter", task_parameters)}
-            },
-        )
-        log_artefact("notebook.ipynb", evaluated_notebook.filepath.read_text())
+        try:
+            notebook.evaluate(
+                output=evaluated_notebook,
+                parameters={
+                    "P": {**baggage, **prefix_keys("task_parameter", task_parameters)}
+                },
+            )
+
+        except BaseException as e:
+            raise e
+
+        finally:
+            # this is not run if notebook is killed by timeout
+            log_artefact("notebook.ipynb", evaluated_notebook.filepath.read_text())
 
     return task_from_python_function(
         f=run_notebook,
