@@ -147,8 +147,9 @@ class JupytextNotebook:
                 cwd=self.filepath.parent,
                 parameters=parameters,
             )
+
         except BaseException as e:
-            # Convert Papermill custom exceptions into a standard Python
+            # Convert any Papermill custom exceptions into a standard Python
             # Exception-class, see
             #
             # https://github.com/nteract/papermill/blob/main/papermill/exceptions.py
@@ -156,3 +157,9 @@ class JupytextNotebook:
             # Otherwise, we get problems with Ray not able to serialize/deserialize
             # the Exception
             raise Exception(str(e))
+
+        finally:
+            # Note: this may not run if the Python process is cancelled by Ray
+            # (eg by timeout)
+            if tmp_notebook_ipynb.filepath.is_file():
+                os.remove(tmp_notebook_ipynb.filepath)
