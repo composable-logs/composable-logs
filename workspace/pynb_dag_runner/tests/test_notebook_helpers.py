@@ -2,6 +2,9 @@ from pathlib import Path
 import os
 
 #
+import pytest
+
+#
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook
 from pynb_dag_runner.helpers import read_json
 
@@ -80,3 +83,44 @@ def test_evaluate_jupytext_notebook(tmp_path: Path):
     assert output_ipynb.filepath.is_file()
     assert str(output_ipynb.filepath).startswith(str(output_path))
     assert "variable_a=baz" in output_ipynb.filepath.read_text()
+
+
+@pytest.fixture
+def failing_jupytext_notebook(tmp_path: Path) -> JupytextNotebook:
+    output_path: Path = tmp_path / "failing_notebook.py"
+
+    fail_jupytext_notebook = """# %%
+# %% tags=["parameters"]
+# %%
+# Example comment
+print(1234 + 234 + 54 + 6)
+# %%
+raise Exception("Failed notebook123")
+# %%
+"""
+    output_path.write_text(fail_jupytext_notebook)
+
+    assert len(output_path.read_text()) == len(fail_jupytext_notebook)
+    return JupytextNotebook(output_path)
+
+
+def test_evaluate_jupytext_notebook_that_fails(
+    failing_jupytext_notebook: JupytextNotebook,
+):
+
+    output_ipynb = JupyterIpynbNotebook(
+        failing_jupytext_notebook.filepath.with_suffix(".ipynb")
+    )
+
+    try:
+        _: JupyterIpynbNotebook = failing_jupytext_notebook.evaluate(
+            output=output_ipynb,
+            parameters={"variable_xyz": "foobarbaz"},
+        )
+
+    except BaseException as e:
+        assert "Failed notebook123" in str(e)
+
+        assert output_ipynb.filepath.is_file()
+        for s in ["variable_xyz", "foobarbaz", str(1234 + 234 + 54 + 6)]:
+            assert s in output_ipynb.filepath.read_text()

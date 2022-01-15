@@ -118,7 +118,7 @@ def _try_eval_f_async_wrapper(
                     result = success_handler(f(*args))
                     span.set_status(Status(StatusCode.OK))
 
-                except Exception as e:
+                except BaseException as e:
                     result = error_handler(e)
                     span.record_exception(e)
                     span.set_status(Status(StatusCode.ERROR, "Failure"))

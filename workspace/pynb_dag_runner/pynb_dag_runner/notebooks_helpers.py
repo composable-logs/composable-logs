@@ -128,11 +128,14 @@ class JupytextNotebook:
     def evaluate(self, output: JupyterIpynbNotebook, parameters: Dict[str, Any] = {}):
         """
         Evaluate a Jupytext notebook, and inject provided parameters using Papermill.
-        """
-        # Convert input Jupytext notebook to a random ipynb file in output directory
-        tmp_notebook_ipynb = JupyterIpynbNotebook.temp(output.filepath.parent)
 
+        Exceptions thrown (eg from a cell) in the notebook are propagated and thrown by
+        this function.
+        """
         try:
+            # Convert input Jupytext notebook to a random ipynb file in output directory
+            tmp_notebook_ipynb = JupyterIpynbNotebook.temp(output.filepath.parent)
+
             assert self.filepath.is_file()
             # assert not output.filepath.is_file()
 
@@ -144,6 +147,17 @@ class JupytextNotebook:
                 cwd=self.filepath.parent,
                 parameters=parameters,
             )
+
+        except BaseException as e:
+            # Convert any Papermill custom exceptions into a standard Python
+            # Exception-class, see
+            #
+            # https://github.com/nteract/papermill/blob/main/papermill/exceptions.py
+            #
+            # Otherwise, we get problems with Ray not able to serialize/deserialize
+            # the Exception
+            raise Exception(str(e))
+
         finally:
             # Note: this may not run if the Python process is cancelled by Ray
             # (eg by timeout)

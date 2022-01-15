@@ -152,7 +152,7 @@ def test_jupytext_exception_throwing_notebook(N_retries):
             failed_run_span = run_spans[idx]
 
             exception = one(spans.exceptions_in(failed_run_span))["attributes"]
-            assert exception["exception.type"] == "PapermillExecutionError"
+            assert exception["exception.type"] == "Exception"
             assert "Thrown from notebook!" in exception["exception.message"]
 
             assert run_spans[idx]["status"] == {
