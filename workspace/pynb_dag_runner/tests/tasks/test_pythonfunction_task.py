@@ -86,7 +86,7 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
         assert ts0 < ts1
 
 
-### ---- Test PythonFunctionTask evaluation ----
+### ---- Test Python task evaluation ----
 
 
 @pytest.mark.parametrize("task_should_fail", [True, False])
@@ -482,7 +482,7 @@ def test__task_retries__task_is_retried_until_success():
     validate_spans(get_test_spans())
 
 
-### ---- test order dependence for PythonFunctionTask:s ----
+### ---- test order dependence for Python tasks ----
 
 
 @pytest.mark.asyncio

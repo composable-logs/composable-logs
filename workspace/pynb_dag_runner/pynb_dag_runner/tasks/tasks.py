@@ -156,40 +156,6 @@ class PythonFunctionTask(Task[Runlog]):
         )
 
 
-class JupytextNotebookTask(PythonFunctionTask):
-    # -- deprecated, to be deleted --
-    def __init__(
-        self,
-        notebook: JupytextNotebook,
-        task_id: str,
-        get_run_path: Callable[[Runlog], Path],
-        timeout_s: float = None,
-        n_max_retries: int = 1,
-        parameters: Dict[str, Any] = {},
-    ):
-        def f(runlog: Runlog):
-            evaluated_notebook = JupyterIpynbNotebook(
-                (get_run_path(runlog) / notebook.filepath.name).with_suffix(".ipynb")
-            )
-
-            try:
-                notebook.evaluate(
-                    output=evaluated_notebook,
-                    parameters={"P": runlog.as_dict(prefix_filter="parameters.")},
-                )
-            finally:
-                evaluated_notebook.to_html()
-
-        super().__init__(
-            f=f,
-            task_id=task_id,
-            get_run_path=get_run_path,
-            timeout_s=timeout_s,
-            n_max_retries=n_max_retries,
-            parameters=parameters,
-        )
-
-
 def log_artefact(name, content):
     tracer = otel.trace.get_tracer(__name__)  # type: ignore
     with tracer.start_as_current_span("artefact") as span:
