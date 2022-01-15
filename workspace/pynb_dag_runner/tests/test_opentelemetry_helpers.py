@@ -103,6 +103,26 @@ def test_tracing_native_python(dummy_loop_parameter):
     assert exception_event["attributes"]["exception.message"] == "foo!"
 
 
+@pytest.mark.parametrize("should_fail", [True, False])
+def test_otel_exceptions(should_fail):
+    with SpanRecorder() as r:
+        tracer = ot.trace.get_tracer(__name__)
+
+        with tracer.start_as_current_span("TopLevel") as t:
+            if should_fail:
+                t.record_exception(ValueError("foo!"))
+
+    if should_fail:
+        exception = one(r.spans.exception_events())
+        assert exception.keys() == set(["attributes", "name", "timestamp"])
+        assert exception["name"] == "exception"
+        assert exception["attributes"]["exception.type"] == "ValueError"
+        assert exception["attributes"]["exception.message"] == "foo!"
+
+    else:
+        assert len(r.spans.exception_events()) == 0
+
+
 @pytest.mark.parametrize("dummy_loop_parameter", range(3))
 def test_tracing_nested_native_python(dummy_loop_parameter):
     # test that we can record and validate properties of spans emitted by native

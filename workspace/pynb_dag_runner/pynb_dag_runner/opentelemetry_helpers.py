@@ -196,6 +196,12 @@ class Spans:
             [get_span_exceptions(s) for s in [top] + list(self.restrict_by_top(top))]
         )
 
+    def exception_events(self):
+        """
+        Return list of all recorded exceptions
+        """
+        return flatten([get_span_exceptions(s) for s in self])
+
 
 def _get_all_spans():
     return flatten([read_jsonl(Path(f)) for f in glob.glob("/tmp/spans/*.txt")])
