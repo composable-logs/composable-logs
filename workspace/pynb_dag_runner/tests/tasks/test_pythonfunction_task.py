@@ -7,7 +7,7 @@ import opentelemetry as otel
 
 #
 from pynb_dag_runner.opentelemetry_helpers import SpanId, Spans
-from pynb_dag_runner.tasks.extract import extract_task_dependencies
+from pynb_dag_runner.opentelemetry_task_span_parser import extract_task_dependencies
 from pynb_dag_runner.helpers import (
     one,
     pairs,
@@ -18,7 +18,6 @@ from pynb_dag_runner.helpers import (
 )
 from pynb_dag_runner.core.dag_runner import (
     TaskOutcome,
-    run_tasks,
     fan_in,
     run_in_sequence,
     start_and_await_tasks,
@@ -39,8 +38,10 @@ from pynb_dag_runner.opentelemetry_helpers import (
 def assert_compatibility(spans: Spans, task_id_dependencies):
     """
     Test:
-     - generic invariances for runlog timings (Steps 1, 2)
+     - generic invariances for span timings (Steps 1, 2)
      - order constraints in dependency DAG are satisfied by output timings (Step 3)
+
+    *** TODO: to be rewritten based on Opentelemetry spans ****
     """
 
     # Step 1: all task-id:s in order dependencies must have at least one runlog
@@ -76,8 +77,8 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
         for s1, s2 in pairs(run_spans):
             assert get_duration_range_us(s1).stop < get_duration_range_us(s2).start
 
-    # Step 3: Runlog timings satisfy the same order constraints as in DAG run order
-    # dependencies.
+    # Step 3: Span durations should satisfy the same order constraints as in DAG
+    # run order dependencies.
     for rule in task_id_dependencies:
         spans_from = spans.filter(["attributes", "task_id"], rule["from"])
         spans_to = spans.filter(["attributes", "task_id"], rule["to"])
@@ -87,7 +88,7 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
         assert ts0 < ts1
 
 
-### ---- Test PythonFunctionTask evaluation ----
+### ---- Test Python task evaluation ----
 
 
 @pytest.mark.parametrize("task_should_fail", [True, False])
@@ -483,7 +484,7 @@ def test__task_retries__task_is_retried_until_success():
     validate_spans(get_test_spans())
 
 
-### ---- test order dependence for PythonFunctionTask:s ----
+### ---- test order dependence for Python tasks ----
 
 
 @pytest.mark.asyncio
