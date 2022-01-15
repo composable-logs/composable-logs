@@ -43,7 +43,7 @@ def make_test_nb_task(nb_name: str, max_nr_retries: int, task_parameters={}):
     )
 
 
-def test_jupytext_run_ok_notebook():
+def test__jupytext_notebook_task__run_ok_notebook():
     def get_test_spans():
         with SpanRecorder() as rec:
             jupytext_task = make_test_nb_task(
@@ -56,8 +56,7 @@ def test_jupytext_run_ok_notebook():
         return rec.spans
 
     def validate_spans(spans: Spans):
-        for span in spans:
-            assert "exception" not in str(span).lower()
+        assert len(spans.exception_events()) == 0
 
         jupytext_span = one(
             spans.filter(["name"], "execute-task")
@@ -80,7 +79,7 @@ def test_jupytext_run_ok_notebook():
     validate_spans(get_test_spans())
 
 
-def test__jupytext_notebook__always_fail():
+def test__jupytext_notebook_task__always_fail():
     N_retries = 3
 
     def get_test_spans():
@@ -95,6 +94,7 @@ def test__jupytext_notebook__always_fail():
         return rec.spans
 
     def validate_spans(spans: Spans):
+        assert len(spans.exception_events()) > 0
         top_task_span = one(
             spans.filter(["name"], "execute-task")
             #
@@ -129,7 +129,7 @@ def test__jupytext_notebook__always_fail():
 
 # @pytest.mark.parametrize("N_retries", [2, 10])
 @pytest.mark.parametrize("N_retries", [20])
-def xtest_jupytext_exception_throwing_notebook(N_retries):
+def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
     def get_test_spans():
         with SpanRecorder() as rec:
             jupytext_task = make_test_nb_task(
@@ -250,7 +250,7 @@ def xtest_jupytext_exception_throwing_notebook(N_retries):
     # validate_recover_tasks_from_spans(spans)
 
 
-def disable_test_jupytext_stuck_notebook():
+def skip__test__jupytext_notebook_task__stuck_notebook():
     """
     Currently, timeout canceling is done on Ray level, but error handling and
     recovery is done only within the Python process (using try .. catch).
