@@ -30,7 +30,7 @@ def isotimestamp_normalized():
 
 
 def make_test_nb_task(
-    nb_name: str, max_nr_retries: int, task_parameters={}, timeout_s: float = 5.0
+    nb_name: str, max_nr_retries: int, task_parameters={}, timeout_s: float = 10.0
 ):
     nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
     return make_jupytext_task_ot(
