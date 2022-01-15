@@ -8,7 +8,7 @@ import opentelemetry as otel
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
-from pynb_dag_runner.core.dag_runner import Task, TaskDependencies
+from pynb_dag_runner.core.dag_runner import Task
 from pynb_dag_runner.wrappers.runlog import Runlog
 from pynb_dag_runner.wrappers.compute_steps import (
     T,
@@ -298,20 +298,3 @@ def make_jupytext_task_ot(
         tags={**tags, "notebook": str(notebook.filepath)},
         task_type="jupytext",
     )
-
-
-def get_task_dependencies(dependencies: TaskDependencies):
-    """
-    This function assumes that each Task (or Edge) instance referenced in dependencies
-    contains an task_id-attribute. See eg. PythonFunctionTask.
-
-    This function converts this input into a native Python list with
-    the task dependencies. This can, for example, be serialized to a JSON object
-    """
-    return [
-        {
-            "from": edge.from_node.task_id,
-            "to": edge.to_node.task_id,
-        }
-        for edge in dependencies
-    ]

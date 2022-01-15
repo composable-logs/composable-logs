@@ -18,7 +18,6 @@ from pynb_dag_runner.helpers import (
 )
 from pynb_dag_runner.core.dag_runner import (
     TaskOutcome,
-    run_tasks,
     fan_in,
     run_in_sequence,
     start_and_await_tasks,
