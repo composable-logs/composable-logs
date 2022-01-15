@@ -38,8 +38,10 @@ from pynb_dag_runner.opentelemetry_helpers import (
 def assert_compatibility(spans: Spans, task_id_dependencies):
     """
     Test:
-     - generic invariances for runlog timings (Steps 1, 2)
+     - generic invariances for span timings (Steps 1, 2)
      - order constraints in dependency DAG are satisfied by output timings (Step 3)
+
+    *** TODO: to be rewritten based on Opentelemetry spans ****
     """
 
     # Step 1: all task-id:s in order dependencies must have at least one runlog
