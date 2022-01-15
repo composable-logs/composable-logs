@@ -197,6 +197,9 @@ def log_artefact(name, content):
         span.set_status(Status(StatusCode.OK))
 
 
+from pynb_dag_runner.core.dag_runner import task_from_python_function
+
+
 def make_jupytext_task(
     notebook: JupytextNotebook,
     task_id: str,
@@ -255,6 +258,46 @@ def make_jupytext_task(
         return is_success
 
     return Task(f_remote=Future.lift_async(invoke_task))  # type: ignore
+
+
+def make_jupytext_task_ot(
+    notebook: JupytextNotebook,
+    tmp_dir: Path,
+    timeout_s: float = None,
+    max_nr_retries: int = 1,
+    num_cpus: int = 1,
+    task_parameters: RunParameters = {},
+    tags: Any = {},
+):
+    def run_notebook(arg):
+        tmp_filepath: Path = (tmp_dir / notebook.filepath.name).with_suffix(".ipynb")
+        evaluated_notebook = JupyterIpynbNotebook(tmp_filepath)
+
+        baggage = otel.baggage.get_all()
+
+        try:
+            notebook.evaluate(
+                output=evaluated_notebook,
+                parameters={
+                    "P": {**baggage, **prefix_keys("task_parameter", task_parameters)}
+                },
+            )
+
+        except BaseException as e:
+            raise e
+
+        finally:
+            # this is not run if notebook is killed by timeout
+            log_artefact("notebook.ipynb", evaluated_notebook.filepath.read_text())
+
+    return task_from_python_function(
+        f=run_notebook,
+        num_cpus=num_cpus,
+        max_nr_retries=max_nr_retries,
+        timeout_s=timeout_s,
+        tags={**tags, "notebook": str(notebook.filepath)},
+        task_type="jupytext",
+    )
 
 
 def get_task_dependencies(dependencies: TaskDependencies):

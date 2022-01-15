@@ -288,6 +288,7 @@ def task_from_python_function(
     max_nr_retries: int = 1,
     timeout_s: Optional[float] = None,
     tags: TaskTags = {},
+    task_type: str = "Python",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     """
     Lift a Python function f (U -> B) into a Task.
@@ -300,7 +301,7 @@ def task_from_python_function(
         try_f_remote, max_nr_retries=max_nr_retries
     )
 
-    return _task_from_remote_f(try_f_remote_wrapped, tags=tags, task_type="Python")
+    return _task_from_remote_f(try_f_remote_wrapped, tags=tags, task_type=task_type)
 
 
 def _cb_compose_tasks(

@@ -259,11 +259,17 @@ def retry_wrapper_ot(
 
                     try_b: Try[B] = await f(a)
 
-                    # Note: status not set for iteration_span for now
-
                     if try_b.is_success():
+                        iteration_span.set_status(Status(StatusCode.OK))
                         top_span.set_status(Status(StatusCode.OK))
                         return try_b
+                    else:
+                        iteration_span.set_status(
+                            Status(
+                                StatusCode.ERROR,
+                                f"Run failed",
+                            )
+                        )
 
             top_span.set_status(
                 Status(
