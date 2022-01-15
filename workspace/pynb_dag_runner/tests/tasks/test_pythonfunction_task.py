@@ -7,7 +7,7 @@ import opentelemetry as otel
 
 #
 from pynb_dag_runner.opentelemetry_helpers import SpanId, Spans
-from pynb_dag_runner.tasks.extract import extract_task_dependencies
+from pynb_dag_runner.opentelemetry_task_span_parser import extract_task_dependencies
 from pynb_dag_runner.helpers import (
     one,
     pairs,
