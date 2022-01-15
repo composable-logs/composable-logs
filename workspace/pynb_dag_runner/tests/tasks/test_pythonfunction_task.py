@@ -77,8 +77,8 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
         for s1, s2 in pairs(run_spans):
             assert get_duration_range_us(s1).stop < get_duration_range_us(s2).start
 
-    # Step 3: Runlog timings satisfy the same order constraints as in DAG run order
-    # dependencies.
+    # Step 3: Span durations should satisfy the same order constraints as in DAG
+    # run order dependencies.
     for rule in task_id_dependencies:
         spans_from = spans.filter(["attributes", "task_id"], rule["from"])
         spans_to = spans.filter(["attributes", "task_id"], rule["to"])
