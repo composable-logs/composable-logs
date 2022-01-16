@@ -111,8 +111,8 @@ def _try_eval_f_async_wrapper(
             # Execute function in separate OpenTelemetry span.
             with tracer.start_as_current_span("call-python-function") as span:
 
-                span.set_attribute("num_cpus", num_cpus)
-                otel_add_baggage("num_cpus", num_cpus)
+                span.set_attribute("task.num_cpus", num_cpus)
+                otel_add_baggage("task.num_cpus", num_cpus)
 
                 try:
                     result = success_handler(f(*args))
