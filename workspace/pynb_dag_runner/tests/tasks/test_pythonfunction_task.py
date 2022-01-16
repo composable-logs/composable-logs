@@ -337,7 +337,7 @@ def test_always_failing_task():
 
             def f(arg):
                 baggage = otel.baggage.get_all()
-                if int(baggage["retry_nr"]) <= 1:
+                if int(baggage["run.retry_nr"]) <= 1:
                     time.sleep(1e6)
                 else:
                     raise Exception("Failed to run")
@@ -366,7 +366,7 @@ def test_always_failing_task():
 
         top_retry_span = one(spans.filter(["name"], "retry-wrapper"))
         assert spans.contains_path(top_task_span, top_retry_span)
-        assert read_key(top_retry_span, ["attributes", "max_nr_retries"]) == 10
+        assert read_key(top_retry_span, ["attributes", "task.max_nr_retries"]) == 10
 
         retry_call_spans = spans.filter(["name"], "retry-call")
         assert len(retry_call_spans) == 10
@@ -381,7 +381,7 @@ def test_always_failing_task():
                 ["name"], "call-python-function"
             )
 
-            if read_key(retry_span, ["attributes", "retry_nr"]) <= 1:
+            if read_key(retry_span, ["attributes", "run.retry_nr"]) <= 1:
                 assert timeout_span["status"] == {
                     "description": "Timeout",
                     "status_code": "ERROR",
@@ -410,9 +410,9 @@ def test__task_retries__task_is_retried_until_success():
 
             def f(arg):
                 baggage = otel.baggage.get_all()
-                if int(baggage["retry_nr"]) in [0, 1, 2]:
+                if int(baggage["run.retry_nr"]) in [0, 1, 2]:
                     time.sleep(1e6)
-                elif int(baggage["retry_nr"]) == 3:
+                elif int(baggage["run.retry_nr"]) == 3:
                     raise Exception("Unable to run when retry_nr=3")
                 else:
                     pass  # success on index >= 4 (5th call)
@@ -454,19 +454,19 @@ def test__task_retries__task_is_retried_until_success():
                 ["name"], "call-python-function"
             )
 
-            if read_key(top_retry_span, ["attributes", "retry_nr"]) in [0, 1, 2]:
+            if read_key(top_retry_span, ["attributes", "run.retry_nr"]) in [0, 1, 2]:
                 assert timeout_span["status"] == {
                     "description": "Timeout",
                     "status_code": "ERROR",
                 }
                 assert len(call_python_function_spans) == 0
-            elif read_key(top_retry_span, ["attributes", "retry_nr"]) == 3:
+            elif read_key(top_retry_span, ["attributes", "run.retry_nr"]) == 3:
                 assert timeout_span["status"] == {"status_code": "OK"}
                 assert one(call_python_function_spans)["status"] == {
                     "status_code": "ERROR",
                     "description": "Failure",
                 }
-            elif read_key(top_retry_span, ["attributes", "retry_nr"]) == 4:
+            elif read_key(top_retry_span, ["attributes", "run.retry_nr"]) == 4:
                 assert timeout_span["status"] == {"status_code": "OK"}
                 assert one(call_python_function_spans)["status"] == {
                     "status_code": "OK"
