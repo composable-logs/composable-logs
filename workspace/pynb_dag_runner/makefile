@@ -7,6 +7,8 @@ else
   CMD_PREFIX :=
 endif
 
+.PHONY test-pytest test-mypy test-black build clean
+
 test-pytest:
 	echo ">> Running unit tests ..."
 	$(CMD_PREFIX) pytest \
