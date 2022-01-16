@@ -31,8 +31,8 @@ def test__task__can_access_otel_baggage_and_returns_outcome():
         assert otel.baggage.get_all() == {
             "timeout_s": "12.3",
             "num_cpus": 1,
-            "retry_nr": "0",
-            "max_nr_retries": "1",
+            "run.retry_nr": "0",
+            "task.max_nr_retries": "1",
         }
 
         return 42

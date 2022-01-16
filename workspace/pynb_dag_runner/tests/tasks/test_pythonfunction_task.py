@@ -146,11 +146,11 @@ def test__python_function_task__outputs_otel_logs__should_fail_as_parameter(
         # --- check retry spans ---
         retry_wrapper_span = one(spans.filter(["name"], "retry-wrapper"))
         assert spans.contains_path(top_task_span, retry_wrapper_span)
-        assert read_key(retry_wrapper_span, ["attributes", "max_nr_retries"]) == 1
+        assert read_key(retry_wrapper_span, ["attributes", "task.max_nr_retries"]) == 1
 
         retry_span = one(spans.filter(["name"], "retry-call"))
         assert spans.contains_path(top_task_span, retry_wrapper_span, retry_span)
-        assert read_key(retry_span, ["attributes", "retry_nr"]) == 0
+        assert read_key(retry_span, ["attributes", "run.retry_nr"]) == 0
 
         # --- check timeout-guard span ---
         timeout_span: SpanDict = one(spans.filter(["name"], "timeout-guard"))

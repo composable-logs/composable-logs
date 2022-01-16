@@ -315,7 +315,7 @@ async def test_retry_wrapper_ot(args):
 
             baggage_list = await state.get.remote()
             assert baggage_list == [
-                {"max_nr_retries": N_max_retries, "retry_nr": k}
+                {"task.max_nr_retries": N_max_retries, "run.retry_nr": k}
                 for k in range(N_expected_calls)
             ]
 
@@ -323,13 +323,15 @@ async def test_retry_wrapper_ot(args):
 
     def validate_spans(spans: Spans):
         retry_span: SpanDict = one(spans.filter(["name"], "retry-wrapper"))
-        assert read_key(retry_span, ["attributes", "max_nr_retries"]) == N_max_retries
+        assert (
+            read_key(retry_span, ["attributes", "task.max_nr_retries"]) == N_max_retries
+        )
 
         retry_call_spans: Spans = spans.filter(["name"], "retry-call")
         assert len(retry_call_spans) == N_expected_calls
 
         for retry_call_span in retry_call_spans:
-            assert read_key(retry_call_span, ["attributes", "retry_nr"]) in range(
+            assert read_key(retry_call_span, ["attributes", "run.retry_nr"]) in range(
                 N_expected_calls
             )
             spans.contains_path(retry_span, retry_call_span)

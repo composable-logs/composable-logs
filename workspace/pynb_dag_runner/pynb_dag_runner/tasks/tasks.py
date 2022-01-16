@@ -32,7 +32,7 @@ def make_jupytext_task_ot(
     timeout_s: float = None,
     max_nr_retries: int = 1,
     num_cpus: int = 1,
-    task_parameters: RunParameters = {},
+    parameters: RunParameters = {},
     tags: Any = {},
 ):
     def run_notebook(arg):
@@ -44,9 +44,7 @@ def make_jupytext_task_ot(
         try:
             notebook.evaluate(
                 output=evaluated_notebook,
-                parameters={
-                    "P": {**baggage, **prefix_keys("task_parameter", task_parameters)}
-                },
+                parameters={"P": {**baggage, **parameters}},
             )
 
         except BaseException as e:

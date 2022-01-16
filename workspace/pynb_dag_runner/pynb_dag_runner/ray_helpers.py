@@ -199,13 +199,13 @@ def retry_wrapper_ot(
     async def do_retries(a: A) -> Try[B]:
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("retry-wrapper") as top_span:
-            otel_add_baggage("max_nr_retries", max_nr_retries)
-            top_span.set_attribute("max_nr_retries", max_nr_retries)
+            otel_add_baggage("task.max_nr_retries", max_nr_retries)
+            top_span.set_attribute("task.max_nr_retries", max_nr_retries)
 
             for retry_nr in range(max_nr_retries):
                 with tracer.start_as_current_span("retry-call") as iteration_span:
-                    otel_add_baggage("retry_nr", retry_nr)
-                    iteration_span.set_attribute("retry_nr", retry_nr)
+                    otel_add_baggage("run.retry_nr", retry_nr)
+                    iteration_span.set_attribute("run.retry_nr", retry_nr)
 
                     try_b: Try[B] = await f(a)
 
