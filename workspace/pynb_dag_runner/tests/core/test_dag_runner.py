@@ -29,7 +29,7 @@ def test__task__can_access_otel_baggage_and_returns_outcome():
     def f(_):
         # check access to OpenTelemetry baggage
         assert otel.baggage.get_all() == {
-            "timeout_s": "12.3",
+            "task.timeout_s": "12.3",
             "num_cpus": 1,
             "run.retry_nr": "0",
             "task.max_nr_retries": "1",

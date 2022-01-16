@@ -135,8 +135,8 @@ def _try_eval_f_async_wrapper(
         """
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("timeout-guard") as span:
-            span.set_attribute("timeout_s", timeout_s)
-            otel_add_baggage("timeout_s", timeout_s)
+            span.set_attribute("task.timeout_s", timeout_s)
+            otel_add_baggage("task.timeout_s", timeout_s)
 
             work_actor = ExecActor.remote()  # type: ignore
             future = work_actor.call.remote(a)

@@ -180,7 +180,7 @@ async def test_timeout_w_timeout_cancel():
         assert len(func_call_spans) == N_calls
 
         for span in func_call_spans:
-            assert read_key(span, ["attributes", "timeout_s"]) == 0.5
+            assert read_key(span, ["attributes", "task.timeout_s"]) == 0.5
             assert span["status"] == {"status_code": "ERROR", "description": "Timeout"}
 
     validate_spans(await get_test_spans())

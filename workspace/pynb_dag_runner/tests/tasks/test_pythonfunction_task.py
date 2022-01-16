@@ -219,7 +219,7 @@ def test__python_function_task__otel_logs_for_stuck_task():
 
         # --- check timeout-guard span ---
         timeout_span: SpanDict = one(spans.filter(["name"], "timeout-guard"))
-        assert read_key(timeout_span, ["attributes", "timeout_s"]) == 1.0
+        assert read_key(timeout_span, ["attributes", "task.timeout_s"]) == 1.0
 
         assert timeout_span["status"] == {
             "description": "Timeout",
