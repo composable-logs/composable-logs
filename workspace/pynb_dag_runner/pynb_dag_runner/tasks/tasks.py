@@ -11,10 +11,10 @@ from pynb_dag_runner.core.dag_runner import task_from_python_function
 #
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook
 
-RunParameters = Mapping[str, Any]
+TaskParameters = Mapping[str, Any]
 
 
-def prefix_keys(prefix: str, a_dict: RunParameters) -> RunParameters:
+def prefix_keys(prefix: str, a_dict: TaskParameters) -> TaskParameters:
     return {f"{prefix}.{k}": v for k, v in a_dict.items()}
 
 
@@ -32,7 +32,7 @@ def make_jupytext_task_ot(
     timeout_s: float = None,
     max_nr_retries: int = 1,
     num_cpus: int = 1,
-    task_parameters: RunParameters = {},
+    parameters: TaskParameters = {},
     tags: Any = {},
 ):
     def run_notebook(arg):
@@ -44,9 +44,7 @@ def make_jupytext_task_ot(
         try:
             notebook.evaluate(
                 output=evaluated_notebook,
-                parameters={
-                    "P": {**baggage, **prefix_keys("task_parameter", task_parameters)}
-                },
+                parameters={"P": {**baggage, **parameters}},
             )
 
         except BaseException as e:

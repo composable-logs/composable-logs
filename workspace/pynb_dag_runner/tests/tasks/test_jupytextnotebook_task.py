@@ -30,7 +30,7 @@ def isotimestamp_normalized():
 
 
 def make_test_nb_task(
-    nb_name: str, max_nr_retries: int, task_parameters={}, timeout_s: float = 10.0
+    nb_name: str, max_nr_retries: int, parameters={}, timeout_s: float = 10.0
 ):
     nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
     return make_jupytext_task_ot(
@@ -38,7 +38,7 @@ def make_test_nb_task(
         tmp_dir=nb_path,
         timeout_s=timeout_s,
         max_nr_retries=max_nr_retries,
-        task_parameters=task_parameters,
+        parameters=parameters,
     )
 
 
@@ -48,7 +48,7 @@ def test__jupytext_notebook_task__run_ok_notebook():
             jupytext_task = make_test_nb_task(
                 nb_name="notebook_ok.py",
                 max_nr_retries=2,
-                task_parameters={"variable_a": "task-value"},
+                parameters={"task.variable_a": "task-value"},
             )
             _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
@@ -70,6 +70,8 @@ def test__jupytext_notebook_task__run_ok_notebook():
         )
 
         artefact_span = one(spans.filter(["name"], "artefact"))
+
+        # see notebook for motivation behind these string-tests
         for content in [str(1 + 12 + 123), "variable_a=task-value"]:
             assert content in artefact_span["attributes"]["content"]
 
@@ -86,7 +88,7 @@ def test__jupytext_notebook_task__always_fail():
             jupytext_task = make_test_nb_task(
                 nb_name="notebook_always_fail.py",
                 max_nr_retries=N_retries,
-                task_parameters={"injected_parameter": 19238},
+                parameters={"injected_parameter": 19238},
             )
             _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
@@ -112,7 +114,9 @@ def test__jupytext_notebook_task__always_fail():
 
         top_retry_span = one(spans.filter(["name"], "retry-wrapper"))
         assert spans.contains_path(top_task_span, top_retry_span)
-        assert read_key(top_retry_span, ["attributes", "max_nr_retries"]) == N_retries
+        assert (
+            read_key(top_retry_span, ["attributes", "task.max_nr_retries"]) == N_retries
+        )
 
         retry_call_spans = spans.filter(["name"], "retry-call")
         assert len(retry_call_spans) == N_retries
@@ -138,7 +142,7 @@ def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
             jupytext_task = make_test_nb_task(
                 nb_name="notebook_exception.py",
                 max_nr_retries=N_retries,
-                task_parameters={"variable_a": "task-value"},
+                parameters={"variable_a": "task-value"},
             )
             _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
@@ -173,7 +177,9 @@ def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
 
         top_retry_span = one(spans.filter(["name"], "retry-wrapper"))
         assert spans.contains_path(top_task_span, top_retry_span)
-        assert read_key(top_retry_span, ["attributes", "max_nr_retries"]) == N_retries
+        assert (
+            read_key(top_retry_span, ["attributes", "task.max_nr_retries"]) == N_retries
+        )
 
         retry_call_spans = spans.filter(["name"], "retry-call")
         assert len(retry_call_spans) == nr_notebook_executions()
@@ -228,7 +234,7 @@ def test__jupytext_notebook_task__stuck_notebook():
                 nb_name="notebook_stuck.py",
                 max_nr_retries=1,
                 timeout_s=10.0,
-                task_parameters={},
+                parameters={},
             )
             _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
