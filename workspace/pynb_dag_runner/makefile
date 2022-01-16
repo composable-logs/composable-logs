@@ -7,7 +7,7 @@ else
   CMD_PREFIX :=
 endif
 
-.PHONY build clean
+.PHONY: build clean
 
 test-pytest:
 	echo ">> Running unit tests ..."
