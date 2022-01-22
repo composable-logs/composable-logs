@@ -60,12 +60,12 @@ def test__jupytext_notebook_task__run_ok_notebook():
         jupytext_span = one(
             spans.filter(["name"], "execute-task")
             #
-            .filter(["attributes", "tags.task_type"], "jupytext")
+            .filter(["attributes", "task.task_type"], "jupytext")
         )
         assert jupytext_span["status"] == {"status_code": "OK"}
 
         assert (
-            read_key(jupytext_span, ["attributes", "tags.notebook"])
+            read_key(jupytext_span, ["attributes", "task.notebook"])
             == str((Path(__file__).parent)) + "/jupytext_test_notebooks/notebook_ok.py"
         )
 
@@ -99,7 +99,7 @@ def test__jupytext_notebook_task__always_fail():
         top_task_span = one(
             spans.filter(["name"], "execute-task")
             #
-            .filter(["attributes", "tags.task_type"], "jupytext")
+            .filter(["attributes", "task.task_type"], "jupytext")
         )
         assert top_task_span["status"] == {
             "status_code": "ERROR",
@@ -107,7 +107,7 @@ def test__jupytext_notebook_task__always_fail():
         }
 
         assert (
-            read_key(top_task_span, ["attributes", "tags.notebook"])
+            read_key(top_task_span, ["attributes", "task.notebook"])
             == str((Path(__file__).parent))
             + "/jupytext_test_notebooks/notebook_always_fail.py"
         )
@@ -172,7 +172,7 @@ def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
         top_task_span = one(
             spans.filter(["name"], "execute-task")
             #
-            .filter(["attributes", "tags.task_type"], "jupytext")
+            .filter(["attributes", "task.task_type"], "jupytext")
         )
 
         top_retry_span = one(spans.filter(["name"], "retry-wrapper"))
@@ -244,7 +244,7 @@ def test__jupytext_notebook_task__stuck_notebook():
         top_task_span = one(
             spans.filter(["name"], "execute-task")
             #
-            .filter(["attributes", "tags.task_type"], "jupytext")
+            .filter(["attributes", "task.task_type"], "jupytext")
         )
 
         assert top_task_span["status"] == {

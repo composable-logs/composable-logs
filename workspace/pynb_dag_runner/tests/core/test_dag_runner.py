@@ -37,7 +37,7 @@ def test__task__can_access_otel_baggage_and_returns_outcome():
 
         return 42
 
-    task = task_from_python_function(f, tags={"foo": "f"}, timeout_s=12.3)
+    task = task_from_python_function(f, attributes={"task.foo": "f"}, timeout_s=12.3)
 
     [outcome] = start_and_await_tasks([task], [task], timeout_s=100)
 
@@ -69,9 +69,9 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
                 return arg.return_value + 1
 
             tasks: List[RemoteTaskP] = [
-                task_from_python_function(f, tags={"foo": "f"}),
-                task_from_python_function(g, tags={"foo": "g"}),
-                task_from_python_function(h, tags={"foo": "h"}),
+                task_from_python_function(f, attributes={"task.foo": "f"}),
+                task_from_python_function(g, attributes={"task.foo": "g"}),
+                task_from_python_function(h, attributes={"task.foo": "h"}),
             ]
             task_f, task_g, task_h = tasks
 
@@ -99,7 +99,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
 
     def validate_spans(spans: Spans):
         def lookup_task_span_id(func_name: str) -> SpanId:
-            return get_span_id(one(spans.filter(["attributes", "tags.foo"], func_name)))
+            return get_span_id(one(spans.filter(["attributes", "task.foo"], func_name)))
 
         log_dependencies: Set[Tuple[SpanId, SpanId]] = extract_task_dependencies(spans)
 
@@ -151,9 +151,9 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
                 return 145
 
             tasks: List[RemoteTaskP] = [
-                task_from_python_function(f1, tags={"foo": "f1"}),
-                task_from_python_function(f2, tags={"foo": "f2"}),
-                task_from_python_function(f_fan_in, tags={"foo": "fan_in"}),
+                task_from_python_function(f1, attributes={"task.foo": "f1"}),
+                task_from_python_function(f2, attributes={"task.foo": "f2"}),
+                task_from_python_function(f_fan_in, attributes={"task.foo": "fan_in"}),
             ]
             task_1, task_2, task_fan_in = tasks
 
@@ -185,7 +185,7 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
         log_dependencies: Set[Tuple[SpanId, SpanId]] = extract_task_dependencies(spans)
 
         def lookup_task_span_id(func_name: str) -> SpanId:
-            return get_span_id(one(spans.filter(["attributes", "tags.foo"], func_name)))
+            return get_span_id(one(spans.filter(["attributes", "task.foo"], func_name)))
 
         expected_dependencies: Set[Tuple[SpanId, SpanId]] = set(
             [
@@ -226,9 +226,9 @@ def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
                 return 123
 
             tasks: List[RemoteTaskP] = [
-                task_from_python_function(f1, tags={"foo": "f1"}),
-                task_from_python_function(f2, tags={"foo": "f2"}),
-                task_from_python_function(f3, tags={"foo": "f3"}),
+                task_from_python_function(f1, attributes={"foo": "f1"}),
+                task_from_python_function(f2, attributes={"foo": "f2"}),
+                task_from_python_function(f3, attributes={"foo": "f3"}),
             ]
 
             outcomes = start_and_await_tasks(tasks, tasks, timeout_s=100, arg=42)

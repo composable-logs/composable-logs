@@ -92,14 +92,14 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         f_remote: Callable[[U], Awaitable[A]],
         combiner: Callable[[Span, Try[A]], B],
         on_complete_callbacks: List[Callable[[B], Awaitable[None]]] = [],
-        tags: TaskTags = {},
+        attributes: TaskTags = {},
     ):
         self._f_remote: Callable[[U], Awaitable[A]] = f_remote
         self._combiner: Callable[[Span, Try[A]], B] = combiner
         self._on_complete_callbacks: List[
             Callable[[B], Awaitable[None]]
         ] = on_complete_callbacks
-        self._tags: TaskTags = tags
+        self._attributes: TaskTags = attributes
         self._start_called = False
         self._future_span_id: asyncio.Future[
             SpanId
@@ -143,8 +143,8 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
                 self._set_span_id(span)
 
                 # pre-task
-                for k, v in self._tags.items():
-                    span.set_attribute(f"tags.{k}", v)
+                for k, v in self._attributes.items():
+                    span.set_attribute(k, v)
 
                 # wait for task to finish
                 f_result: A = await self._f_remote(arg)
@@ -196,7 +196,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
 def _task_from_remote_f(
     f_remote: Callable[[U], Awaitable[Try[B]]],
     task_type: str,
-    tags: TaskTags = {},
+    attributes: TaskTags = {},
     fail_message: str = "Remote function call failed",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     def _combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
@@ -218,13 +218,13 @@ def _task_from_remote_f(
         else:
             raise try_fu.error  # type: ignore
 
-    if "task_type" in tags:
+    if "task_type" in attributes:
         raise ValueError("task_type key should not be included in tags")
 
     return GenTask_OT.remote(
         f_remote=untry_f,
         combiner=_combiner,
-        tags={**tags, "task_type": task_type},
+        attributes={**attributes, "task.task_type": task_type},
     )
 
 
@@ -233,7 +233,7 @@ def task_from_python_function(
     num_cpus: int = 1,
     max_nr_retries: int = 1,
     timeout_s: Optional[float] = None,
-    tags: TaskTags = {},
+    attributes: TaskTags = {},
     task_type: str = "Python",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     """
@@ -247,7 +247,9 @@ def task_from_python_function(
         try_f_remote, max_nr_retries=max_nr_retries
     )
 
-    return _task_from_remote_f(try_f_remote_wrapped, tags=tags, task_type=task_type)
+    return _task_from_remote_f(
+        try_f_remote_wrapped, attributes=attributes, task_type=task_type
+    )
 
 
 def _cb_compose_tasks(

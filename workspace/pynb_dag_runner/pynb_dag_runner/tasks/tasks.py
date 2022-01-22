@@ -33,7 +33,7 @@ def make_jupytext_task_ot(
     max_nr_retries: int = 1,
     num_cpus: int = 1,
     parameters: TaskParameters = {},
-    tags: Any = {},
+    attributes: Any = {},
 ):
     def run_notebook(arg):
         tmp_filepath: Path = (tmp_dir / notebook.filepath.name).with_suffix(".ipynb")
@@ -59,6 +59,10 @@ def make_jupytext_task_ot(
         num_cpus=num_cpus,
         max_nr_retries=max_nr_retries,
         timeout_s=timeout_s,
-        tags={**tags, "notebook": str(notebook.filepath)},
+        attributes={
+            **attributes,
+            **parameters,
+            "task.notebook": str(notebook.filepath),
+        },
         task_type="jupytext",
     )
