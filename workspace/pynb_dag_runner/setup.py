@@ -11,7 +11,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            'pynb_log_parser = pynb_log_parser.cli:entry_point',
+            "pynb_log_parser = pynb_log_parser.cli:entry_point",
         ],
     },
     url="https://github.com/pynb-dag-runner/pynb-dag-runner",
