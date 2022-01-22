@@ -29,15 +29,17 @@ from pynb_dag_runner.ray_helpers import (
 from pynb_dag_runner.ray_mypy_helpers import RemoteGetFunction, RemoteSetFunction
 from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid
 
+
+# -- types --
+
+AttributesDict = Mapping[str, Any]
+
 A = TypeVar("A")
 B = TypeVar("B")
 C = TypeVar("C")
 U = TypeVar("U")
 V = TypeVar("V")
 W = TypeVar("W")
-
-
-TaskTags = Mapping[str, str]
 
 
 @dataclass(frozen=True, eq=True)
@@ -92,21 +94,20 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
         f_remote: Callable[[U], Awaitable[A]],
         combiner: Callable[[Span, Try[A]], B],
         on_complete_callbacks: List[Callable[[B], Awaitable[None]]] = [],
-        attributes: TaskTags = {},
+        attributes: AttributesDict = {},
     ):
+        def create_future():
+            return asyncio.get_running_loop().create_future()
+
         self._f_remote: Callable[[U], Awaitable[A]] = f_remote
         self._combiner: Callable[[Span, Try[A]], B] = combiner
         self._on_complete_callbacks: List[
             Callable[[B], Awaitable[None]]
         ] = on_complete_callbacks
-        self._attributes: TaskTags = attributes
+        self._attributes: AttributesDict = attributes
         self._start_called = False
-        self._future_span_id: asyncio.Future[
-            SpanId
-        ] = asyncio.get_running_loop().create_future()
-        self._future_result: asyncio.Future[
-            B
-        ] = asyncio.get_running_loop().create_future()
+        self._future_span_id: asyncio.Future[SpanId] = create_future()
+        self._future_result: asyncio.Future[B] = create_future()
 
     def add_callback(self, cb: Callable[[B], Awaitable[None]]) -> None:
         """
@@ -196,7 +197,7 @@ class GenTask_OT(Generic[U, A, B], RayMypy):
 def _task_from_remote_f(
     f_remote: Callable[[U], Awaitable[Try[B]]],
     task_type: str,
-    attributes: TaskTags = {},
+    attributes: AttributesDict = {},
     fail_message: str = "Remote function call failed",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     def _combiner(span: Span, b: Try[B]) -> TaskOutcome[B]:
@@ -233,7 +234,7 @@ def task_from_python_function(
     num_cpus: int = 1,
     max_nr_retries: int = 1,
     timeout_s: Optional[float] = None,
-    attributes: TaskTags = {},
+    attributes: AttributesDict = {},
     task_type: str = "Python",
 ) -> RemoteTaskP[U, TaskOutcome[B]]:
     """

@@ -88,7 +88,7 @@ def test__jupytext_notebook_task__always_fail():
             jupytext_task = make_test_nb_task(
                 nb_name="notebook_always_fail.py",
                 max_nr_retries=N_retries,
-                parameters={"injected_parameter": 19238},
+                parameters={"task.injected_parameter": 19238},
             )
             _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
@@ -126,7 +126,7 @@ def test__jupytext_notebook_task__always_fail():
             assert len(retry_spans.exception_events()) == 1
 
             artefact_span = one(retry_spans.filter(["name"], "artefact"))
-            assert "injected_parameter" in artefact_span["attributes"]["content"]
+            assert "task.injected_parameter" in artefact_span["attributes"]["content"]
 
             spans.contains_path(
                 top_task_span, top_retry_span, retry_span, artefact_span
@@ -142,7 +142,7 @@ def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
             jupytext_task = make_test_nb_task(
                 nb_name="notebook_exception.py",
                 max_nr_retries=N_retries,
-                parameters={"variable_a": "task-value"},
+                parameters={"task.variable_a": "task-value"},
             )
             _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
