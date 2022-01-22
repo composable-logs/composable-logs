@@ -6,15 +6,13 @@ import opentelemetry as otel
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
-from pynb_dag_runner.core.dag_runner import task_from_python_function
+from pynb_dag_runner.core.dag_runner import task_from_python_function, AttributesDict
 
 #
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook
 
-TaskParameters = Mapping[str, Any]
 
-
-def prefix_keys(prefix: str, a_dict: TaskParameters) -> TaskParameters:
+def prefix_keys(prefix: str, a_dict: AttributesDict) -> AttributesDict:
     return {f"{prefix}.{k}": v for k, v in a_dict.items()}
 
 
@@ -32,9 +30,15 @@ def make_jupytext_task_ot(
     timeout_s: float = None,
     max_nr_retries: int = 1,
     num_cpus: int = 1,
-    parameters: TaskParameters = {},
-    tags: Any = {},
+    parameters: AttributesDict = {},
 ):
+    # run-attributes sans-baggage which can only be determined at run time
+
+    run_attributes: AttributesDict = {
+        **parameters,
+        "task.notebook": str(notebook.filepath),
+    }
+
     def run_notebook(arg):
         tmp_filepath: Path = (tmp_dir / notebook.filepath.name).with_suffix(".ipynb")
         evaluated_notebook = JupyterIpynbNotebook(tmp_filepath)
@@ -44,7 +48,7 @@ def make_jupytext_task_ot(
         try:
             notebook.evaluate(
                 output=evaluated_notebook,
-                parameters={"P": {**baggage, **parameters}},
+                parameters={"P": {**run_attributes, **baggage}},
             )
 
         except BaseException as e:
@@ -59,6 +63,6 @@ def make_jupytext_task_ot(
         num_cpus=num_cpus,
         max_nr_retries=max_nr_retries,
         timeout_s=timeout_s,
-        tags={**tags, "notebook": str(notebook.filepath)},
+        attributes=run_attributes,
         task_type="jupytext",
     )
