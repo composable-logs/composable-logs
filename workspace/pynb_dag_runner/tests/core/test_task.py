@@ -26,7 +26,7 @@ def disable_test_make_task_from_function_or_remote_function(task_fail: bool):
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
             task: RemoteTaskP = task_from_python_function(
-                f, tags={"foo": "my_test_func"}
+                f, attributes={"task.foo": "my_test_func"}
             )
 
             assert ray.get(task.has_started.remote()) == False
@@ -56,7 +56,7 @@ def disable_test_make_task_from_function_or_remote_function(task_fail: bool):
 
         def get_span_for_task(func_name: str) -> Span:
             assert func_name in ["f", "g", "h"]
-            return one(spans.filter(["attributes", "tags.foo"], "my_test_func"))
+            return one(spans.filter(["attributes", "task.foo"], "my_test_func"))
 
         # check exceptions
         task_span = get_span_for_task("g")

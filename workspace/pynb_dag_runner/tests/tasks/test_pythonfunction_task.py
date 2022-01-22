@@ -107,7 +107,7 @@ def test__python_function_task__outputs_otel_logs__should_fail_as_parameter(
                     return 123
 
             task: RemoteTaskP = task_from_python_function(
-                f, tags={"foo": "my_test_func"}
+                f, attributes={"task.foo": "my_test_func"}
             )
             [outcome] = start_and_await_tasks(
                 [task], [task], timeout_s=10, arg="dummy value"
@@ -126,8 +126,8 @@ def test__python_function_task__outputs_otel_logs__should_fail_as_parameter(
         assert len(spans.filter(["name"], "task-dependency")) == 0
 
         top_task_span: SpanDict = one(spans.filter(["name"], "execute-task"))
-        assert read_key(top_task_span, ["attributes", "tags.foo"]) == "my_test_func"
-        assert read_key(top_task_span, ["attributes", "tags.task_type"]) == "Python"
+        assert read_key(top_task_span, ["attributes", "task.foo"]) == "my_test_func"
+        assert read_key(top_task_span, ["attributes", "task.task_type"]) == "Python"
 
         error_spans: Spans = Spans(
             [span for span in spans if len(get_span_exceptions(span)) > 0]
@@ -198,7 +198,7 @@ def test__python_function_task__otel_logs_for_stuck_task():
                 time.sleep(1e6)
 
             task: RemoteTaskP = task_from_python_function(
-                f, tags={"id": "stuck_function"}, timeout_s=1.0
+                f, attributes={"task.id": "stuck_function"}, timeout_s=1.0
             )
             [outcome] = start_and_await_tasks(
                 [task], [task], timeout_s=10, arg="dummy value"
@@ -214,8 +214,8 @@ def test__python_function_task__otel_logs_for_stuck_task():
         assert len(spans.filter(["name"], "task-dependency")) == 0
 
         top_task_span: SpanDict = one(spans.filter(["name"], "execute-task"))
-        assert read_key(top_task_span, ["attributes", "tags.id"]) == "stuck_function"
-        assert read_key(top_task_span, ["attributes", "tags.task_type"]) == "Python"
+        assert read_key(top_task_span, ["attributes", "task.id"]) == "stuck_function"
+        assert read_key(top_task_span, ["attributes", "task.task_type"]) == "Python"
 
         # --- check timeout-guard span ---
         timeout_span: SpanDict = one(spans.filter(["name"], "timeout-guard"))
@@ -244,7 +244,7 @@ def _get_time_range(spans: Spans, function_id: str, inner: bool):
     task_top_span = one(
         spans.filter(["name"], "execute-task")
         # -
-        .filter(["attributes", "tags.function_id"], function_id)
+        .filter(["attributes", "task.function_id"], function_id)
     )
 
     task_spans = spans.restrict_by_top(task_top_span)
@@ -266,7 +266,7 @@ def test_tasks_run_in_parallel():
             tasks = [
                 task_from_python_function(
                     lambda _: time.sleep(1.0),
-                    tags={"function_id": f"id#{function_id}"},
+                    attributes={"task.function_id": f"id#{function_id}"},
                     timeout_s=10.0,
                 )
                 for function_id in range(2)
@@ -297,7 +297,7 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
             tasks = [
                 task_from_python_function(
                     lambda _: time.sleep(0.5),
-                    tags={"function_id": f"id#{function_id}"},
+                    attributes={"task.function_id": f"id#{function_id}"},
                     timeout_s=10.0,
                 )
                 for function_id in range(4)
@@ -345,7 +345,7 @@ def test_always_failing_task():
             tasks = [
                 task_from_python_function(
                     f=f,
-                    tags={"function_id": "foo"},
+                    attributes={"task.function_id": "foo"},
                     max_nr_retries=10,
                     timeout_s=3.0,
                 )
@@ -420,7 +420,7 @@ def test__task_retries__task_is_retried_until_success():
             tasks = [
                 task_from_python_function(
                     f=f,
-                    tags={"function_id": "test_task"},
+                    attributes={"task.function_id": "test_task"},
                     max_nr_retries=10,  # 5 retries is needed for success
                     timeout_s=1.5,
                 )
@@ -436,9 +436,9 @@ def test__task_retries__task_is_retried_until_success():
         # Top task span is success
         top_task_span = one(spans.filter(["name"], "execute-task"))
         assert (
-            read_key(top_task_span, ["attributes", "tags.function_id"]) == "test_task"
+            read_key(top_task_span, ["attributes", "task.function_id"]) == "test_task"
         )
-        assert read_key(top_task_span, ["attributes", "tags.task_type"]) == "Python"
+        assert read_key(top_task_span, ["attributes", "task.task_type"]) == "Python"
         assert top_task_span["status"] == {"status_code": "OK"}
 
         retry_call_spans = spans.filter(["name"], "retry-call")
@@ -627,7 +627,7 @@ async def test_random_sleep_tasks_with_order_dependencies(
             tasks = [
                 task_from_python_function(
                     f=random_sleep,
-                    tags={"task_id": f"t{k}"},
+                    attributes={"task.task_id": f"t{k}"},
                 )
                 for k in range(5)
             ]
@@ -662,7 +662,7 @@ async def test_random_sleep_tasks_with_order_dependencies(
                 one(
                     spans.filter(["name"], "execute-task")
                     #
-                    .filter(["attributes", "tags.task_id"], f"t{task_nr}")
+                    .filter(["attributes", "task.task_id"], f"t{task_nr}")
                 )
             )
 
