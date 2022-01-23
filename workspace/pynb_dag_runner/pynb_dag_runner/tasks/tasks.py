@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Dict, Mapping, Any
 
 #
 import opentelemetry as otel
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 #
-from pynb_dag_runner.core.dag_runner import task_from_python_function, AttributesDict
+from pynb_dag_runner.core.dag_runner import task_from_python_function
+from pynb_dag_runner.opentelemetry_helpers import AttributesDict
 
 #
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook

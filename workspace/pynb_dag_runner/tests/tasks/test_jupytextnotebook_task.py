@@ -122,7 +122,7 @@ def test__jupytext_notebook_task__always_fail():
         assert len(retry_call_spans) == N_retries
 
         for retry_span in retry_call_spans:
-            retry_spans: Spans = spans.restrict_by_top(retry_span)
+            retry_spans: Spans = spans.bound_under(retry_span)
             assert len(retry_spans.exception_events()) == 1
 
             artefact_span = one(retry_spans.filter(["name"], "artefact"))
@@ -200,7 +200,9 @@ def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
         for idx in failed_indices():
             failed_run_span = run_spans[idx]
 
-            exception = one(spans.exceptions_in(failed_run_span))["attributes"]
+            exception = one(spans.bound_inclusive(failed_run_span).exception_events())[
+                "attributes"
+            ]
             assert exception["exception.type"] == "Exception"
             assert "Thrown from notebook!" in exception["exception.message"]
 
@@ -213,7 +215,7 @@ def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
             # for both successful and failed runs, a partially evaluated notebook
             # should have been logged as an artefact.
             artefact_span = one(
-                spans.restrict_by_top(run_spans[idx]).filter(["name"], "artefact")
+                spans.bound_under(run_spans[idx]).filter(["name"], "artefact")
             )
             assert artefact_span["attributes"]["name"] == "notebook.ipynb"
             assert str(1 + 12 + 123) in artefact_span["attributes"]["content"]

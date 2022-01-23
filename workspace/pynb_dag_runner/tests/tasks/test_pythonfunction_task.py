@@ -61,7 +61,7 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
     for top_span in top_spans:
         task_id = top_span["attributes"]["task_id"]
         run_spans = list(
-            spans.restrict_by_top(top_span)
+            spans.bound_under(top_span)
             .filter(["name"], "task-run")
             .sort_by_start_time()
         )
@@ -247,7 +247,7 @@ def _get_time_range(spans: Spans, function_id: str, inner: bool):
         .filter(["attributes", "task.function_id"], function_id)
     )
 
-    task_spans = spans.restrict_by_top(task_top_span)
+    task_spans = spans.bound_under(task_top_span)
 
     inner_flag_to_span_dict = {
         # inner=True: return time range for span used for (inner) python
@@ -372,7 +372,7 @@ def test_always_failing_task():
         assert len(retry_call_spans) == 10
 
         for retry_span in retry_call_spans:
-            retry_subspans = spans.restrict_by_top(retry_span)
+            retry_subspans = spans.bound_under(retry_span)
 
             timeout_span: SpanDict = one(
                 retry_subspans.filter(["name"], "timeout-guard")
@@ -445,7 +445,7 @@ def test__task_retries__task_is_retried_until_success():
         assert len(retry_call_spans) == 5
 
         for top_retry_span in retry_call_spans:
-            retry_subspans = spans.restrict_by_top(top_retry_span)
+            retry_subspans = spans.bound_under(top_retry_span)
 
             timeout_span: SpanDict = one(
                 retry_subspans.filter(["name"], "timeout-guard")
