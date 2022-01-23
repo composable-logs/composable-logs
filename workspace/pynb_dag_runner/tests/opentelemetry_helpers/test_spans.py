@@ -112,3 +112,52 @@ def test__otel__spans__tracing_nested_native_python(dummy_loop_parameter):
     assert check_duration(sub2, 0.1)
 
     assert read_key(sub1, ["attributes", "sub1attribute"]) == 12345
+
+
+def test__otel__spans__get_attributes__empty_span_collection():
+    assert Spans([]).get_attributes() == {}
+
+
+def test__otel__spans__get_attributes__with_unique_attribute_values():
+    with SpanRecorder() as r:
+        tracer = ot.trace.get_tracer(__name__)
+
+        with tracer.start_as_current_span("TopLevel") as t1:
+            t1.set_attribute("a.foo", "1")
+            with tracer.start_as_current_span("SubLevel") as t2:
+                t2.set_attribute("a.foo", "1")
+                t2.set_attribute("b.bar", "2")
+
+    assert r.spans.get_attributes(allowed_prefixes={"a"}) == {"a.foo": "1"}
+    assert r.spans.get_attributes(allowed_prefixes={"b.bar"}) == {"b.bar": "2"}
+    assert r.spans.get_attributes(allowed_prefixes={"not-found-prefix"}) == {}
+    assert r.spans.get_attributes(allowed_prefixes={}) == {}
+    assert (
+        r.spans.get_attributes(allowed_prefixes={""})
+        == r.spans.get_attributes()
+        == {"a.foo": "1", "b.bar": "2"}
+    )
+
+
+def test__otel__spans__get_attributes__with_non_unique_attribute_values():
+    with SpanRecorder() as r:
+        tracer = ot.trace.get_tracer(__name__)
+
+        with tracer.start_as_current_span("span-1") as t1:
+            t1.set_attribute("a.foo", "1")
+            t1.set_attribute("b.bar", "2")
+            t1.set_attribute("c.baz", "3")
+
+        with tracer.start_as_current_span("span-2") as t2:
+            t2.set_attribute("a.foo", "2")  # not-unique, previously a.foo = "1"
+            t2.set_attribute("b.bar", "2")
+
+    # even if span collection contain non-unique attribute keys we can extract unions
+    # when key-values are unique after filtering
+    assert r.spans.get_attributes(allowed_prefixes={"b"}) == {"b.bar": "2"}
+    assert r.spans.get_attributes(allowed_prefixes={"c"}) == {"c.baz": "3"}
+
+    # check that get_attributes crashes if key-values are not unique
+    for allowed_prefixes in [None, {"a.foo"}]:
+        with pytest.raises(ValueError):
+            _ = r.spans.get_attributes(allowed_prefixes=allowed_prefixes)

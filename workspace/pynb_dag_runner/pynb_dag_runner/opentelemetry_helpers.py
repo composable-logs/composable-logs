@@ -207,7 +207,9 @@ class Spans:
         """
         return flatten([get_span_exceptions(s) for s in self])
 
-    def get_attributes(self, allowed_prefixes: Optional[Set[str]]) -> AttributesDict:
+    def get_attributes(
+        self, allowed_prefixes: Optional[Set[str]] = None
+    ) -> AttributesDict:
         """
         Return union of all attributes in this span collection. Only include attribute
         keys that start with the allowed prefixes listed in `allowed_prefixes`.
