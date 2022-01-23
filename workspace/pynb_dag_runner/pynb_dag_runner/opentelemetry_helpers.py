@@ -1,6 +1,6 @@
 import glob
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Mapping, Set, Optional, MutableMapping
 
 # Note eg "from opentelemetry import trace" fails mypy
 import opentelemetry as otel
@@ -10,6 +10,8 @@ from opentelemetry import context, baggage  # type: ignore
 
 #
 from pynb_dag_runner.helpers import pairs, flatten, read_jsonl, one
+
+AttributesDict = Mapping[str, Any]
 
 
 # ---- baggage helpers ----
@@ -179,28 +181,65 @@ class Spans:
                 self.contains_path(*ps, recursive=recursive) for ps in pairs(span_chain)
             )
 
-    def restrict_by_top(self, top: SpanDict) -> "Spans":
+    def _bound_by(self, top: SpanDict, inclusive: bool = False) -> "Spans":
         """
-        Restrict this collection of Spans to spans that can be connected to
-        the parent-span using one or many parent-child relationship(s).
+        Bound this span collection to spans that can be connected to
+        the top-span using one or many parent-child relationships.
 
-        Note: the provided span `top` is not included in the result.
+        Note: the provided span `top` is only included if inclusive=True.
         """
-        return Spans([s for s in self if self.contains_path(top, s, recursive=True)])
+        top_optional: List[SpanDict] = [top] if inclusive else []
 
-    def exceptions_in(self, top: SpanDict):
-        """
-        Return list of Exception events in top and all sub-spans to top.
-        """
-        return flatten(
-            [get_span_exceptions(s) for s in [top] + list(self.restrict_by_top(top))]
+        return Spans(
+            top_optional
+            + [s for s in self if self.contains_path(top, s, recursive=True)]
         )
+
+    def bound_under(self, top) -> "Spans":
+        return self._bound_by(top, inclusive=False)
+
+    def bound_inclusive(self, top) -> "Spans":
+        return self._bound_by(top, inclusive=True)
 
     def exception_events(self):
         """
-        Return list of all recorded exceptions
+        Return list of all recorded exceptions in this span collection.
         """
         return flatten([get_span_exceptions(s) for s in self])
+
+    def get_attributes(
+        self, allowed_prefixes: Optional[Set[str]] = None
+    ) -> AttributesDict:
+        """
+        Return union of all attributes in this span collection. Only include attribute
+        keys that start with the allowed prefixes listed in `allowed_prefixes`.
+
+        Raise an exception if the span collection spans contains an attribute key with
+        multiple distinct values in different spans.
+        """
+        result: MutableMapping[str, Any] = dict()
+
+        def filter_attribute_dict(d: AttributesDict) -> AttributesDict:
+            if allowed_prefixes is None:
+                return d
+            else:
+                return {
+                    k: v
+                    for k, v in d.items()
+                    if any(k.startswith(prefix) for prefix in allowed_prefixes)
+                }
+
+        for span in self:
+            for k, v in filter_attribute_dict(span["attributes"]).items():
+                if k in result:
+                    if result[k] != v:
+                        raise ValueError(
+                            f"Encountered key={k} with different values {result[k]} and {v}"
+                        )
+                    # do nothing: {k: v} is already in result
+                else:
+                    result[k] = v
+        return result
 
 
 def _get_all_spans():

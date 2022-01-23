@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Set
+from typing import Any, Tuple, Set
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanId
 
 
