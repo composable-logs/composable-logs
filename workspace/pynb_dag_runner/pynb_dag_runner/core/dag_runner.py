@@ -4,11 +4,9 @@ from typing import (
     Awaitable,
     List,
     Optional,
-    Any,
     TypeVar,
     Generic,
     Callable,
-    Mapping,
     Protocol,
 )
 
@@ -27,12 +25,10 @@ from pynb_dag_runner.ray_helpers import (
     retry_wrapper_ot,
 )
 from pynb_dag_runner.ray_mypy_helpers import RemoteGetFunction, RemoteSetFunction
-from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid
+from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid, AttributesDict
 
 
 # -- types --
-
-AttributesDict = Mapping[str, Any]
 
 A = TypeVar("A")
 B = TypeVar("B")

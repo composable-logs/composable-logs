@@ -1,6 +1,6 @@
 import glob
 from pathlib import Path
-from typing import Any, List, Set, Optional, MutableMapping
+from typing import Any, List, Mapping, Set, Optional, MutableMapping
 
 # Note eg "from opentelemetry import trace" fails mypy
 import opentelemetry as otel
@@ -10,7 +10,8 @@ from opentelemetry import context, baggage  # type: ignore
 
 #
 from pynb_dag_runner.helpers import pairs, flatten, read_jsonl, one
-from pynb_dag_runner.core.dag_runner import AttributesDict
+
+AttributesDict = Mapping[str, Any]
 
 
 # ---- baggage helpers ----
