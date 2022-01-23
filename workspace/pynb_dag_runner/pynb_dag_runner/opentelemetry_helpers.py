@@ -179,31 +179,25 @@ class Spans:
                 self.contains_path(*ps, recursive=recursive) for ps in pairs(span_chain)
             )
 
-    def restrict_by_top(self, top: SpanDict, include_top: bool = False) -> "Spans":
+    def _bound_by(self, top: SpanDict, inclusive: bool = False) -> "Spans":
         """
-        Restrict this collection of Spans to spans that can be connected to
+        Bound this span collection to spans that can be connected to
         the top-span using one or many parent-child relationships.
 
-        Note: the provided span `top` is only included if include_top=True.
+        Note: the provided span `top` is only included if inclusive=True.
         """
-        top_optional: List[SpanDict] = [top] if include_top else []
+        top_optional: List[SpanDict] = [top] if inclusive else []
 
         return Spans(
             top_optional
             + [s for s in self if self.contains_path(top, s, recursive=True)]
         )
 
-    def exceptions_in(self, top: SpanDict, include_top: bool = True):
-        """
-        Return list of Exception events in top and all sub-spans to top.
-        """
-        # -- deprecate this and use exception_events instead --
-        return flatten(
-            [
-                get_span_exceptions(s)
-                for s in list(self.restrict_by_top(top, include_top=include_top))
-            ]
-        )
+    def bound_under(self, top) -> "Spans":
+        return self._bound_by(top, inclusive=False)
+
+    def bound_inclusive(self, top) -> "Spans":
+        return self._bound_by(top, inclusive=True)
 
     def exception_events(self):
         """
