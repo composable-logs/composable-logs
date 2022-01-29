@@ -59,6 +59,21 @@ def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
     return result
 
 
+def add_html_notebook_artefacts(artefacts: List[ArtefactDict]) -> List[ArtefactDict]:
+    result = []
+
+    for artefact_dict in artefacts:
+        if (
+            artefact_dict["name"].endswith(".ipynb")
+            and artefact_dict["encoding"] == "text/utf-8"
+        ):
+            # convert evaluated .ipynb notebook into html page for easier viewing
+            pass
+
+        result.append(artefact_dict)
+    return result
+
+
 def _run_iterator(
     spans: Spans, task_top_span
 ) -> Iterable[Tuple[RunDict, Iterable[ArtefactDict]]]:

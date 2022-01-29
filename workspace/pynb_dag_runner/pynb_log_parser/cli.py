@@ -4,7 +4,10 @@ from argparse import ArgumentParser
 #
 from pynb_dag_runner.helpers import read_json, write_json
 from pynb_dag_runner.opentelemetry_helpers import Spans
-from pynb_dag_runner.opentelemetry_task_span_parser import get_pipeline_iterators
+from pynb_dag_runner.opentelemetry_task_span_parser import (
+    get_pipeline_iterators,
+    add_html_notebook_artefacts,
+)
 
 
 def _status_summary(span_dict) -> str:
@@ -58,7 +61,7 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
             write_json(run_basepath / "run.json", task_run_dict)
 
             print("     *** run: ", task_run_dict)
-            for artefact_dict in task_run_artefacts:
+            for artefact_dict in add_html_notebook_artefacts(task_run_artefacts):
                 print("         *** artefact: ", str(artefact_dict)[:100])
 
                 if artefact_dict["encoding"] == "text/utf-8":
@@ -68,7 +71,10 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
                     (run_basepath / artefact_dict["name"]).write_text(
                         artefact_dict["content"]
                     )
-                # print(artefact_dict)
+                else:
+                    raise ValueError(
+                        f"Unknown artefact encoding {str(artefact_dict)[:2000]}"
+                    )
 
 
 # --- cli tool implementation ---
