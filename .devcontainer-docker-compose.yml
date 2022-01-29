@@ -9,6 +9,9 @@ services:
     - "8888:8888"
     command:
     - |
-      cd /home/host_user/workspace/
+      cd /home/host_user/workspace
+
+      pip3 install --user --editable ./pynb_dag_runner/.
+
       jupyter notebook --no-browser --port 8888 --ip 0.0.0.0
     hostname: pynb-dag-runner-dev
