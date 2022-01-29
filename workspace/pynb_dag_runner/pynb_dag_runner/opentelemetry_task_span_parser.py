@@ -22,7 +22,7 @@ def extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
 
 # --- span parser ---
 
-FlowDict = Any
+PipelineDict = Any
 TaskDict = Any
 RunDict = Any
 ArtefactDict = Any
@@ -77,16 +77,16 @@ def _task_iterator(spans: Spans) -> Iterable[Tuple[TaskDict, Iterable[RunDict]]]
 
 def get_pipeline_iterators(
     spans: Spans,
-) -> Tuple[FlowDict, Iterable[Tuple[TaskDict, Iterable[RunDict]]]]:
+) -> Tuple[PipelineDict, Iterable[Tuple[TaskDict, Iterable[RunDict]]]]:
     """
     Top level function that returns dict with pipeline scoped data and nested
     iterators for looping through tasks, runs, and artefacts logged to runs.
 
     Input is all OpenTelemetry spans logged for one pipeline run.
     """
-    flow_attributes = {
+    pipeline_attributes = {
         "task_dependencies": list(extract_task_dependencies(spans)),
-        "flow_attributes": spans.get_attributes(allowed_prefixes={"flow."}),
+        "pipeline_attributes": spans.get_attributes(allowed_prefixes={"pipeline."}),
     }
 
-    return flow_attributes, _task_iterator(spans)
+    return pipeline_attributes, _task_iterator(spans)
