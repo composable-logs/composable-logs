@@ -5,7 +5,11 @@ import os
 import pytest
 
 #
-from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook
+from pynb_dag_runner.notebooks_helpers import (
+    JupytextNotebook,
+    JupyterIpynbNotebook,
+    convert_ipynb_to_html,
+)
 from pynb_dag_runner.helpers import read_json
 
 # Example content of a Jupyter notebook stored in the py-percent file format.
@@ -83,6 +87,22 @@ def test_evaluate_jupytext_notebook(tmp_path: Path):
     assert output_ipynb.filepath.is_file()
     assert str(output_ipynb.filepath).startswith(str(output_path))
     assert "variable_a=baz" in output_ipynb.filepath.read_text()
+
+
+def test_convert_ipynb_string_to_html(tmp_path: Path):
+    notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
+
+    output_ipynb = JupyterIpynbNotebook(tmp_path / "foo.ipynb")
+
+    _ = notebook_py.evaluate(
+        output=output_ipynb,
+        parameters={"variable_a": "123xyz456"},
+    )
+
+    html_string: str = convert_ipynb_to_html(output_ipynb.filepath.read_text())
+
+    for test_string in ["<html", "123xyz456"]:
+        assert test_string in html_string.lower()
 
 
 @pytest.fixture

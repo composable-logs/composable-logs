@@ -21,6 +21,23 @@ The below classes allow us to do the same conversion with Python.
 """
 
 
+def convert_ipynb_to_html(ipynb_notebook_content: str) -> str:
+    """
+    Convert input string with content of a Jupyter notebook (in .ipynb format)
+    into a html-string.
+
+    No evaluation of code cells.
+    """
+
+    tmp_path: str = tempfile.mkdtemp(prefix="pynb-dag-runner-temp")
+    tmp_filepath: Path = Path(tmp_path) / "temp-notebook.ipynb"
+    tmp_filepath.write_text(ipynb_notebook_content)
+    output, _ = HTMLExporter(template_name="classic").from_filename(tmp_filepath)
+
+    os.remove(tmp_filepath)
+    return output
+
+
 class JupyterIpynbNotebook:
     # ipynb is the default file format used by Jupyter for storing notebooks.
     def __init__(self, filepath: Path):

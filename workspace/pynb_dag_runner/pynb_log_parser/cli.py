@@ -4,7 +4,10 @@ from argparse import ArgumentParser
 #
 from pynb_dag_runner.helpers import read_json, write_json
 from pynb_dag_runner.opentelemetry_helpers import Spans
-from pynb_dag_runner.opentelemetry_task_span_parser import get_pipeline_iterators
+from pynb_dag_runner.opentelemetry_task_span_parser import (
+    get_pipeline_iterators,
+    add_html_notebook_artefacts,
+)
 
 
 def _status_summary(span_dict) -> str:
@@ -23,14 +26,14 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
     write_json(output_basepath / "pipeline.json", pipeline_dict)
 
     for task_dict, task_retry_it in task_it:
-        if task_dict["task_dict"]["task.task_type"] == "jupytext":
+        if task_dict["attributes"]["task.task_type"] == "jupytext":
             task_subdir: str = "--".join(
                 [
                     "jupytext-notebook-task",
-                    task_dict["task_dict"]["task.notebook"]
+                    task_dict["attributes"]["task.notebook"]
                     .replace("/", "-")
                     .replace(".", "-"),
-                    task_dict["task_span_id"],
+                    task_dict["span_id"],
                     _status_summary(task_dict),
                 ]
             )
@@ -43,11 +46,13 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
         task_basepath.mkdir(parents=True, exist_ok=True)
         write_json(task_basepath / "task.json", task_dict)
 
+        print("*** task: ", task_dict)
+
         for task_run_dict, task_run_artefacts in task_retry_it:
             run_basepath: Path = task_basepath / "--".join(
                 [
-                    f"run={task_run_dict['run_attributes']['run.retry_nr']}",
-                    task_run_dict["run_span_id"],
+                    f"run={task_run_dict['attributes']['run.retry_nr']}",
+                    task_run_dict["span_id"],
                     _status_summary(task_run_dict),
                 ]
             )
@@ -55,8 +60,23 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
             run_basepath.mkdir(parents=True, exist_ok=True)
             write_json(run_basepath / "run.json", task_run_dict)
 
-            for artefact in task_run_artefacts:
-                pass
+            print("     *** run: ", task_run_dict)
+            for artefact_dict in add_html_notebook_artefacts(task_run_artefacts):
+                print(
+                    f"         *** artefact: {artefact_dict['name']} ({artefact_dict['encoding']})"
+                )
+
+                if artefact_dict["encoding"] == "text/utf-8":
+                    assert ".." not in artefact_dict["name"]
+                    assert not artefact_dict["name"].startswith("/")
+
+                    (run_basepath / artefact_dict["name"]).write_text(
+                        artefact_dict["content"]
+                    )
+                else:
+                    raise ValueError(
+                        f"Unknown artefact encoding {str(artefact_dict)[:2000]}"
+                    )
 
 
 # --- cli tool implementation ---
