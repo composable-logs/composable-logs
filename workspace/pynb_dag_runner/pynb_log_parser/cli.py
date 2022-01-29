@@ -62,7 +62,9 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
 
             print("     *** run: ", task_run_dict)
             for artefact_dict in add_html_notebook_artefacts(task_run_artefacts):
-                print("         *** artefact: ", str(artefact_dict)[:100])
+                print(
+                    f"         *** artefact: {artefact_dict['name']} ({artefact_dict['encoding']})"
+                )
 
                 if artefact_dict["encoding"] == "text/utf-8":
                     assert ".." not in artefact_dict["name"]

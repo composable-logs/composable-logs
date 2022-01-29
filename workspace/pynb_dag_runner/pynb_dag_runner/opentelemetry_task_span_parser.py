@@ -1,7 +1,9 @@
+from pathlib import Path
 from typing import Any, Iterable, Tuple, Set, List
 
 #
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanId, get_duration_s
+from pynb_dag_runner.notebooks_helpers import convert_ipynb_to_html
 
 
 def extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
@@ -60,6 +62,12 @@ def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
 
 
 def add_html_notebook_artefacts(artefacts: List[ArtefactDict]) -> List[ArtefactDict]:
+    """
+    Helper function for iterating through a list of artefacts.
+
+    The function returns the input list, but appended with html-artefact versions of
+    any Jupyter notebook ipynb-artefacts (if present).
+    """
     result = []
 
     for artefact_dict in artefacts:
@@ -68,7 +76,16 @@ def add_html_notebook_artefacts(artefacts: List[ArtefactDict]) -> List[ArtefactD
             and artefact_dict["encoding"] == "text/utf-8"
         ):
             # convert evaluated .ipynb notebook into html page for easier viewing
-            pass
+            result.append(
+                {
+                    **artefact_dict,
+                    **{
+                        "name": str(Path(artefact_dict["name"]).with_suffix(".html")),
+                        "encoding": "text/utf-8",
+                        "content": convert_ipynb_to_html(artefact_dict["content"]),
+                    },
+                }
+            )
 
         result.append(artefact_dict)
     return result
