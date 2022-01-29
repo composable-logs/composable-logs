@@ -28,8 +28,35 @@ RunDict = Any
 ArtefactDict = Any
 
 
+def _key_span_details(span):
+    return {
+        "span_id": span["context"]["span_id"],
+        "start_time": span["start_time"],
+        "end_time": span["end_time"],
+        "duration_s": get_duration_s(span),
+        "status": span["status"],
+    }
+
+
 def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
-    return []
+    result = []
+    for artefact_span in (
+        spans.bound_under(task_run_top_span)
+        # -
+        .filter(["name"], "artefact")
+        # -
+        .filter(["status", "status_code"], "OK")
+    ):
+        result.append(
+            {
+                **_key_span_details(artefact_span),
+                "name": artefact_span["attributes"]["name"],
+                "encoding": "text/utf-8",
+                "content": artefact_span["attributes"]["content"],
+            }
+        )
+
+    return result
 
 
 def _run_iterator(
@@ -39,12 +66,8 @@ def _run_iterator(
         ["name"], "retry-call"
     ):
         run_dict = {
-            "run_span_id": task_run_top_span["context"]["span_id"],
-            "start_time": task_run_top_span["start_time"],
-            "end_time": task_run_top_span["end_time"],
-            "duration_s": get_duration_s(task_run_top_span),
-            "status": task_run_top_span["status"],
-            "run_attributes": (
+            **_key_span_details(task_run_top_span),
+            "attributes": (
                 spans.bound_inclusive(task_run_top_span)
                 #
                 .get_attributes(allowed_prefixes={"run."})
@@ -58,12 +81,8 @@ def _run_iterator(
 def _task_iterator(spans: Spans) -> Iterable[Tuple[TaskDict, Iterable[RunDict]]]:
     for task_top_span in spans.filter(["name"], "execute-task"):
         task_dict = {
-            "task_span_id": task_top_span["context"]["span_id"],
-            "start_time": task_top_span["start_time"],
-            "end_time": task_top_span["end_time"],
-            "duration_s": get_duration_s(task_top_span),
-            "status": task_top_span["status"],
-            "task_dict": (
+            **_key_span_details(task_top_span),
+            "attributes": (
                 spans.bound_inclusive(task_top_span)
                 #
                 .get_attributes(allowed_prefixes={"task."})
@@ -86,7 +105,7 @@ def get_pipeline_iterators(
     """
     pipeline_attributes = {
         "task_dependencies": list(extract_task_dependencies(spans)),
-        "pipeline_attributes": spans.get_attributes(allowed_prefixes={"pipeline."}),
+        "attributes": spans.get_attributes(allowed_prefixes={"pipeline."}),
     }
 
     return pipeline_attributes, _task_iterator(spans)
