@@ -161,3 +161,59 @@ def test__otel__spans__get_attributes__with_non_unique_attribute_values():
     for allowed_prefixes in [None, {"a.foo"}]:
         with pytest.raises(ValueError):
             _ = r.spans.get_attributes(allowed_prefixes=allowed_prefixes)
+
+
+def test__otel__demo_context_propagation_mechanism():
+    # This unit test is demo:ing of principle how OpenTelemetry span
+    # contexts are propagated to notebooks.
+    #
+    # Context propagation using TraceContextTextMapPropagator as shown here:
+    # - https://github.com/open-telemetry/opentelemetry-python/blob/main/docs/faq-and-cookbook.rst
+    # - https://stackoverflow.com/questions/68494838
+
+    from opentelemetry.trace.propagation.tracecontext import (
+        TraceContextTextMapPropagator,
+    )
+
+    def get_test_spans():
+        with SpanRecorder() as r:
+            tracer1 = ot.trace.get_tracer("tracer1")
+
+            with tracer1.start_as_current_span("parent-span") as t1:
+                t1.set_attribute("parent-attr", "foo")
+
+                # Get Span context as a string that can be propagated
+                # to other processes.
+                ctx_propagator1 = TraceContextTextMapPropagator()
+                carrier = {}
+                ctx_propagator1.inject(carrier=carrier)
+                assert isinstance(carrier, dict)
+                assert carrier.keys() == {"traceparent"}
+                assert isinstance(carrier["traceparent"], str)
+
+            del tracer1, t1
+
+            # Create sub-span based only on data in context propagation carrier dict.
+            # This could run in some other process (eg. remote Ray task) or call to
+            # service behind REST API.
+            tracer2 = ot.trace.get_tracer("tracer2-in-some-other-process")
+            ctx_propagator2 = TraceContextTextMapPropagator()
+            with tracer2.start_span(
+                "child-span", context=ctx_propagator2.extract(carrier=carrier)
+            ) as child:
+                child.set_attribute("child-attr", "foo-bar")
+
+        return r.spans
+
+    def validate_spans(spans: Spans):
+        assert len(spans) == 2
+
+        top_span = one(spans.filter(["name"], "parent-span"))
+        child_span = one(spans.filter(["name"], "child-span"))
+
+        assert top_span["attributes"]["parent-attr"] == "foo"
+        assert child_span["attributes"]["child-attr"] == "foo-bar"
+
+        assert spans.contains_path(top_span, child_span, recursive=False)
+
+    validate_spans(get_test_spans())
