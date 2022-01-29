@@ -17,10 +17,10 @@ def _status_summary(span_dict) -> str:
 def write_to_output_dir(spans: Spans, output_basepath: Path):
     print(" - Writing tasks in spans to output_basepath", output_basepath)
 
-    flow_dict, task_it = get_pipeline_iterators(spans)
+    pipeline_dict, task_it = get_pipeline_iterators(spans)
 
     output_basepath.mkdir(parents=True, exist_ok=True)
-    write_json(output_basepath / "flow.json", flow_dict)
+    write_json(output_basepath / "pipeline.json", pipeline_dict)
 
     for task_dict, task_retry_it in task_it:
         if task_dict["task_dict"]["task.task_type"] == "jupytext":
