@@ -321,23 +321,30 @@ def test__jupytext_notebook_task__otel_logging_from_notebook():
         # artefacts logged from notebook are logged as subspans under the notebook span
         assert spans.contains_path(jupytext_span, artefacts_span)
 
-        def check_key_value(key, value):
-            key_value_span = one(
-                spans.filter(["name"], "key-value")
+        def check_named_value(key, value, encoding):
+            value_span = one(
+                spans.filter(["name"], "named-value")
                 #
-                .filter(["attributes", "key"], key)
+                .filter(["attributes", "name"], key)
                 #
                 .filter(["status", "status_code"], "OK")
             )
-            assert key_value_span["attributes"]["value-json"] == json.dumps(value)
+            assert value_span["attributes"]["value"] == json.dumps(value)
 
-            assert spans.contains_path(jupytext_span, key_value_span)
+            assert spans.contains_path(jupytext_span, value_span)
 
-        check_key_value("value_str_a", "a")
-        check_key_value("value_null", None)
-        check_key_value("value_float_1_23", 1.23)
-        check_key_value("value_list_1_2_null", [1, 2, None])
-        check_key_value("value_dict", {"a": 123, "b": "foo"})
-        check_key_value("value_list_nested", [1, [2, None, []]])
+        # check values logged with general key-value logger
+        check_named_value("value_str_a", "a", "json")
+        check_named_value("value_null", None, "json")
+        check_named_value("value_float_1_23", 1.23, "json")
+        check_named_value("value_list_1_2_null", [1, 2, None], "json")
+        check_named_value("value_dict", {"a": 123, "b": "foo"}, "json")
+        check_named_value("value_list_nested", [1, [2, None, []]], "json")
+
+        # check values logged with typed-loggers
+        check_named_value("boolean_true", True, "json/bool")
+        check_named_value("int_1", 1, "json/int")
+        check_named_value("float_1p23", 1.23, "json/float")
+        check_named_value("string_abc", "abc", "json/string")
 
     validate_spans(get_test_spans())
