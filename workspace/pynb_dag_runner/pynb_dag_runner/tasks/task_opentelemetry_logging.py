@@ -25,7 +25,7 @@ def _log_artefact(name: str, content: str, traceparent: Optional[str] = None):
     else:
         # Log artefact as sub-span with parent determined from context propagated
         # traceparent.
-        context = TraceContextTextMapPropagator().extract(
+        context: Mapping[str, str] = TraceContextTextMapPropagator().extract(
             carrier={"traceparent": traceparent}
         )
 
@@ -36,29 +36,20 @@ def _log_artefact(name: str, content: str, traceparent: Optional[str] = None):
             log_to_span(span)
 
 
-def connect_to_ray():
-    """
-    Connect to Ray cluster from eg notebook
-    """
-    return ray.init(
-        address="auto",
-        namespace="pydar-ray-cluster",
-    )
-
-
 class PydarLogger:
     """
-    pynb-dag-runner client to use from eg notebooks that connects to PydarLoggingActor
+    pynb-dag-runner logger that can be used eg notebooks
     """
 
-    def __init__(self, P):
+    def __init__(self, P: Mapping[str, Any]):
         assert isinstance(P, dict)
 
-        # Without this, OpenTelemetry in notebook will not connect to Ray-cluster's
-        # logging setup.
-        connect_to_ray()
+        # Connect to running Ray cluster. Without this, OpenTelemetry logging from
+        #  notebook will not connect to Ray-cluster's logging setup.
+        ray.init(address="auto", namespace="pydar-ray-cluster")
 
+        # Get context for Task that triggered notebook (for context propagation)
         self._traceparent = P.get("_opentelemetry_traceparent", None)
 
-    def log_artefact(self, name, content):
+    def log_artefact(self, name: str, content: str):
         _log_artefact(name, content, traceparent=self._traceparent)
