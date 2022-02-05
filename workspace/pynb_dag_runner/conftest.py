@@ -10,6 +10,9 @@ def _ray_init():
     #   Hence ray do not need to start when VS Code is discovering tests (which seems
     #   to generate errors).
     ray.init(
+        # By giving explicit namespace to cluster we can connect by name
+        # eg. from notebooks
+        namespace="pydar-ray-cluster",
         num_cpus=2,
         ignore_reinit_error=True,
         # enable tracing and write traces to /tmp/spans/<pid>.txt in JSONL format
@@ -29,6 +32,7 @@ def init_ray_before_all_tests():
 
 @pytest.fixture
 def ray_reinit():
+    # This fixture allows us to reset cluster before individual (flaky) tests
     ray.shutdown()
     _ray_init()
     yield

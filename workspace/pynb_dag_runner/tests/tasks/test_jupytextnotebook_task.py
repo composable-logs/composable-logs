@@ -271,3 +271,42 @@ def test__jupytext_notebook_task__stuck_notebook():
         assert len(spans.filter(["name"], "artefact")) == 0
 
     validate_spans(get_test_spans())
+
+
+def test__jupytext_notebook_task__otel_logging_from_notebook():
+    def get_test_spans():
+        with SpanRecorder() as rec:
+            jupytext_task = make_test_nb_task(
+                nb_name="notebook_otel_logging.py",
+                max_nr_retries=1,
+                parameters={"task.variable_a": "task-value"},
+            )
+            _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
+
+        return rec.spans
+
+    def validate_spans(spans: Spans):
+        assert len(spans.exception_events()) == 0
+
+        jupytext_span = one(
+            spans.filter(["name"], "execute-task")
+            #
+            .filter(["attributes", "task.task_type"], "jupytext")
+            #
+            .filter(["status", "status_code"], "OK")
+        )
+
+        artefacts_span = one(
+            spans.filter(["name"], "artefact")
+            #
+            .filter(["attributes", "name"], "from_notebook.txt")
+            #
+            .filter(["status", "status_code"], "OK")
+        )
+        assert artefacts_span["attributes"]["content"] == "foobar123"
+        assert artefacts_span["attributes"]["encoding"] == "text/utf8"
+
+        # artefacts logged from notebook are logged as subspans under the notebook span
+        assert spans.contains_path(jupytext_span, artefacts_span)
+
+    validate_spans(get_test_spans())
