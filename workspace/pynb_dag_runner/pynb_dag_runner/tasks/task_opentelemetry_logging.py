@@ -107,7 +107,7 @@ class PydarLogger:
             name=name, value=value, encoding="json/int", traceparent=self._traceparent
         )
 
-    def log_boolean(self, name: str, value: int):
+    def log_boolean(self, name: str, value: bool):
         if not isinstance(value, bool):
             raise ValueError(f"log_boolean: value not an boolean {str(value)}")
 
