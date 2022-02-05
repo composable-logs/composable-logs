@@ -296,15 +296,17 @@ def test__jupytext_notebook_task__otel_logging_from_notebook():
             .filter(["status", "status_code"], "OK")
         )
 
-        artefacts_span_logged_from_notebook = one(
+        artefacts_span = one(
             spans.filter(["name"], "artefact")
             #
             .filter(["attributes", "name"], "from_notebook.txt")
             #
             .filter(["status", "status_code"], "OK")
         )
+        assert artefacts_span["attributes"]["content"] == "foobar123"
+        assert artefacts_span["attributes"]["encoding"] == "text/utf8"
 
         # artefacts logged from notebook are logged as subspans under the notebook span
-        assert spans.contains_path(jupytext_span, artefacts_span_logged_from_notebook)
+        assert spans.contains_path(jupytext_span, artefacts_span)
 
     validate_spans(get_test_spans())
