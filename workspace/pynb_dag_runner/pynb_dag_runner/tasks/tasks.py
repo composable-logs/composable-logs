@@ -22,12 +22,12 @@ def prefix_keys(prefix: str, a_dict: AttributesDict) -> AttributesDict:
 
 def _get_traceparent() -> str:
     """
-    Get implicit OpenTelemetry trace-parent for implicit span for context propagation
+    Get implicit OpenTelemetry span context for context propagation (to notebooks)
     """
     carrier: Mapping[str, str] = {}
     TraceContextTextMapPropagator().inject(carrier=carrier)
 
-    # check that context-carrier is of type {"traceparent": <some string>}
+    # check that context `carrier` dict is of type {"traceparent": <some string>}
     assert isinstance(carrier, dict)
     assert carrier.keys() == {"traceparent"}
     assert isinstance(carrier["traceparent"], str)
