@@ -25,7 +25,7 @@ logger = PydarLogger(P)
 logger.log_artefact("from_notebook.txt", "foobar123")
 
 # %%
-# test logging of general json-serializable content
+# test logging of general json-serializable values
 
 logger.log_value("value_str_a", "a")
 logger.log_value("value_null", None)
