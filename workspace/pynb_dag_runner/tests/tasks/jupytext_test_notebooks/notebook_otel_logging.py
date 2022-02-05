@@ -20,15 +20,43 @@ from pynb_dag_runner.tasks.task_opentelemetry_logging import PydarLogger
 logger = PydarLogger(P)
 
 # %%
+# test logging of file with utf8-data
 
 logger.log_artefact("from_notebook.txt", "foobar123")
 
-logger.log_key_value("value_str_a", "a")
-logger.log_key_value("value_null", None)
-logger.log_key_value("value_float_1_23", 1.23)
-logger.log_key_value("value_list_1_2_null", [1, 2, None])
-logger.log_key_value("value_dict", {"a": 123, "b": "foo"})
-logger.log_key_value("value_list_nested", [1, [2, None, []]])
 # %%
-print(f"""variable_a={P["task.variable_a"]}""")
+# test logging of general json-serializable content
+
+logger.log_value("value_str_a", "a")
+logger.log_value("value_null", None)
+logger.log_value("value_float_1_23", 1.23)
+logger.log_value("value_list_1_2_null", [1, 2, None])
+logger.log_value("value_dict", {"a": 123, "b": "foo"})
+logger.log_value("value_list_nested", [1, [2, None, []]])
+
+# %%
+# test logging using typed loggers
+
+logger.log_boolean("boolean_true", True)
+logger.log_int("int_1", 1)
+logger.log_float("float_1p23", 1.23)
+logger.log_string("string_abc", "abc")
+
+# %%
+
+# Trying to log None with typed-loggers will fail
+
+
+def assert_fails(f):
+    try:
+        f()
+    except:
+        return
+    raise Exception("function call did not raise Exception")
+
+
+assert_fails(lambda: logger.log_boolean("bool_fail", None))  # type: ignore
+assert_fails(lambda: logger.log_int("int_fail", None))  # type: ignore
+assert_fails(lambda: logger.log_float("float_fail", None))  # type: ignore
+assert_fails(lambda: logger.log_string("string_fail", None))  # type: ignore
 # %%

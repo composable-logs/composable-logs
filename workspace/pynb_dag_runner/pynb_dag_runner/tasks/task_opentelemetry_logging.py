@@ -44,19 +44,22 @@ def _log_artefact(name: str, content: str, traceparent: Optional[str] = None):
     _call_in_trace_context(f=_log, span_name="artefact", traceparent=traceparent)
 
 
-def _log_key_value(key: str, value: Any, traceparent: Optional[str] = None):
-    if not isinstance(key, str):
-        raise ValueError("Key should be string when logging key-value")
+def _log_named_value(
+    name: str, value: Any, encoding: str, traceparent: Optional[str] = None
+):
+    if not isinstance(name, str):
+        raise ValueError(f"name {name} should be string when logging a named-value")
 
     if value != json.loads(json.dumps(value)):
-        raise ValueError("Value should be json-serializable when logging key-value")
+        raise ValueError("Value should be json-serializable when logging name-value")
 
     def _log(span: Span):
-        span.set_attribute("key", key)
-        span.set_attribute("value-json", json.dumps(value))
+        span.set_attribute("name", name)
+        span.set_attribute("encoding", encoding)
+        span.set_attribute("value", json.dumps(value))
         span.set_status(Status(StatusCode.OK))
 
-    _call_in_trace_context(f=_log, span_name="key-value", traceparent=traceparent)
+    _call_in_trace_context(f=_log, span_name="named-value", traceparent=traceparent)
 
 
 class PydarLogger:
@@ -77,5 +80,45 @@ class PydarLogger:
     def log_artefact(self, name: str, content: str):
         _log_artefact(name=name, content=content, traceparent=self._traceparent)
 
-    def log_key_value(self, key: str, value: Any):
-        _log_key_value(key=key, value=value, traceparent=self._traceparent)
+    def log_value(self, name: str, value: Any):
+        """
+        Log generic json-serializiable value
+        """
+        _log_named_value(
+            name=name, value=value, encoding="json", traceparent=self._traceparent
+        )
+
+    def log_string(self, name: str, value: str):
+        if not isinstance(value, str):
+            raise ValueError(f"log_string: value not a string {str(value)}")
+
+        _log_named_value(
+            name=name,
+            value=value,
+            encoding="json/string",
+            traceparent=self._traceparent,
+        )
+
+    def log_int(self, name: str, value: int):
+        if not isinstance(value, int):
+            raise ValueError(f"log_int: value not an integer {str(value)}")
+
+        _log_named_value(
+            name=name, value=value, encoding="json/int", traceparent=self._traceparent
+        )
+
+    def log_boolean(self, name: str, value: int):
+        if not isinstance(value, bool):
+            raise ValueError(f"log_boolean: value not an boolean {str(value)}")
+
+        _log_named_value(
+            name=name, value=value, encoding="json/bool", traceparent=self._traceparent
+        )
+
+    def log_float(self, name: str, value: float):
+        if not isinstance(value, float):
+            raise ValueError(f"log_float: value not a float {str(value)}")
+
+        _log_named_value(
+            name=name, value=value, encoding="json/float", traceparent=self._traceparent
+        )
