@@ -23,7 +23,12 @@ logger = PydarLogger(P)
 
 logger.log_artefact("from_notebook.txt", "foobar123")
 
-# print(1 + 12 + 123)
+logger.log_key_value("value_str_a", "a")
+logger.log_key_value("value_null", None)
+logger.log_key_value("value_float_1_23", 1.23)
+logger.log_key_value("value_list_1_2_null", [1, 2, None])
+logger.log_key_value("value_dict", {"a": 123, "b": "foo"})
+logger.log_key_value("value_list_nested", [1, [2, None, []]])
 # %%
 print(f"""variable_a={P["task.variable_a"]}""")
 # %%

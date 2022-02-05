@@ -1,4 +1,4 @@
-import datetime
+import datetime, json
 from pathlib import Path
 
 #
@@ -15,6 +15,18 @@ from pynb_dag_runner.opentelemetry_helpers import (
     get_duration_s,
     read_key,
 )
+
+
+def assert_no_exceptions(spans: Spans):
+    exceptions = spans.exception_events()
+
+    if len(exceptions) == 0:
+        print("***** No exceptions ******")
+    else:
+        print(f"***** {len(exceptions)} exceptions in total ******")
+        for e in exceptions:
+            print(100 * "=")
+            print(json.dumps(e, indent=2))
 
 
 def isotimestamp_normalized():
@@ -286,7 +298,7 @@ def test__jupytext_notebook_task__otel_logging_from_notebook():
         return rec.spans
 
     def validate_spans(spans: Spans):
-        assert len(spans.exception_events()) == 0
+        assert_no_exceptions(spans)
 
         jupytext_span = one(
             spans.filter(["name"], "execute-task")
@@ -308,5 +320,24 @@ def test__jupytext_notebook_task__otel_logging_from_notebook():
 
         # artefacts logged from notebook are logged as subspans under the notebook span
         assert spans.contains_path(jupytext_span, artefacts_span)
+
+        def check_key_value(key, value):
+            key_value_span = one(
+                spans.filter(["name"], "key-value")
+                #
+                .filter(["attributes", "key"], key)
+                #
+                .filter(["status", "status_code"], "OK")
+            )
+            assert key_value_span["attributes"]["value-json"] == json.dumps(value)
+
+            assert spans.contains_path(jupytext_span, key_value_span)
+
+        check_key_value("value_str_a", "a")
+        check_key_value("value_null", None)
+        check_key_value("value_float_1_23", 1.23)
+        check_key_value("value_list_1_2_null", [1, 2, None])
+        check_key_value("value_dict", {"a": 123, "b": "foo"})
+        check_key_value("value_list_nested", [1, [2, None, []]])
 
     validate_spans(get_test_spans())
