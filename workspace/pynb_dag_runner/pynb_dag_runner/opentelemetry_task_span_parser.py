@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Tuple, Set, List
+from typing import Any, Iterable, Mapping, MutableMapping, Tuple, Set, List
 
 #
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanId, get_duration_s
@@ -93,7 +93,7 @@ def add_html_notebook_artefacts(artefacts: List[ArtefactDict]) -> List[ArtefactD
 
 
 def _get_logged_named_values(spans: Spans, task_run_top_span) -> Mapping[str, Any]:
-    result: Mapping[str, Any] = {}
+    result: MutableMapping[str, Any] = {}
 
     for artefact_span in (
         spans.bound_under(task_run_top_span)
