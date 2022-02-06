@@ -18,6 +18,13 @@ def _status_summary(span_dict) -> str:
 
 
 def write_to_output_dir(spans: Spans, out_basepath: Path):
+    """
+    Write out tasks/runs/artefacts found in spans into a directory structure for
+    inspection using a file browser.
+
+    Any notebooks logged are written to the directory structure both in
+    ipynb and html formats.
+    """
     print(" - Writing tasks in spans to ", out_basepath)
 
     pipeline_dict, task_it = get_pipeline_iterators(spans)
@@ -84,11 +91,21 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
                     )
 
 
+def make_mermaid_gantt_inputfile(spans: Spans) -> str:
+    """
+    Generate input file for Mermaid diagram generator for creating Gantt diagram
+    of tasks/runs found in spans.
+
+    """
+    return "//todo//"
+
+
 # --- cli tool implementation ---
 
 # Example usage:
 #
 # pynb_log_parser --input_span_file pynb_log_parser/opentelemetry-spans.json --output_directory pynb_log_parser/tmp
+# pynb_log_parser --input_span_file pynb_log_parser/opentelemetry-spans.json --output_filepath_mermaid_gantt pynb_log_parser/gantt.mmd
 
 
 def args():
@@ -105,6 +122,12 @@ def args():
         type=Path,
         help="base output directory for writing tasks and logged artefacts",
     )
+    parser.add_argument(
+        "--output_filepath_mermaid_gantt",
+        required=False,
+        type=Path,
+        help="output file path for Mermaid Gantt diagram input file (eg. gantt.mmd)",
+    )
     return parser.parse_args()
 
 
@@ -112,7 +135,12 @@ def entry_point():
     print("-- pynb_dag_runner: log parser cli --")
 
     spans: Spans = Spans(read_json(args().input_span_file))
-    print("nr of spans loaded", len(spans))
+    print(f"Number of spans loaded {len(spans)}")
 
     if args().output_directory is not None:
         write_to_output_dir(spans, args().output_directory)
+
+    if args().output_filepath_mermaid_gantt is not None:
+        args().output_filepath_mermaid_gantt.write_text(
+            make_mermaid_gantt_inputfile(spans)
+        )
