@@ -17,16 +17,23 @@ def _status_summary(span_dict) -> str:
         return "FAILED"
 
 
-def write_to_output_dir(spans: Spans, output_basepath: Path):
-    print(" - Writing tasks in spans to output_basepath", output_basepath)
+def write_to_output_dir(spans: Spans, out_basepath: Path):
+    print(" - Writing tasks in spans to ", out_basepath)
 
     pipeline_dict, task_it = get_pipeline_iterators(spans)
 
-    write_json(output_basepath / "pipeline.json", pipeline_dict)
+    def safe_path(path: Path):
+        assert not str(path).startswith("/")
+        assert ".." not in str(path)
+        return path
+
+    # -- write json with pipeline-specific data --
+    write_json(safe_path(out_basepath / "pipeline.json"), pipeline_dict)
 
     for task_dict, task_retry_it in task_it:
+        # -- write json with task-specific data --
         if task_dict["attributes"]["task.task_type"] == "jupytext":
-            task_subdir: str = "--".join(
+            task_dir: str = "--".join(
                 [
                     "jupytext-notebook-task",
                     task_dict["attributes"]["task.notebook"]
@@ -40,14 +47,13 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
         else:
             raise Exception(f"Unknown task type for {task_dict}")
 
-        task_basepath: Path = output_basepath / task_subdir
-
-        write_json(task_basepath / "task.json", task_dict)
+        write_json(safe_path(out_basepath / task_dir / "task.json"), task_dict)
 
         print("*** task: ", task_dict)
 
         for task_run_dict, task_run_artefacts in task_retry_it:
-            run_basepath: Path = task_basepath / "--".join(
+            # -- write json with run-specific data --
+            run_dir: str = "--".join(
                 [
                     f"run={task_run_dict['attributes']['run.retry_nr']}",
                     task_run_dict["span_id"],
@@ -55,24 +61,26 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
                 ]
             )
 
-            write_json(run_basepath / "run.json", task_run_dict)
+            write_json(
+                safe_path(out_basepath / task_dir / run_dir / "run.json"),
+                task_run_dict,
+            )
 
             print("     *** run: ", task_run_dict)
             for artefact_dict in add_html_notebook_artefacts(task_run_artefacts):
-                print(
-                    f"         *** artefact: {artefact_dict['name']} ({artefact_dict['encoding']})"
-                )
+                # -- write artefact logged to run --
+                artefact_name: str = artefact_dict["name"]
+                artefact_encoding: str = artefact_dict["encoding"]
+                artefact_content: str = artefact_dict["content"]
 
-                if artefact_dict["encoding"] == "text/utf-8":
-                    assert ".." not in artefact_dict["name"]
-                    assert not artefact_dict["name"].startswith("/")
+                print(f"         *** artefact: {artefact_name} ({artefact_encoding})")
 
-                    (run_basepath / artefact_dict["name"]).write_text(
-                        artefact_dict["content"]
-                    )
+                if artefact_encoding == "text/utf-8":
+                    out_path: Path = out_basepath / task_dir / run_dir / artefact_name
+                    safe_path(out_path).write_text(artefact_content)
                 else:
                     raise ValueError(
-                        f"Unknown artefact encoding {str(artefact_dict)[:2000]}"
+                        f"Unknown encoding of artefect: {str(artefact_dict)[:2000]}"
                     )
 
 
@@ -80,7 +88,7 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
 
 # Example usage:
 #
-# pynb_log_parser --input_span_file pynb_log_parser/opentelemetry-spans.json --output_basepath pynb_log_parser/tmp
+# pynb_log_parser --input_span_file pynb_log_parser/opentelemetry-spans.json --output_directory pynb_log_parser/tmp
 
 
 def args():
