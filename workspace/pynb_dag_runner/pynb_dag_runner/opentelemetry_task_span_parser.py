@@ -102,7 +102,7 @@ def _run_iterator(
             "attributes": (
                 spans.bound_inclusive(task_run_top_span)
                 #
-                .get_attributes(allowed_prefixes={"run."})
+                .get_attributes(allowed_prefixes={"run.", "task.", "pipeline."})
             ),
         }
         yield run_dict, _artefact_iterator(spans, task_run_top_span)
@@ -117,7 +117,7 @@ def _task_iterator(spans: Spans) -> Iterable[Tuple[TaskDict, Iterable[RunDict]]]
             "attributes": (
                 spans.bound_inclusive(task_top_span)
                 #
-                .get_attributes(allowed_prefixes={"task."})
+                .get_attributes(allowed_prefixes={"task.", "pipeline."})
             ),
         }
 
