@@ -1,5 +1,6 @@
+import json
 from pathlib import Path
-from typing import Any, Iterable, Tuple, Set, List
+from typing import Any, Iterable, Mapping, Tuple, Set, List
 
 #
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanId, get_duration_s
@@ -91,6 +92,41 @@ def add_html_notebook_artefacts(artefacts: List[ArtefactDict]) -> List[ArtefactD
     return result
 
 
+def _get_logged_named_values(spans: Spans, task_run_top_span) -> Mapping[str, Any]:
+    result: Mapping[str, Any] = {}
+
+    for artefact_span in (
+        spans.bound_under(task_run_top_span)
+        # -
+        .filter(["name"], "named-value")
+        # -
+        .filter(["status", "status_code"], "OK")
+    ):
+        assert artefact_span["attributes"].keys() == {"name", "encoding", "value"}
+
+        name: str = artefact_span["attributes"]["name"]
+        encoding: str = artefact_span["attributes"]["encoding"]
+        value: str = artefact_span["attributes"]["value"]
+
+        if name in result:
+            raise ValueError(f"Named value {name} has been logged multiple times.")
+
+        if encoding == "json":
+            result[name] = {"value": json.loads(value), "type": "json"}
+        elif encoding == "json/string":
+            result[name] = {"value": json.loads(value), "type": "string"}
+        elif encoding == "json/int":
+            result[name] = {"value": json.loads(value), "type": "int"}
+        elif encoding == "json/float":
+            result[name] = {"value": json.loads(value), "type": "float"}
+        elif encoding == "json/bool":
+            result[name] = {"value": json.loads(value), "type": "bool"}
+        else:
+            raise ValueError(f"Unknown encoding {encoding} for named value {name}")
+
+    return result
+
+
 def _run_iterator(
     spans: Spans, task_top_span
 ) -> Iterable[Tuple[RunDict, Iterable[ArtefactDict]]]:
@@ -104,6 +140,7 @@ def _run_iterator(
                 #
                 .get_attributes(allowed_prefixes={"run.", "task.", "pipeline."})
             ),
+            "logged_values": _get_logged_named_values(spans, task_run_top_span),
         }
         yield run_dict, _artefact_iterator(spans, task_run_top_span)
 
