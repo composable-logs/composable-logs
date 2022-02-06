@@ -105,7 +105,7 @@ def read_jsonl(path: Path):
 
 def one(xs: Sequence[A]) -> A:
     """
-    Assert that argument can be converted into list with only one element, and
+    Assert that input can be converted into list with only one element, and
     return that element.
     """
     xs_list = list(xs)
