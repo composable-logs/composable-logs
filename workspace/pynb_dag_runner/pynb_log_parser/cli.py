@@ -1,3 +1,4 @@
+import datetime
 from pathlib import Path
 from argparse import ArgumentParser
 
@@ -90,6 +91,7 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
                         f"Unknown encoding of artefect: {str(artefact_dict)[:2000]}"
                     )
 
+
 ''''
 # content of old parser from repo ./tools/draw-runlog-visuals/render-runlogs.py
 
@@ -152,6 +154,8 @@ def make_gantt_mermaid_file_content(runlogs):
 
     return "\n".join(output_lines)
 '''
+from pynb_dag_runner.opentelemetry_helpers import get_duration_range_us
+
 
 def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     """
@@ -159,7 +163,61 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     of tasks/runs found in spans.
 
     """
-    return "//todo//"
+    output_lines = [
+        "gantt",
+        "    %% Mermaid input file for drawing Gantt chart of runlog runtimes",
+        "    %% See https://mermaid-js.github.io/mermaid/#/gantt",
+        "    %%",
+        "    axisFormat %H:%M",
+        "    %%",
+        "    %% Give timestamps as unix timestamps (ms)",
+        "    dateFormat x",
+        "    %%",
+    ]
+
+    def render_seconds(us_range) -> str:
+        "Convert duration is seconds into more human readable format"
+        seconds: float = (us_range.stop - us_range.start) / 1e6
+        if seconds <= 60:
+            return f"{round(seconds, 2)}s"
+        else:
+            dt = datetime.timedelta(seconds=seconds)
+            return (
+                (str(dt).replace(":", "h ", 1).replace(":", "m ", 1)[:-4] + "s")
+                .replace("0h ", "")
+                .replace("00m ", "")
+            )
+
+    pipeline_dict, task_it = get_pipeline_iterators(spans)
+
+    for task_dict, task_retry_it in task_it:
+        print("task", task_dict)
+        print(get_duration_range_us(task_dict).start)
+
+        # -- write json with task-specific data --
+        if task_dict["attributes"]["task.task_type"] == "jupytext":
+            pass
+        else:
+            raise Exception(f"Unknown task type for {task_dict}")
+
+        output_lines += [f"""    section {task_dict["attributes"]["task.notebook"]}"""]
+
+        for task_run_dict, _ in task_retry_it:
+            print("run", task_run_dict)
+            modifier = ""
+            us_range = get_duration_range_us(task_run_dict)
+
+            output_lines += [
+                ", ".join(
+                    [
+                        f"""    {render_seconds(us_range)} - {_status_summary(task_run_dict)} :{modifier} """,
+                        f"""{us_range.start // 1000000} """,
+                        f"""{us_range.stop // 1000000} """,
+                    ]
+                )
+            ]
+
+    return "\n".join(output_lines)
 
 
 # --- cli tool implementation ---
