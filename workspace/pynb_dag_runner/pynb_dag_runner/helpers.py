@@ -86,6 +86,13 @@ def read_json(filepath: Path) -> Any:
 
 
 def write_json(filepath: Path, obj: Any):
+    """
+    Write object as JSON object to filepath (and create directories if needed).
+    """
+
+    # ensure base directory for filepath exists
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
     with open(filepath, "w") as f:
         json.dump(obj, f, indent=2)
 
