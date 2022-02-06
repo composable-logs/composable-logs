@@ -22,7 +22,6 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
 
     pipeline_dict, task_it = get_pipeline_iterators(spans)
 
-    output_basepath.mkdir(parents=True, exist_ok=True)
     write_json(output_basepath / "pipeline.json", pipeline_dict)
 
     for task_dict, task_retry_it in task_it:
@@ -43,7 +42,6 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
 
         task_basepath: Path = output_basepath / task_subdir
 
-        task_basepath.mkdir(parents=True, exist_ok=True)
         write_json(task_basepath / "task.json", task_dict)
 
         print("*** task: ", task_dict)
@@ -57,7 +55,6 @@ def write_to_output_dir(spans: Spans, output_basepath: Path):
                 ]
             )
 
-            run_basepath.mkdir(parents=True, exist_ok=True)
             write_json(run_basepath / "run.json", task_run_dict)
 
             print("     *** run: ", task_run_dict)

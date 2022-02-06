@@ -94,12 +94,12 @@ def test_pairs():
 
 
 def test_write_read_json(tmp_path: Path):
-    test_obj = [42, {"42": [0, None, []]}]
-    test_path = tmp_path / "test.json"
+    for _ in range(4):
+        test_obj = [42, {"42": [0, None, []]}]
+        test_path = tmp_path / "directories"/ "that-should" / "be-created" / "test.json"
 
-    write_json(test_path, test_obj)
-    assert read_json(test_path) == test_obj
-
+        write_json(test_path, test_obj)
+        assert read_json(test_path) == test_obj
 
 def test_one():
     assert one([1]) == 1
