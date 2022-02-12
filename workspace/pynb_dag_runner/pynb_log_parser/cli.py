@@ -158,11 +158,6 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
 
 # --- cli tool implementation ---
 
-# Example usage:
-#
-# pynb_log_parser --input_span_file pynb_log_parser/opentelemetry-spans.json --output_directory pynb_log_parser/tmp
-# pynb_log_parser --input_span_file pynb_log_parser/opentelemetry-spans.json --output_filepath_mermaid_gantt pynb_log_parser/gantt.mmd
-
 
 def args():
     parser = ArgumentParser()
