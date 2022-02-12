@@ -11,6 +11,7 @@
 #  - https://github.com/mermaid-js/mermaid-cli
 #  - https://github.com/mermaid-js/mermaid-cli/blob/master/docs/docker-permission-denied.md
 #
+set -eu
 
 INPUT_FILE=$1
 OUTPUT_FILE=$2

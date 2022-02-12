@@ -5,6 +5,7 @@
 # eg.
 # parse_otel_spans.sh <docker-image-name> /path/to/spans.json <output-flag> <output-path>
 #
+set -eu
 
 DOCKER_IMAGE=$1
 INPUT_FILEPATH=$2
