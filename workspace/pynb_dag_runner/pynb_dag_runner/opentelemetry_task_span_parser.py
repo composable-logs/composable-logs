@@ -148,7 +148,7 @@ def _run_iterator(
 
 
 def _task_iterator(spans: Spans) -> Iterable[Tuple[TaskDict, Iterable[RunDict]]]:
-    for task_top_span in spans.filter(["name"], "execute-task"):
+    for task_top_span in spans.filter(["name"], "execute-task").sort_by_start_time():
         task_dict = {
             **_key_span_details(task_top_span),
             "attributes": (
