@@ -130,8 +130,10 @@ def _get_logged_named_values(spans: Spans, task_run_top_span) -> Mapping[str, An
 def _run_iterator(
     spans: Spans, task_top_span
 ) -> Iterable[Tuple[RunDict, Iterable[ArtefactDict]]]:
-    for task_run_top_span in spans.bound_under(task_top_span).filter(
-        ["name"], "retry-call"
+    for task_run_top_span in (
+        spans.bound_under(task_top_span)
+        .filter(["name"], "retry-call")
+        .sort_by_start_time()
     ):
         run_dict = {
             **_key_span_details(task_run_top_span),
