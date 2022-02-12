@@ -32,7 +32,7 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
     pipeline_dict, task_it = get_pipeline_iterators(spans)
 
     def safe_path(path: Path):
-        assert not str(path).startswith("/")
+        assert str(path).startswith("/")
         assert ".." not in str(path)
         return path
 

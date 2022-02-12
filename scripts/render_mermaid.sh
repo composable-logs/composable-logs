@@ -4,7 +4,7 @@
 # conversion of Mermaid input mmd file into png/svg
 #
 # eg.
-# to_mermaid.sh /path/to/file.mmd /full/path/output.{png,svg}
+# render_mermaid.sh /path/to/file.mmd /full/path/output.{png,svg}
 #
 # See:
 #  - https://mermaid-js.github.io/mermaid/#/
@@ -18,8 +18,7 @@ OUTPUT_FILE=$2
 INPUT_DIR=$(dirname $INPUT_FILE)
 OUTPUT_DIR=$(dirname $INPUT_FILE)
 
-docker \
-    run \
+docker run \
     -u $UID \
     --rm \
     --network none \
