@@ -138,9 +138,12 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
 
         for task_run_dict, _ in task_retry_it:
             print("run", task_run_dict)
-            modifier = ""
-            # if runlog["out.status"] == "FAILURE":
-            #     modifier = "crit"
+
+            if _status_summary(task_run_dict) == "OK":
+                modifier = ""
+            else:
+                modifier = "crit"
+
             us_range = get_duration_range_us(task_run_dict)
 
             output_lines += [
