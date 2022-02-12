@@ -2,9 +2,10 @@ import datetime
 from pathlib import Path
 from argparse import ArgumentParser
 
+
 #
 from pynb_dag_runner.helpers import read_json, write_json
-from pynb_dag_runner.opentelemetry_helpers import Spans
+from pynb_dag_runner.opentelemetry_helpers import Spans, get_duration_range_us
 from pynb_dag_runner.opentelemetry_task_span_parser import (
     get_pipeline_iterators,
     add_html_notebook_artefacts,
@@ -92,71 +93,6 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
                     )
 
 
-''''
-# content of old parser from repo ./tools/draw-runlog-visuals/render-runlogs.py
-
-def runlog_taskname(runlog) -> str:
-    if runlog["task_type"] == "PythonNotebookTask":
-        return f"""{runlog["notebook_path"]} (nb)"""
-    else:
-        raise Exception(f"Unknown task_type field in runlog={str(runlog)}")
-
-
-def make_gantt_mermaid_file_content(runlogs):
-    """
-    Draw Gantt chart from runtimes
-    """
-
-    def runlog_duration_text(runlog) -> str:
-        # runtime for a runlog is only used when drawing Gantt-charts
-        seconds: float = runlog["out.timing.duration_ms"] / 1000
-        if seconds <= 60:
-            return f"{round(seconds, 2)}s"
-        else:
-            dt = datetime.timedelta(seconds=seconds)
-            return (
-                (str(dt).replace(":", "h ", 1).replace(":", "m ", 1)[:-4] + "s")
-                .replace("0h ", "")
-                .replace("00m ", "")
-            )
-
-    output_lines = [
-        "gantt",
-        "    %% Mermaid input file for drawing Gantt chart of runlog runtimes",
-        "    %% See https://mermaid-js.github.io/mermaid/#/gantt",
-        "    %%",
-        "    axisFormat %H:%M",
-        "    %%",
-        "    %% Give timestamps as unix timestamps (ms)",
-        "    dateFormat x",
-        "    %%",
-    ]
-
-    for runlog in sorted(runlogs, key=lambda runlog: runlog["out.timing.start_ts"]):
-        output_lines += [f"""    section {runlog_taskname(runlog)}"""]
-
-        # render failed tasks in red
-        assert runlog["out.status"] in ["SUCCESS", "FAILURE"]
-        if runlog["out.status"] == "FAILURE":
-            modifier = "crit"
-        else:
-            modifier = ""
-
-        output_lines += [
-            ", ".join(
-                [
-                    f"""    {runlog_duration_text(runlog)} - {runlog["out.status"]} :{modifier} """,
-                    f"""{runlog["out.timing.start_ts"] // 1000000} """,
-                    f"""{runlog["out.timing.end_ts"] // 1000000} """,
-                ]
-            )
-        ]
-
-    return "\n".join(output_lines)
-'''
-from pynb_dag_runner.opentelemetry_helpers import get_duration_range_us
-
-
 def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     """
     Generate input file for Mermaid diagram generator for creating Gantt diagram
@@ -188,16 +124,14 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
                 .replace("00m ", "")
             )
 
-    pipeline_dict, task_it = get_pipeline_iterators(spans)
+    _, task_it = get_pipeline_iterators(spans)
 
     for task_dict, task_retry_it in task_it:
         print("task", task_dict)
         print(get_duration_range_us(task_dict).start)
 
         # -- write json with task-specific data --
-        if task_dict["attributes"]["task.task_type"] == "jupytext":
-            pass
-        else:
+        if task_dict["attributes"]["task.task_type"] != "jupytext":
             raise Exception(f"Unknown task type for {task_dict}")
 
         output_lines += [f"""    section {task_dict["attributes"]["task.notebook"]}"""]
@@ -205,6 +139,8 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
         for task_run_dict, _ in task_retry_it:
             print("run", task_run_dict)
             modifier = ""
+            # if runlog["out.status"] == "FAILURE":
+            #     modifier = "crit"
             us_range = get_duration_range_us(task_run_dict)
 
             output_lines += [
