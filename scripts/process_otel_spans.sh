@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eu
 
 echo "====================== process-otel-spans ====================="
 
@@ -15,7 +16,7 @@ $SCRIPT_DIRECTORY/parse_otel_spans.sh \
     $PYTHON_DOCKER_IMAGE_NAME \
     $OPENTELEMETRY_SPANS_JSON_FILEPATH \
     output_directory \
-    $OUTPUT_BASEDIR/jsons
+    $OUTPUT_BASEDIR/pipeline-outputs
 
 echo "==============================================================="
 echo "--- Converting: otel spans json -> Mermaid input file for Gantt diagram ..."
