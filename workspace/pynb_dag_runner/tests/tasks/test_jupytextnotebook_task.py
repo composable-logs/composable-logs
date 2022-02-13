@@ -364,7 +364,7 @@ def test__jupytext_notebook_task__otel_logging_from_notebook():
         artefacts_span = one(
             spans.filter(["name"], "artefact")
             #
-            .filter(["attributes", "name"], "from_notebook.txt")
+            .filter(["attributes", "name"], "README.md")
             #
             .filter(["status", "status_code"], "OK")
         )
@@ -400,4 +400,26 @@ def test__jupytext_notebook_task__otel_logging_from_notebook():
         check_named_value("float_1p23", 1.23, "json/float")
         check_named_value("string_abc", "abc", "json/string")
 
-    validate_spans(get_test_spans())
+    def validate_parsed_spans(spans: Spans):
+        _, task_it = get_pipeline_iterators(spans)
+
+        for _, run_it in [one(task_it)]:  # type: ignore
+            for _, artefact_it in [one(run_it)]:  # type: ignore
+                artefacts = {a["name"]: a for a in artefact_it}
+
+                assert artefacts["README.md"] == {
+                    "name": "README.md",
+                    "content-type": "utf-8",
+                    "content": "foobar123",
+                }
+                assert artefacts["binary.bin"] == {
+                    "name": "binary.bin",
+                    "content-type": "binary",
+                    "content": bytes(range(256)),
+                }
+
+                assert len(artefacts) == 3
+
+    spans = get_test_spans()
+    validate_spans(spans)
+    validate_parsed_spans(spans)

@@ -28,7 +28,7 @@ def encode_to_wire(content: Union[str, bytes]) -> Tuple[str, str]:
 
 def decode_from_wire(encoding: str, content: str) -> Union[str, bytes]:
     if not isinstance(content, str):
-        raise ValueError(f"Expected utf-8 data, but got data of type {type(content)}.")
+        raise ValueError(f"Expected utf-8 data, but got {type(content)}.")
 
     if encoding == "utf-8":
         return content

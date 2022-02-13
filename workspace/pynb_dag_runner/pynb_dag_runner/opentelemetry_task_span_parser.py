@@ -1,10 +1,11 @@
 import json
 from pathlib import Path
-from typing import Any, Iterable, Mapping, MutableMapping, Tuple, Set, List
+from typing import Any, Iterable, Mapping, MutableMapping, Tuple, Set, List, Union
 
 #
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanId, get_duration_s
 from pynb_dag_runner.notebooks_helpers import convert_ipynb_to_html
+from pynb_dag_runner.tasks.task_opentelemetry_logging import decode_from_wire
 
 
 def extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
@@ -50,11 +51,23 @@ def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
         # -
         .filter(["status", "status_code"], "OK")
     ):
+        wire_encoding = artefact_span["attributes"]["encoding"]
+        wire_data = artefact_span["attributes"]["content"]
+
+        content_data: Union[str, bytes] = decode_from_wire(wire_encoding, wire_data)
+
+        if wire_encoding == "utf-8":
+            data_type = "utf-8"
+        elif wire_encoding == "binary/base64":
+            data_type = "binary"
+        else:
+            raise Exception("Unknown artefact type")
+
         result.append(
             {
                 "name": artefact_span["attributes"]["name"],
-                "encoding": "utf-8",
-                "content": artefact_span["attributes"]["content"],
+                "content-type": data_type,
+                "content": content_data,
             }
         )
 
