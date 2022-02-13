@@ -93,11 +93,26 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
                     )
 
 
+def render_seconds(us_range) -> str:
+    """
+    Convert duration (a range in us) into more human readable format like 1m 20s
+    """
+    seconds: float = (us_range.stop - us_range.start) / 1e6
+    if seconds <= 60:
+        return f"{round(seconds, 2)}s"
+    else:
+        dt = datetime.timedelta(seconds=seconds)
+        return (
+            (str(dt).replace(":", "h ", 1).replace(":", "m ", 1)[:-4] + "s")
+            .replace("0h ", "")
+            .replace("00m ", "")
+        )
+
+
 def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     """
     Generate input file for Mermaid diagram generator for creating Gantt diagram
     of tasks/runs found in spans.
-
     """
     output_lines = [
         "gantt",
@@ -110,19 +125,6 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
         "    dateFormat x",
         "    %%",
     ]
-
-    def render_seconds(us_range) -> str:
-        "Convert duration is seconds into more human readable format"
-        seconds: float = (us_range.stop - us_range.start) / 1e6
-        if seconds <= 60:
-            return f"{round(seconds, 2)}s"
-        else:
-            dt = datetime.timedelta(seconds=seconds)
-            return (
-                (str(dt).replace(":", "h ", 1).replace(":", "m ", 1)[:-4] + "s")
-                .replace("0h ", "")
-                .replace("00m ", "")
-            )
 
     _, task_it = get_pipeline_iterators(spans)
 
@@ -159,6 +161,67 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     return "\n".join(output_lines)
 
 
+def make_mermaid_dag_inputfile(spans: Spans):
+    """
+    Generate input file for Mermaid diagram generator for creating dependency diagram
+    of tasks found in spans.
+
+    Runs are not shown in this diagram.
+    """
+    output_lines = [
+        "graph LR",
+        "    %% Mermaid input file for drawing task dependencies ",
+        "    %% See https://mermaid-js.github.io/mermaid",
+        "    %%",
+    ]
+
+    pipeline_dict, task_it = get_pipeline_iterators(spans)
+
+    def dag_node_id(span_id: str) -> str:
+        # span_id:s are of form "0x<hex>" and can not be used as Mermaid node_ids as-is.
+        return f"TASK_SPAN_ID_{span_id}"
+
+    def dag_node_description(task_dict) -> str:
+        assert task_dict["attributes"]["task.task_type"] == "jupytext"
+
+        out_lines = []
+        for k, v in task_dict["attributes"].items():
+            if k.startswith("task.") and k not in ["task.task_type", "task.notebook"]:
+                out_lines += [f"{k}={v}"]
+
+        return (
+            '"'
+            + "<br />".join(
+                [
+                    task_dict["attributes"]["task.notebook"] + " (jupytext task)",
+                    # here one could potentially also add total length of task w.
+                    # outcome status (success/failure)
+                    "",
+                ]
+                + list(sorted(out_lines))
+            )
+            + '"'
+        )
+
+    for task_dict, _ in task_it:
+        print("task", task_dict)
+
+        if task_dict["attributes"]["task.task_type"] != "jupytext":
+            raise Exception(f"Unknown task type for {task_dict}")
+
+        output_lines += [
+            f"    {dag_node_id(task_dict['span_id'])}"
+            f"[{dag_node_description(task_dict)}]"
+        ]
+
+    for span_id_from, span_id_to in pipeline_dict["task_dependencies"]:
+        output_lines += [
+            f"    {dag_node_id(span_id_from)} --> {dag_node_id(span_id_to)}"
+        ]
+
+    return "\n".join(output_lines)
+
+
 # --- cli tool implementation ---
 
 
@@ -182,6 +245,12 @@ def args():
         type=Path,
         help="output file path for Mermaid Gantt diagram input file (eg. gantt.mmd)",
     )
+    parser.add_argument(
+        "--output_filepath_mermaid_dag",
+        required=False,
+        type=Path,
+        help="output file path for Mermaid DAG diagram input file (eg. dag.mmd)",
+    )
     return parser.parse_args()
 
 
@@ -198,3 +267,6 @@ def entry_point():
         args().output_filepath_mermaid_gantt.write_text(
             make_mermaid_gantt_inputfile(spans)
         )
+
+    if args().output_filepath_mermaid_dag is not None:
+        args().output_filepath_mermaid_dag.write_text(make_mermaid_dag_inputfile(spans))
