@@ -93,6 +93,22 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
                     )
 
 
+def render_seconds(us_range) -> str:
+    """
+    Convert duration (a range in us) into more human readable format like 1m 20s
+    """
+    seconds: float = (us_range.stop - us_range.start) / 1e6
+    if seconds <= 60:
+        return f"{round(seconds, 2)}s"
+    else:
+        dt = datetime.timedelta(seconds=seconds)
+        return (
+            (str(dt).replace(":", "h ", 1).replace(":", "m ", 1)[:-4] + "s")
+            .replace("0h ", "")
+            .replace("00m ", "")
+        )
+
+
 def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     """
     Generate input file for Mermaid diagram generator for creating Gantt diagram
@@ -109,19 +125,6 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
         "    dateFormat x",
         "    %%",
     ]
-
-    def render_seconds(us_range) -> str:
-        "Convert duration is seconds into more human readable format"
-        seconds: float = (us_range.stop - us_range.start) / 1e6
-        if seconds <= 60:
-            return f"{round(seconds, 2)}s"
-        else:
-            dt = datetime.timedelta(seconds=seconds)
-            return (
-                (str(dt).replace(":", "h ", 1).replace(":", "m ", 1)[:-4] + "s")
-                .replace("0h ", "")
-                .replace("00m ", "")
-            )
 
     _, task_it = get_pipeline_iterators(spans)
 
@@ -159,74 +162,64 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
 
 
 def make_mermaid_dag_inputfile(spans: Spans):
+    """
+    Generate input file for Mermaid diagram generator for creating dependency diagram
+    of tasks found in spans.
 
-    '''
-    def make_dependency_mermaid_file_content(runlogs, task_dependencies):
-        """
-        Draw task dependency graph
-        """
-        output_lines = [
-            "graph LR",
-            "    %% Mermaid input file for drawing task dependencies ",
-            "    %% See https://mermaid-js.github.io/mermaid",
-            "    %%",
+    Runs are not shown in this diagram.
+    """
+    output_lines = [
+        "graph LR",
+        "    %% Mermaid input file for drawing task dependencies ",
+        "    %% See https://mermaid-js.github.io/mermaid",
+        "    %%",
+    ]
+
+    pipeline_dict, task_it = get_pipeline_iterators(spans)
+
+    def dag_node_id(span_id: str) -> str:
+        # span_id:s are of form "0x<hex>" and can not be used as Mermaid node_ids as-is.
+        return f"TASK_SPAN_ID_{span_id}"
+
+    def dag_node_description(task_dict) -> str:
+        assert task_dict["attributes"]["task.task_type"] == "jupytext"
+
+        out_lines = []
+        for k, v in task_dict["attributes"].items():
+            if k.startswith("task.") and k not in ["task.task_type", "task.notebook"]:
+                out_lines += [f"{k}={v}"]
+
+        return (
+            '"'
+            + "<br />".join(
+                [
+                    task_dict["attributes"]["task.notebook"] + " (jupytext task)",
+                    # here one could potentially also add total length of task w.
+                    # outcome status (success/failure)
+                    "",
+                ]
+                + list(sorted(out_lines))
+            )
+            + '"'
+        )
+
+    for task_dict, _ in task_it:
+        print("task", task_dict)
+
+        if task_dict["attributes"]["task.task_type"] != "jupytext":
+            raise Exception(f"Unknown task type for {task_dict}")
+
+        output_lines += [
+            f"    {dag_node_id(task_dict['span_id'])}"
+            f"[{dag_node_description(task_dict)}]"
         ]
 
-        # for tasks that have been retried, the same task_id may occur in multiple runlog.json
-        # files
-        all_task_ids = set([runlog["task_id"] for runlog in runlogs])
+    for span_id_from, span_id_to in pipeline_dict["task_dependencies"]:
+        output_lines += [
+            f"    {dag_node_id(span_id_from)} --> {dag_node_id(span_id_to)}"
+        ]
 
-        task_id_to_node_name = {
-            task_id: f"NODE_{idx}" for idx, task_id in enumerate(all_task_ids)
-        }
-
-        def get_unique(xs):
-            xs_set = set(xs)
-            assert len(xs_set) == 1
-            return list(xs_set)[0]
-
-        def get_task_description(task_id):
-            # get all runlogs for this task_id
-            task_id_runlogs = [runlog for runlog in runlogs if runlog["task_id"] == task_id]
-            assert len(task_id_runlogs) >= 1
-
-            result = []
-
-            # add task name as first line in node content
-            result += [get_unique(runlog_taskname(runlog) for runlog in task_id_runlogs)]
-
-            # loop over all keys in all runlogs for this task(_id)
-            for key in set.union(*[set(runlog.keys()) for runlog in task_id_runlogs]):
-                if key.startswith("parameters.task"):
-                    task_key = key.replace("parameters.task.", "", 1)
-                    value = get_unique(runlog[key] for runlog in task_id_runlogs)
-
-                    # do not render default retry/timout settings
-                    if task_key == "n_max_retries" and value == 1:
-                        continue
-
-                    if task_key == "timeout_s" and value is None:
-                        continue
-
-                    result += [f"{task_key}={value}"]
-
-            return '"' + "<br /> ".join(result) + '"'
-
-        # add one node to the graph per task_id
-        for task_id, node_name in task_id_to_node_name.items():
-            output_lines += [f"    {node_name}[{get_task_description(task_id)}]"]
-
-        # add arrows between nodes in the graph where tasks are dependent on each other
-        for dependency in task_dependencies:
-            from_id = dependency["from"]
-            to_id = dependency["to"]
-            output_lines += [
-                f"    {task_id_to_node_name[from_id]} --> {task_id_to_node_name[to_id]}"
-            ]
-
-        return "\n".join(output_lines)
-    '''
-    pass
+    return "\n".join(output_lines)
 
 
 # --- cli tool implementation ---
