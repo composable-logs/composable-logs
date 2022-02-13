@@ -52,7 +52,6 @@ def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
     ):
         result.append(
             {
-                **_key_span_details(artefact_span),
                 "name": artefact_span["attributes"]["name"],
                 "encoding": "text/utf-8",
                 "content": artefact_span["attributes"]["content"],
@@ -174,9 +173,9 @@ def get_pipeline_iterators(
 
     Input is all OpenTelemetry spans logged for one pipeline run.
     """
-    pipeline_attributes = {
+    pipeline_dict = {
         "task_dependencies": list(extract_task_dependencies(spans)),
         "attributes": spans.get_attributes(allowed_prefixes={"pipeline."}),
     }
 
-    return pipeline_attributes, _task_iterator(spans)
+    return pipeline_dict, _task_iterator(spans)

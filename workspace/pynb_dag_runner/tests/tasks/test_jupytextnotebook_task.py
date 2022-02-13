@@ -8,6 +8,7 @@ import pytest
 from pynb_dag_runner.tasks.tasks import make_jupytext_task_ot
 from pynb_dag_runner.core.dag_runner import start_and_await_tasks
 from pynb_dag_runner.helpers import one
+from pynb_dag_runner.opentelemetry_task_span_parser import get_pipeline_iterators
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
@@ -55,12 +56,14 @@ def make_test_nb_task(
 
 
 def test__jupytext_notebook_task__run_ok_notebook():
+    NB_PATH = str((Path(__file__).parent)) + "/jupytext_test_notebooks/notebook_ok.py"
+
     def get_test_spans():
         with SpanRecorder() as rec:
             jupytext_task = make_test_nb_task(
                 nb_name="notebook_ok.py",
                 max_nr_retries=2,
-                parameters={"task.variable_a": "task-value"},
+                parameters={"pipeline.foo": "bar", "task.variable_a": "task-value"},
             )
             _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
@@ -76,10 +79,7 @@ def test__jupytext_notebook_task__run_ok_notebook():
         )
         assert jupytext_span["status"] == {"status_code": "OK"}
 
-        assert (
-            read_key(jupytext_span, ["attributes", "task.notebook"])
-            == str((Path(__file__).parent)) + "/jupytext_test_notebooks/notebook_ok.py"
-        )
+        assert read_key(jupytext_span, ["attributes", "task.notebook"]) == NB_PATH
 
         artefact_span = one(spans.filter(["name"], "artefact"))
 
@@ -89,7 +89,60 @@ def test__jupytext_notebook_task__run_ok_notebook():
 
         spans.contains_path(jupytext_span, artefact_span)
 
-    validate_spans(get_test_spans())
+    def validate_parsed_spans(spans: Spans):
+        pipeline_dict, task_it = get_pipeline_iterators(spans)
+
+        common_keys = {
+            "span_id",
+            "start_time",
+            "end_time",
+            "duration_s",
+            "status",
+            "attributes",
+        }
+
+        assert pipeline_dict.keys() == {"attributes", "task_dependencies"}
+        assert pipeline_dict["task_dependencies"] == []
+        expected_pipeline_attributes = {"pipeline.foo": "bar"}
+        assert pipeline_dict["attributes"] == expected_pipeline_attributes
+
+        for task_dict, run_it in [one(task_it)]:  # type: ignore
+            assert task_dict.keys() == common_keys  # type: ignore
+            for k in ["span_id", "start_time", "end_time"]:
+                assert isinstance(task_dict[k], str)  # type: ignore
+            assert isinstance(task_dict["duration_s"], float)  # type: ignore
+
+            assert task_dict["status"] == {"status_code": "OK"}  # type: ignore
+
+            expected_task_attributes = {
+                "task.variable_a": "task-value",
+                "task.max_nr_retries": 2,
+                "task.notebook": NB_PATH,
+                "task.num_cpus": 1,
+                "task.task_type": "jupytext",
+                "task.timeout_s": 10.0,
+            }
+            assert task_dict["attributes"] == {  # type: ignore
+                **expected_pipeline_attributes,
+                **expected_task_attributes,
+            }
+
+            for run_dict, artefact_it in [one(run_it)]:  # type: ignore
+                assert run_dict.keys() == common_keys | {"logged_values"}
+                assert run_dict["attributes"] == {
+                    "run.retry_nr": 0,
+                    "task.num_cpus": 1,
+                    "task.timeout_s": 10.0,
+                    # TODO: all pipeline and task attributes are not listed here
+                }
+
+                # check that one notebooks artefact should be logged
+                for artefact_dict in [one(artefact_it)]:
+                    assert artefact_dict.keys() == {"name", "encoding", "content"}
+
+    spans = get_test_spans()
+    validate_spans(spans)
+    validate_parsed_spans(spans)
 
 
 def test__jupytext_notebook_task__always_fail():
