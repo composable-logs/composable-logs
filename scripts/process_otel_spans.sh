@@ -7,11 +7,14 @@ OPENTELEMETRY_SPANS_JSON_FILEPATH=$1
 PYTHON_DOCKER_IMAGE_NAME=$2
 OUTPUT_BASEDIR=$3
 
-echo "==============================================================="
-
-echo "--- Converting: otel spans json -> directory structure with json:s and notebooks ..."
+# Get path to this script, so we can call other scripts in the
+# same directory.
 SCRIPT_DIRECTORY="$(dirname $(realpath $0))"
 
+echo "==============================================================="
+echo "--- Converting: otel spans json -> directory structure with"
+echo "--- json:s and notebooks ..."
+echo "==============================================================="
 $SCRIPT_DIRECTORY/parse_otel_spans.sh \
     $PYTHON_DOCKER_IMAGE_NAME \
     $OPENTELEMETRY_SPANS_JSON_FILEPATH \
@@ -19,18 +22,27 @@ $SCRIPT_DIRECTORY/parse_otel_spans.sh \
     $OUTPUT_BASEDIR/pipeline-outputs
 
 echo "==============================================================="
-echo "--- Converting: otel spans json -> Mermaid input file for Gantt diagram ..."
-
+echo "--- Converting: otel spans json -> Mermaid input files for DAG "
+echo "--- and Gantt diagrams ..."
+echo "==============================================================="
 $SCRIPT_DIRECTORY/parse_otel_spans.sh \
     $PYTHON_DOCKER_IMAGE_NAME \
     $OPENTELEMETRY_SPANS_JSON_FILEPATH \
     output_filepath_mermaid_gantt \
     $OUTPUT_BASEDIR/gantt.mmd
 
+$SCRIPT_DIRECTORY/parse_otel_spans.sh \
+    $PYTHON_DOCKER_IMAGE_NAME \
+    $OPENTELEMETRY_SPANS_JSON_FILEPATH \
+    output_filepath_mermaid_dag \
+    $OUTPUT_BASEDIR/dag.mmd
+
 echo "==============================================================="
 echo "--- Converting: Mermaid input file for Gantt diagram -> png"
+echo "==============================================================="
 $SCRIPT_DIRECTORY/render_mermaid.sh $OUTPUT_BASEDIR/gantt.mmd $OUTPUT_BASEDIR/gantt-diagram.png
-rm $OUTPUT_BASEDIR/gantt.mmd
+$SCRIPT_DIRECTORY/render_mermaid.sh $OUTPUT_BASEDIR/dag.mmd $OUTPUT_BASEDIR/dag-diagram.png
+rm $OUTPUT_BASEDIR/gantt.mmd $OUTPUT_BASEDIR/dag.mmd
 
 echo "==============================================================="
 echo "--- Converting: Done"
