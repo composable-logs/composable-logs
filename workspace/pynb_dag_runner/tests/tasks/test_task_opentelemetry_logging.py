@@ -29,9 +29,17 @@ def test__encode_decode_to_wire__is_identity():
 
 
 def test__encode_decode_to_wire__exceptions_for_invalid_data():
-    for invalid_data in [None, 123, {"a": 123}, 123.4, True]:
+    # encoding/decoding should fail for these inputs
+    examples_of_invalid_data = [None, 123, {"a": 123}, 123.4, True]
+
+    for invalid_data in examples_of_invalid_data:
         with pytest.raises(ValueError):
             encode_to_wire(invalid_data)
 
     with pytest.raises(ValueError):
-        decode_from_wire("utf8", None)
+        decode_from_wire("utf8", "valid utf8 data, but invalid encoding name")
+
+    for valid_encoding in ["utf-8", "binary/base64"]:
+        for invalid_data in examples_of_invalid_data:
+            with pytest.raises(ValueError):
+                decode_from_wire(valid_encoding, invalid_data)
