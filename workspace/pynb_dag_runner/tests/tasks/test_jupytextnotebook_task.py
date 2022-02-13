@@ -138,7 +138,7 @@ def test__jupytext_notebook_task__run_ok_notebook():
 
                 # check that one notebooks artefact should be logged
                 for artefact_dict in [one(artefact_it)]:
-                    assert artefact_dict.keys() == {"name", "encoding", "content"}
+                    assert artefact_dict.keys() == {"name", "content-type", "content"}
 
     spans = get_test_spans()
     validate_spans(spans)
