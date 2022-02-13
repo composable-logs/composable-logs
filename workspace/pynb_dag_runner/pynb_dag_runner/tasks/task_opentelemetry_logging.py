@@ -1,5 +1,5 @@
-import json
-from typing import Any, Callable, Optional, Mapping
+import base64, json
+from typing import Any, Callable, Optional, Mapping, Union, Tuple
 
 #
 import opentelemetry as otel
@@ -11,10 +11,45 @@ from opentelemetry.trace.propagation.tracecontext import (
     TraceContextTextMapPropagator,
 )
 
+# ---- encode/decode functions -----
+
+
+def encode_to_wire(content: Union[str, bytes]) -> Tuple[str, str]:
+    if isinstance(content, str):
+        return "utf-8", content
+
+    elif isinstance(content, bytes):
+        # TODO: review
+        # https://docs.python.org/3/library/base64.html#security-considerations
+        return "binary/base64", base64.b64encode(content).decode("utf-8")
+    else:
+        raise ValueError("Input should be utf-8 (Python) string or binary")
+
+
+def decode_from_wire(encoding: str, content: str) -> Union[str, bytes]:
+    if encoding == "utf-8":
+        return content
+    elif encoding == "binary/base64":
+        return base64.b64decode(content)
+    else:
+        raise ValueError(f"Unknown encoding {encoding}.")
+
+
+# ----
+
 
 def _call_in_trace_context(
     f: Callable[[Span], None], span_name: str, traceparent: Optional[str] = None
 ):
+    """
+    Executing a code block `f: Span -> None`in a new OpenTelemetry span with
+    name `span_name`. The argument to f is the new span.
+
+    `traceparent`:
+      - if None, use current global span context.
+      - Otherwise, an explicit span-context can be provided (with context propagated
+        using TraceContextTextMapPropagator).
+    """
     tracer = otel.trace.get_tracer(__name__)  # type: ignore
 
     if traceparent is None:
@@ -34,11 +69,18 @@ def _call_in_trace_context(
             f(span)
 
 
-def _log_artefact(name: str, content: str, traceparent: Optional[str] = None):
+def _log_artefact(
+    name: str,
+    content: Union[bytes, str],
+    traceparent: Optional[str] = None,
+):
     def _log(span: Span):
         span.set_attribute("name", name)
-        span.set_attribute("encoding", "text/utf8")
-        span.set_attribute("content", content)
+
+        wire_encoding, wire_data = encode_to_wire(content)
+        span.set_attribute("encoding", wire_encoding)
+        span.set_attribute("content", wire_data)
+
         span.set_status(Status(StatusCode.OK))
 
     _call_in_trace_context(f=_log, span_name="artefact", traceparent=traceparent)
@@ -77,7 +119,7 @@ class PydarLogger:
         # Get context for Task that triggered notebook (for context propagation)
         self._traceparent = P.get("_opentelemetry_traceparent", None)
 
-    def log_artefact(self, name: str, content: str):
+    def log_artefact(self, name: str, content: Union[bytes, str]):
         _log_artefact(name=name, content=content, traceparent=self._traceparent)
 
     def log_value(self, name: str, value: Any):

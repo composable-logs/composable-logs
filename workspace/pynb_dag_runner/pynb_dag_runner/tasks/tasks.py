@@ -73,7 +73,10 @@ def make_jupytext_task_ot(
 
         finally:
             # this is not run if notebook is killed by timeout
-            _log_artefact("notebook.ipynb", evaluated_notebook.filepath.read_text())
+            _log_artefact(
+                "notebook.ipynb",
+                evaluated_notebook.filepath.read_text(),
+            )
 
     return task_from_python_function(
         f=run_notebook,

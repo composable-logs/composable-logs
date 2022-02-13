@@ -53,7 +53,7 @@ def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
         result.append(
             {
                 "name": artefact_span["attributes"]["name"],
-                "encoding": "text/utf-8",
+                "encoding": "utf-8",
                 "content": artefact_span["attributes"]["content"],
             }
         )
@@ -73,7 +73,7 @@ def add_html_notebook_artefacts(artefacts: List[ArtefactDict]) -> List[ArtefactD
     for artefact_dict in artefacts:
         if (
             artefact_dict["name"].endswith(".ipynb")
-            and artefact_dict["encoding"] == "text/utf-8"
+            and artefact_dict["encoding"] == "utf-8"
         ):
             # convert evaluated .ipynb notebook into html page for easier viewing
             result.append(
@@ -81,7 +81,7 @@ def add_html_notebook_artefacts(artefacts: List[ArtefactDict]) -> List[ArtefactD
                     **artefact_dict,
                     **{
                         "name": str(Path(artefact_dict["name"]).with_suffix(".html")),
-                        "encoding": "text/utf-8",
+                        "encoding": "utf-8",
                         "content": convert_ipynb_to_html(artefact_dict["content"]),
                     },
                 }

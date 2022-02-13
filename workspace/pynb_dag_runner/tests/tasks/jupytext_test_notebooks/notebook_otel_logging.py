@@ -20,7 +20,7 @@ from pynb_dag_runner.tasks.task_opentelemetry_logging import PydarLogger
 logger = PydarLogger(P)
 
 # %%
-# test logging of file with utf8-data
+# test logging of artefact with utf-8 content
 
 logger.log_artefact("from_notebook.txt", "foobar123")
 

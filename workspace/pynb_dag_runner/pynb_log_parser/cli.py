@@ -84,7 +84,7 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
 
                 print(f"         *** artefact: {artefact_name} ({artefact_encoding})")
 
-                if artefact_encoding == "text/utf-8":
+                if artefact_encoding == "utf-8":
                     out_path: Path = out_basepath / task_dir / run_dir / artefact_name
                     safe_path(out_path).write_text(artefact_content)
                 else:
