@@ -106,13 +106,13 @@ def test__jupytext_notebook_task__run_ok_notebook():
         expected_pipeline_attributes = {"pipeline.foo": "bar"}
         assert pipeline_dict["attributes"] == expected_pipeline_attributes
 
-        for task_dict, run_it in [one(task_it)]:
-            assert task_dict.keys() == common_keys
+        for task_dict, run_it in [one(task_it)]:  # type: ignore
+            assert task_dict.keys() == common_keys  # type: ignore
             for k in ["span_id", "start_time", "end_time"]:
-                assert isinstance(task_dict[k], str)
-            assert isinstance(task_dict["duration_s"], float)
+                assert isinstance(task_dict[k], str)  # type: ignore
+            assert isinstance(task_dict["duration_s"], float)  # type: ignore
 
-            assert task_dict["status"] == {"status_code": "OK"}
+            assert task_dict["status"] == {"status_code": "OK"}  # type: ignore
 
             expected_task_attributes = {
                 "task.variable_a": "task-value",
@@ -122,12 +122,12 @@ def test__jupytext_notebook_task__run_ok_notebook():
                 "task.task_type": "jupytext",
                 "task.timeout_s": 10.0,
             }
-            assert task_dict["attributes"] == {
+            assert task_dict["attributes"] == {  # type: ignore
                 **expected_pipeline_attributes,
                 **expected_task_attributes,
             }
 
-            for run_dict, artefact_it in [one(run_it)]:
+            for run_dict, artefact_it in [one(run_it)]:  # type: ignore
                 assert run_dict.keys() == common_keys | {"logged_values"}
                 assert run_dict["attributes"] == {
                     "run.retry_nr": 0,
