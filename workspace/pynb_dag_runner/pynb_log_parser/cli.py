@@ -159,6 +159,10 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     return "\n".join(output_lines)
 
 
+def make_mermaid_dag_inputfile(spans: Spans):
+    pass
+
+
 # --- cli tool implementation ---
 
 
@@ -182,6 +186,12 @@ def args():
         type=Path,
         help="output file path for Mermaid Gantt diagram input file (eg. gantt.mmd)",
     )
+    parser.add_argument(
+        "--output_filepath_mermaid_dag",
+        required=False,
+        type=Path,
+        help="output file path for Mermaid DAG diagram input file (eg. dag.mmd)",
+    )
     return parser.parse_args()
 
 
@@ -198,3 +208,6 @@ def entry_point():
         args().output_filepath_mermaid_gantt.write_text(
             make_mermaid_gantt_inputfile(spans)
         )
+
+    if args().output_filepath_mermaid_dag is not None:
+        args().output_filepath_mermaid_dag.write_text(make_mermaid_dag_inputfile(spans))
