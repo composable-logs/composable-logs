@@ -29,6 +29,7 @@ def test__encode_decode_to_wire__is_identity():
         True,
         1.23,
         1000000,
+        {"a": 1, "b": [None, {"c": True}]},
     ]:
         assert msg == SerializedData.encode(msg).decode()
 
