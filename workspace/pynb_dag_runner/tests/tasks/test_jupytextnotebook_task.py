@@ -430,8 +430,8 @@ def test__jupytext_notebook_task__otel_logging_from_notebook(tmp_path: Path):
                     "type": "utf-8",
                     "content": "foobar123",
                 }
-                assert artefacts["binary.bin"] == {
-                    "name": "binary.bin",
+                assert artefacts["class_a/binary.bin"] == {
+                    "name": "class_a/binary.bin",
                     "type": "bytes",
                     "content": bytes(range(256)),
                 }

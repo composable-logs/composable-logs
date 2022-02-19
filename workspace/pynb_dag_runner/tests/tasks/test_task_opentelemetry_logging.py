@@ -69,6 +69,7 @@ def _make_log(type, name, value):
 
 
 class _fig:
+    # dummy mock of matplotlib figure object for testing
     def savefig(self, file_name, **kw_args):
         Path(file_name).write_bytes(bytes([23, 34]))
 
