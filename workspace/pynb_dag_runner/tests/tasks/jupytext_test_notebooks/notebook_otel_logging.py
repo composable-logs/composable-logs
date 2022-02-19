@@ -23,7 +23,7 @@ logger = PydarLogger(P)
 # test logging of artefact with utf-8 content
 
 logger.log_artefact("README.md", "foobar123")
-logger.log_artefact("binary.bin", bytes(range(256)))
+logger.log_artefact("class_a/binary.bin", bytes(range(256)))
 
 # %%
 # test logging of general json-serializable values
