@@ -1,14 +1,12 @@
 import json
 from pathlib import Path
-from typing import Any, Iterable, Mapping, MutableMapping, Tuple, Set, List, Union
+from typing import Any, Iterable, Mapping, MutableMapping, Tuple, Set, List
 
 #
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanId, get_duration_s
 from pynb_dag_runner.notebooks_helpers import convert_ipynb_to_html
-from pynb_dag_runner.tasks.task_opentelemetry_logging import decode_from_wire
 from pynb_dag_runner.tasks.task_opentelemetry_logging import (
     SerializedData,
-    decode_from_wire,
 )
 
 
@@ -66,7 +64,7 @@ def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
             {
                 "name": artefact_span["attributes"]["name"],
                 "content-type": serialized_data.type,
-                "content": decode_from_wire(serialized_data),
+                "content": serialized_data.decode(),
             }
         )
 

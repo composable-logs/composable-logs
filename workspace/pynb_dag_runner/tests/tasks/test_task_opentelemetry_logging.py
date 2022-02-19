@@ -1,13 +1,9 @@
-from pynb_dag_runner.tasks.task_opentelemetry_logging import (
-    encode_to_wire,
-    decode_from_wire,
-    SerializedData,
-)
+from pynb_dag_runner.tasks.task_opentelemetry_logging import SerializedData
 
 # --
 import pytest
 
-# ---- test encode_to_wire, decode_to_wire ----
+# ---- test SerializedData encoding and decoding ----
 
 
 @pytest.mark.parametrize(
@@ -20,8 +16,8 @@ import pytest
 def test__encode_decode_to_wire__explicit_examples(test_case):
     data, serialized_data = test_case
 
-    assert encode_to_wire(data) == serialized_data
-    assert decode_from_wire(serialized_data) == data
+    assert SerializedData.encode(data) == serialized_data
+    assert serialized_data.decode() == data
 
 
 def test__encode_decode_to_wire__is_identity():
@@ -30,7 +26,7 @@ def test__encode_decode_to_wire__is_identity():
         bytes([0, 1, 2, 3]),
         bytes(1000 * list(range(256))),
     ]:
-        assert msg == decode_from_wire(encode_to_wire(msg))
+        assert msg == SerializedData.encode(msg).decode()
 
 
 def test__encode_decode_to_wire__exceptions_for_invalid_data():
@@ -39,7 +35,7 @@ def test__encode_decode_to_wire__exceptions_for_invalid_data():
 
     for invalid_data in examples_of_invalid_data:
         with pytest.raises(ValueError):
-            encode_to_wire(invalid_data)
+            SerializedData.encode(invalid_data)
 
     with pytest.raises(ValueError):
-        decode_from_wire(SerializedData("string", "utf8", "should be 'utf-8'"))
+        SerializedData("string", "utf8", "should be 'utf-8'").decode()

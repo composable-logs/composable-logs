@@ -28,31 +28,28 @@ class SerializedData:
     # encoded data represented as utf-8 string
     content: str
 
+    def decode(self):
+        if not isinstance(self.content, str):
+            raise ValueError(f"Expected serialized data in utf-8 format.")
 
-def encode_to_wire(content: LoggableTypes) -> SerializedData:
-    if isinstance(content, str):
-        return SerializedData("utf-8", "utf-8", content)
+        if self.type == "utf-8" and self.encoding == "utf-8":
+            return self.content
+        elif self.type == "bytes" and self.encoding == "base64":
+            return base64.b64decode(self.content)
+        else:
+            raise ValueError(f"Unknown encoding {self.type}, {self.encoding}.")
 
-    elif isinstance(content, bytes):
-        # TODO: review
-        # https://docs.python.org/3/library/base64.html#security-considerations
-        return SerializedData(
-            "bytes", "base64", base64.b64encode(content).decode("utf-8")
-        )
-    else:
-        raise ValueError("Input should be utf-8 (Python) string or binary")
+    @classmethod
+    def encode(cls, content: LoggableTypes) -> "SerializedData":
+        if isinstance(content, str):
+            return cls("utf-8", "utf-8", content)
 
-
-def decode_from_wire(data: SerializedData) -> LoggableTypes:
-    if not isinstance(data.content, str):
-        raise ValueError(f"Expected serialized data in utf-8 format.")
-
-    if data.type == "utf-8" and data.encoding == "utf-8":
-        return data.content
-    elif data.type == "bytes" and data.encoding == "base64":
-        return base64.b64decode(data.content)
-    else:
-        raise ValueError(f"Unknown encoding {data.type}, {data.encoding}.")
+        elif isinstance(content, bytes):
+            # TODO: review
+            # https://docs.python.org/3/library/base64.html#security-considerations
+            return cls("bytes", "base64", base64.b64encode(content).decode("utf-8"))
+        else:
+            raise ValueError("Input should be utf-8 (Python) string or binary")
 
 
 # ----
@@ -97,7 +94,7 @@ def _log_artefact(
     def _log(span: Span):
         span.set_attribute("name", name)
 
-        serialized_data = encode_to_wire(content)
+        serialized_data = SerializedData.encode(content)
         span.set_attribute("type", serialized_data.type)
         span.set_attribute("encoding", serialized_data.encoding)
         span.set_attribute("content", serialized_data.content)
