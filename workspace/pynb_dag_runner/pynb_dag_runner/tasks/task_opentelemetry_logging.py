@@ -1,5 +1,6 @@
 import base64, json
-from typing import Any, Callable, Optional, Mapping, Union, Tuple
+from typing import Any, Callable, Optional, Mapping, Union
+from dataclasses import dataclass
 
 #
 import opentelemetry as otel
@@ -13,29 +14,45 @@ from opentelemetry.trace.propagation.tracecontext import (
 
 # ---- encode/decode functions -----
 
+LoggableTypes = Union[str, bytes]
 
-def encode_to_wire(content: Union[str, bytes]) -> Tuple[str, str]:
+
+@dataclass
+class SerializedData:
+    # eg "str", "bytes", see LoggableTypes
+    type: str
+
+    # "base64" for binary, "utf-8" for string, "json" for other types
+    encoding: str
+
+    # encoded data represented as utf-8 string
+    content: str
+
+
+def encode_to_wire(content: LoggableTypes) -> SerializedData:
     if isinstance(content, str):
-        return "utf-8", content
+        return SerializedData("utf-8", "utf-8", content)
 
     elif isinstance(content, bytes):
         # TODO: review
         # https://docs.python.org/3/library/base64.html#security-considerations
-        return "binary/base64", base64.b64encode(content).decode("utf-8")
+        return SerializedData(
+            "bytes", "base64", base64.b64encode(content).decode("utf-8")
+        )
     else:
         raise ValueError("Input should be utf-8 (Python) string or binary")
 
 
-def decode_from_wire(encoding: str, content: str) -> Union[str, bytes]:
-    if not isinstance(content, str):
-        raise ValueError(f"Expected utf-8 data, but got {type(content)}.")
+def decode_from_wire(data: SerializedData) -> LoggableTypes:
+    if not isinstance(data.content, str):
+        raise ValueError(f"Expected serialized data in utf-8 format.")
 
-    if encoding == "utf-8":
-        return content
-    elif encoding == "binary/base64":
-        return base64.b64decode(content)
+    if data.type == "utf-8" and data.encoding == "utf-8":
+        return data.content
+    elif data.type == "bytes" and data.encoding == "base64":
+        return base64.b64decode(data.content)
     else:
-        raise ValueError(f"Unknown encoding {encoding}.")
+        raise ValueError(f"Unknown encoding {data.type}, {data.encoding}.")
 
 
 # ----
@@ -80,9 +97,10 @@ def _log_artefact(
     def _log(span: Span):
         span.set_attribute("name", name)
 
-        wire_encoding, wire_data = encode_to_wire(content)
-        span.set_attribute("encoding", wire_encoding)
-        span.set_attribute("content", wire_data)
+        serialized_data = encode_to_wire(content)
+        span.set_attribute("type", serialized_data.type)
+        span.set_attribute("encoding", serialized_data.encoding)
+        span.set_attribute("content", serialized_data.content)
 
         span.set_status(Status(StatusCode.OK))
 

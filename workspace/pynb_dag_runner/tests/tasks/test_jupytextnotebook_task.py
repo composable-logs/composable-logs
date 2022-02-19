@@ -414,7 +414,7 @@ def test__jupytext_notebook_task__otel_logging_from_notebook():
                 }
                 assert artefacts["binary.bin"] == {
                     "name": "binary.bin",
-                    "content-type": "binary",
+                    "content-type": "bytes",
                     "content": bytes(range(256)),
                 }
 
