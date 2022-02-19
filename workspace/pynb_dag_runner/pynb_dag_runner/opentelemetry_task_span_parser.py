@@ -2,7 +2,12 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, MutableMapping, Tuple, Set, List
 
 #
-from pynb_dag_runner.opentelemetry_helpers import Spans, SpanId, get_duration_s
+from pynb_dag_runner.opentelemetry_helpers import (
+    Spans,
+    SpanDict,
+    SpanId,
+    get_duration_s,
+)
 from pynb_dag_runner.notebooks_helpers import convert_ipynb_to_html
 from pynb_dag_runner.tasks.task_opentelemetry_logging import SerializedData
 
@@ -41,6 +46,20 @@ def _key_span_details(span):
     }
 
 
+def _decode_data_content_span(span: SpanDict):
+    serialized_data = SerializedData(
+        type=span["attributes"]["type"],
+        encoding=span["attributes"]["encoding"],
+        encoded_content=span["attributes"]["content_encoded"],
+    )
+
+    return {
+        "name": span["attributes"]["name"],
+        "type": serialized_data.type,
+        "content": serialized_data.decode(),
+    }
+
+
 def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
     result = []
     for artefact_span in (
@@ -50,20 +69,7 @@ def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
         # -
         .filter(["status", "status_code"], "OK")
     ):
-
-        serialized_data = SerializedData(
-            type=artefact_span["attributes"]["type"],
-            encoding=artefact_span["attributes"]["encoding"],
-            encoded_content=artefact_span["attributes"]["content_encoded"],
-        )
-
-        result.append(
-            {
-                "name": artefact_span["attributes"]["name"],
-                "type": serialized_data.type,
-                "content": serialized_data.decode(),
-            }
-        )
+        result.append(_decode_data_content_span(artefact_span))
 
     return result
 

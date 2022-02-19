@@ -1,4 +1,5 @@
-import base64, json
+import base64, json, tempfile, os
+from pathlib import Path
 from typing import Any, Callable, Optional, Mapping, Union
 from dataclasses import dataclass
 
@@ -58,12 +59,13 @@ class SerializedData:
             return cls("bytes", "base64", base64.b64encode(content).decode("utf-8"))
 
         json_data = json.dumps(content)
-        if isinstance(content, int):
+        if isinstance(content, bool):
+            # Note: isinstance(True, int) == True, so we first test for bool
+            return cls("bool", "json", json_data)
+        elif isinstance(content, int):
             return cls("int", "json", json_data)
         elif isinstance(content, float):
             return cls("float", "json", json_data)
-        elif isinstance(content, bool):
-            return cls("boolean", "json", json_data)
         elif content == json.loads(json_data):
             # input data is JSON serializable
             return cls("json", "json", json_data)
@@ -143,11 +145,18 @@ class PydarLogger:
         assert isinstance(P, dict)
 
         # Connect to running Ray cluster. Without this, OpenTelemetry logging from
-        #  notebook will not connect to Ray-cluster's logging setup.
-        ray.init(address="auto", namespace="pydar-ray-cluster")
+        # notebook will not connect to Ray-cluster's logging setup.
+        ray.init(
+            address="auto",
+            namespace="pydar-ray-cluster",
+            # The below setting required for constructor to work in tests
+            ignore_reinit_error=True,
+        )
 
         # Get context for Task that triggered notebook (for context propagation)
         self._traceparent = P.get("_opentelemetry_traceparent", None)
+
+    # --- log files ---
 
     def log_artefact(self, name: str, content: Union[bytes, str]):
 
@@ -165,6 +174,21 @@ class PydarLogger:
             is_file=True,
             traceparent=self._traceparent,
         )
+
+    def log_figure(self, name: str, fig):
+        """
+        Log matplotlib figure as an png artefact
+        """
+        tmp_path = Path(tempfile.mkdtemp(prefix="pydar-temp", dir="/tmp/")) / "img.png"
+
+        # plots are transparent by default.
+        fig.savefig(tmp_path, facecolor="white", transparent=False)
+
+        self.log_artefact(name=name, content=tmp_path.read_bytes())
+
+        os.remove(tmp_path)
+
+    # --- log values ---
 
     def log_value(self, name: str, value: Any):
         """
