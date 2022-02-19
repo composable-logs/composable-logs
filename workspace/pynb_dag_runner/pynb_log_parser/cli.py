@@ -31,10 +31,10 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
 
     pipeline_dict, task_it = get_pipeline_iterators(spans)
 
-    def safe_path(path: Path):
-        assert str(path).startswith("/")
-        assert ".." not in str(path)
-        return path
+    def safe_path(filepath: Path):
+        assert str(filepath).startswith("/")
+        assert ".." not in str(filepath)
+        return filepath
 
     # -- write json with pipeline-specific data --
     write_json(safe_path(out_basepath / "pipeline.json"), pipeline_dict)
@@ -88,6 +88,7 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
                 if artefact_type == "utf-8":
                     safe_path(out_path).write_text(artefact_content)
                 elif artefact_type == "bytes":
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
                     safe_path(out_path).write_bytes(artefact_content)
                 else:
                     raise ValueError(
