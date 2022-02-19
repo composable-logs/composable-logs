@@ -80,7 +80,7 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
                 # -- write artefact logged to run --
                 artefact_name: str = artefact_dict["name"]
                 artefact_encoding: str = artefact_dict["encoding"]
-                artefact_content: str = artefact_dict["content"]
+                artefact_content: str = artefact_dict["content_encoding"]
 
                 print(f"         *** artefact: {artefact_name} ({artefact_encoding})")
 

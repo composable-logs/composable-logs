@@ -5,9 +5,7 @@ from typing import Any, Iterable, Mapping, MutableMapping, Tuple, Set, List
 #
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanId, get_duration_s
 from pynb_dag_runner.notebooks_helpers import convert_ipynb_to_html
-from pynb_dag_runner.tasks.task_opentelemetry_logging import (
-    SerializedData,
-)
+from pynb_dag_runner.tasks.task_opentelemetry_logging import SerializedData
 
 
 def extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
@@ -31,7 +29,7 @@ def extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
 PipelineDict = Any
 TaskDict = Any
 RunDict = Any
-ArtefactDict = Any
+ArtefactDict = Any  # {name, type, content} in decoded form
 
 
 def _key_span_details(span):
@@ -57,13 +55,13 @@ def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
         serialized_data = SerializedData(
             type=artefact_span["attributes"]["type"],
             encoding=artefact_span["attributes"]["encoding"],
-            content=artefact_span["attributes"]["content"],
+            encoded_content=artefact_span["attributes"]["content_encoded"],
         )
 
         result.append(
             {
                 "name": artefact_span["attributes"]["name"],
-                "content-type": serialized_data.type,
+                "type": serialized_data.type,
                 "content": serialized_data.decode(),
             }
         )
@@ -83,7 +81,7 @@ def add_html_notebook_artefacts(artefacts: List[ArtefactDict]) -> List[ArtefactD
     for artefact_dict in artefacts:
         if (
             artefact_dict["name"].endswith(".ipynb")
-            and artefact_dict["encoding"] == "utf-8"
+            and artefact_dict["type"] == "utf-8"
         ):
             # convert evaluated .ipynb notebook into html page for easier viewing
             result.append(
@@ -91,7 +89,7 @@ def add_html_notebook_artefacts(artefacts: List[ArtefactDict]) -> List[ArtefactD
                     **artefact_dict,
                     **{
                         "name": str(Path(artefact_dict["name"]).with_suffix(".html")),
-                        "encoding": "utf-8",
+                        "type": "utf-8",
                         "content": convert_ipynb_to_html(artefact_dict["content"]),
                     },
                 }
@@ -111,27 +109,25 @@ def _get_logged_named_values(spans: Spans, task_run_top_span) -> Mapping[str, An
         # -
         .filter(["status", "status_code"], "OK")
     ):
-        assert artefact_span["attributes"].keys() == {"name", "encoding", "value"}
+        assert artefact_span["attributes"].keys() == {
+            "name",
+            "type",
+            "encoding",
+            "content_encoded",
+        }
 
         name: str = artefact_span["attributes"]["name"]
-        encoding: str = artefact_span["attributes"]["encoding"]
-        value: str = artefact_span["attributes"]["value"]
 
         if name in result:
             raise ValueError(f"Named value {name} has been logged multiple times.")
 
-        if encoding == "json":
-            result[name] = {"value": json.loads(value), "type": "json"}
-        elif encoding == "json/string":
-            result[name] = {"value": json.loads(value), "type": "string"}
-        elif encoding == "json/int":
-            result[name] = {"value": json.loads(value), "type": "int"}
-        elif encoding == "json/float":
-            result[name] = {"value": json.loads(value), "type": "float"}
-        elif encoding == "json/bool":
-            result[name] = {"value": json.loads(value), "type": "bool"}
-        else:
-            raise ValueError(f"Unknown encoding {encoding} for named value {name}")
+        serialized_data = SerializedData(
+            type=artefact_span["attributes"]["type"],
+            encoding=artefact_span["attributes"]["encoding"],
+            encoded_content=artefact_span["attributes"]["content_encoded"],
+        )
+
+        result[name] = {"value": serialized_data.decode(), "type": serialized_data.type}
 
     return result
 

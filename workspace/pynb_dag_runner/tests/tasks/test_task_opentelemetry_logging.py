@@ -10,6 +10,7 @@ import pytest
     "test_case",
     [
         ("foo", SerializedData("utf-8", "utf-8", "foo")),
+        (123, SerializedData("int", "json", "123")),
         (bytes([0, 1, 2, 3, 4, 5]), SerializedData("bytes", "base64", "AAECAwQF")),
     ],
 )
@@ -25,16 +26,22 @@ def test__encode_decode_to_wire__is_identity():
         "test-text-message",
         bytes([0, 1, 2, 3]),
         bytes(1000 * list(range(256))),
+        True,
+        1.23,
+        1000000,
     ]:
         assert msg == SerializedData.encode(msg).decode()
 
 
 def test__encode_decode_to_wire__exceptions_for_invalid_data():
+    class Foo:
+        pass
+
     # encoding/decoding should fail for these inputs
-    examples_of_invalid_data = [None, 123, {"a": 123}, 123.4, True]
+    examples_of_invalid_data = [None, Foo()]
 
     for invalid_data in examples_of_invalid_data:
-        with pytest.raises(ValueError):
+        with pytest.raises(Exception):
             SerializedData.encode(invalid_data)
 
     with pytest.raises(ValueError):

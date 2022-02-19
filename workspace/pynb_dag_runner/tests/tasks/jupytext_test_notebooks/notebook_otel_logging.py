@@ -29,7 +29,6 @@ logger.log_artefact("binary.bin", bytes(range(256)))
 # test logging of general json-serializable values
 
 logger.log_value("value_str_a", "a")
-logger.log_value("value_null", None)
 logger.log_value("value_float_1_23", 1.23)
 logger.log_value("value_list_1_2_null", [1, 2, None])
 logger.log_value("value_dict", {"a": 123, "b": "foo"})
@@ -56,6 +55,7 @@ def assert_fails(f):
     raise Exception("function call did not raise Exception")
 
 
+assert_fails(lambda: logger.log_value("value_fail", None))  # type: ignore
 assert_fails(lambda: logger.log_boolean("bool_fail", None))  # type: ignore
 assert_fails(lambda: logger.log_int("int_fail", None))  # type: ignore
 assert_fails(lambda: logger.log_float("float_fail", None))  # type: ignore
