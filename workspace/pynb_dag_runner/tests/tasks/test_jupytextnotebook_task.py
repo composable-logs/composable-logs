@@ -1,4 +1,4 @@
-import datetime, json
+import datetime, glob, json
 from pathlib import Path
 
 #
@@ -16,6 +16,11 @@ from pynb_dag_runner.opentelemetry_helpers import (
     SpanRecorder,
     get_duration_s,
     read_key,
+)
+from pynb_log_parser.cli import (
+    write_to_output_dir,
+    make_mermaid_gantt_inputfile,
+    make_mermaid_dag_inputfile,
 )
 
 
@@ -346,7 +351,7 @@ def test__jupytext_notebook_task__stuck_notebook():
     validate_spans(get_test_spans())
 
 
-def test__jupytext_notebook_task__otel_logging_from_notebook():
+def test__jupytext_notebook_task__otel_logging_from_notebook(tmp_path: Path):
     def get_test_spans():
         with SpanRecorder() as rec:
             jupytext_task = make_test_nb_task(
@@ -433,6 +438,31 @@ def test__jupytext_notebook_task__otel_logging_from_notebook():
 
                 assert len(artefacts) == 3
 
+    def validate_cli_tool(spans: Spans, output_path: Path):
+        # check: rendering Mermaid input file contents does not crash
+        assert len(make_mermaid_dag_inputfile(spans)) > 10
+        assert len(make_mermaid_gantt_inputfile(spans)) > 10
+
+        # write directory structure from spans
+        write_to_output_dir(spans, output_path)
+
+        files = glob.glob(f"{output_path}/**/*", recursive=True)
+        filenames = [Path(f).name for f in files if Path(f).is_file()]
+
+        assert set(filenames) == {
+            # --- root of output directory ---
+            "pipeline.json",
+            # --- one task in pipeline run ---
+            "task.json",
+            # --- files for single run of task ---
+            "notebook.ipynb",
+            "notebook.html",
+            "run.json",
+            "binary.bin",
+            "README.md",
+        }
+
     spans = get_test_spans()
     validate_spans(spans)
     validate_parsed_spans(spans)
+    validate_cli_tool(spans, tmp_path)

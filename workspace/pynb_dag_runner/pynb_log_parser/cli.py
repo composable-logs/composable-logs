@@ -79,14 +79,16 @@ def write_to_output_dir(spans: Spans, out_basepath: Path):
             for artefact_dict in add_html_notebook_artefacts(task_run_artefacts):
                 # -- write artefact logged to run --
                 artefact_name: str = artefact_dict["name"]
-                artefact_encoding: str = artefact_dict["encoding"]
-                artefact_content: str = artefact_dict["content_encoding"]
+                artefact_type: str = artefact_dict["type"]
+                artefact_content: str = artefact_dict["content"]
 
-                print(f"         *** artefact: {artefact_name} ({artefact_encoding})")
+                print(f"         *** artefact: {artefact_name} ({artefact_type})")
 
-                if artefact_encoding == "utf-8":
-                    out_path: Path = out_basepath / task_dir / run_dir / artefact_name
+                out_path: Path = out_basepath / task_dir / run_dir / artefact_name
+                if artefact_type == "utf-8":
                     safe_path(out_path).write_text(artefact_content)
+                elif artefact_type == "bytes":
+                    safe_path(out_path).write_bytes(artefact_content)
                 else:
                     raise ValueError(
                         f"Unknown encoding of artefect: {str(artefact_dict)[:2000]}"
