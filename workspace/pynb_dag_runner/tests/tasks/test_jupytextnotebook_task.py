@@ -1,4 +1,4 @@
-import datetime, json
+import datetime, glob, json
 from pathlib import Path
 
 #
@@ -6,6 +6,7 @@ import pytest
 
 #
 from pynb_dag_runner.tasks.tasks import make_jupytext_task_ot
+from pynb_dag_runner.tasks.task_opentelemetry_logging import SerializedData
 from pynb_dag_runner.core.dag_runner import start_and_await_tasks
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.opentelemetry_task_span_parser import get_pipeline_iterators
@@ -15,6 +16,11 @@ from pynb_dag_runner.opentelemetry_helpers import (
     SpanRecorder,
     get_duration_s,
     read_key,
+)
+from pynb_log_parser.cli import (
+    write_to_output_dir,
+    make_mermaid_gantt_inputfile,
+    make_mermaid_dag_inputfile,
 )
 
 
@@ -85,7 +91,7 @@ def test__jupytext_notebook_task__run_ok_notebook():
 
         # see notebook for motivation behind these string-tests
         for content in [str(1 + 12 + 123), "variable_a=task-value"]:
-            assert content in artefact_span["attributes"]["content"]
+            assert content in artefact_span["attributes"]["content_encoded"]
 
         spans.contains_path(jupytext_span, artefact_span)
 
@@ -138,7 +144,11 @@ def test__jupytext_notebook_task__run_ok_notebook():
 
                 # check that one notebooks artefact should be logged
                 for artefact_dict in [one(artefact_it)]:
-                    assert artefact_dict.keys() == {"name", "encoding", "content"}
+                    assert artefact_dict.keys() == {
+                        "name",
+                        "type",
+                        "content",
+                    }
 
     spans = get_test_spans()
     validate_spans(spans)
@@ -191,7 +201,10 @@ def test__jupytext_notebook_task__always_fail():
             assert len(retry_spans.exception_events()) == 1
 
             artefact_span = one(retry_spans.filter(["name"], "artefact"))
-            assert "task.injected_parameter" in artefact_span["attributes"]["content"]
+            assert (
+                "task.injected_parameter"
+                in artefact_span["attributes"]["content_encoded"]
+            )
 
             spans.contains_path(
                 top_task_span, top_retry_span, retry_span, artefact_span
@@ -283,7 +296,7 @@ def test__jupytext_notebook_task__exception_throwing_notebook(N_retries):
                 spans.bound_under(run_spans[idx]).filter(["name"], "artefact")
             )
             assert artefact_span["attributes"]["name"] == "notebook.ipynb"
-            assert str(1 + 12 + 123) in artefact_span["attributes"]["content"]
+            assert str(1 + 12 + 123) in artefact_span["attributes"]["content_encoded"]
 
     validate_spans(get_test_spans())
 
@@ -338,7 +351,7 @@ def test__jupytext_notebook_task__stuck_notebook():
     validate_spans(get_test_spans())
 
 
-def test__jupytext_notebook_task__otel_logging_from_notebook():
+def test__jupytext_notebook_task__otel_logging_from_notebook(tmp_path: Path):
     def get_test_spans():
         with SpanRecorder() as rec:
             jupytext_task = make_test_nb_task(
@@ -364,17 +377,17 @@ def test__jupytext_notebook_task__otel_logging_from_notebook():
         artefacts_span = one(
             spans.filter(["name"], "artefact")
             #
-            .filter(["attributes", "name"], "from_notebook.txt")
+            .filter(["attributes", "name"], "README.md")
             #
             .filter(["status", "status_code"], "OK")
         )
-        assert artefacts_span["attributes"]["content"] == "foobar123"
-        assert artefacts_span["attributes"]["encoding"] == "text/utf8"
+        assert artefacts_span["attributes"]["content_encoded"] == "foobar123"
+        assert artefacts_span["attributes"]["encoding"] == "utf-8"
 
         # artefacts logged from notebook are logged as subspans under the notebook span
         assert spans.contains_path(jupytext_span, artefacts_span)
 
-        def check_named_value(key, value, encoding):
+        def check_named_value(key, value):
             value_span = one(
                 spans.filter(["name"], "named-value")
                 #
@@ -382,22 +395,74 @@ def test__jupytext_notebook_task__otel_logging_from_notebook():
                 #
                 .filter(["status", "status_code"], "OK")
             )
-            assert value_span["attributes"]["value"] == json.dumps(value)
-
             assert spans.contains_path(jupytext_span, value_span)
+            assert (
+                SerializedData(
+                    type=value_span["attributes"]["type"],
+                    encoding=value_span["attributes"]["encoding"],
+                    encoded_content=value_span["attributes"]["content_encoded"],
+                ).decode()
+                == value
+            )
 
         # check values logged with general key-value logger
-        check_named_value("value_str_a", "a", "json")
-        check_named_value("value_null", None, "json")
-        check_named_value("value_float_1_23", 1.23, "json")
-        check_named_value("value_list_1_2_null", [1, 2, None], "json")
-        check_named_value("value_dict", {"a": 123, "b": "foo"}, "json")
-        check_named_value("value_list_nested", [1, [2, None, []]], "json")
+        check_named_value("value_str_a", "a")
+        check_named_value("value_float_1_23", 1.23)
+        check_named_value("value_list_1_2_null", [1, 2, None])
+        check_named_value("value_dict", {"a": 123, "b": "foo"})
+        check_named_value("value_list_nested", [1, [2, None, []]])
 
         # check values logged with typed-loggers
-        check_named_value("boolean_true", True, "json/bool")
-        check_named_value("int_1", 1, "json/int")
-        check_named_value("float_1p23", 1.23, "json/float")
-        check_named_value("string_abc", "abc", "json/string")
+        check_named_value("boolean_true", True)
+        check_named_value("int_1", 1)
+        check_named_value("float_1p23", 1.23)
+        check_named_value("string_abc", "abc")
 
-    validate_spans(get_test_spans())
+    def validate_parsed_spans(spans: Spans):
+        _, task_it = get_pipeline_iterators(spans)
+
+        for _, run_it in [one(task_it)]:  # type: ignore
+            for _, artefact_it in [one(run_it)]:  # type: ignore
+                artefacts = {a["name"]: a for a in artefact_it}
+
+                assert artefacts["README.md"] == {
+                    "name": "README.md",
+                    "type": "utf-8",
+                    "content": "foobar123",
+                }
+                assert artefacts["binary.bin"] == {
+                    "name": "binary.bin",
+                    "type": "bytes",
+                    "content": bytes(range(256)),
+                }
+
+                assert len(artefacts) == 3
+
+    def validate_cli_tool(spans: Spans, output_path: Path):
+        # check: rendering Mermaid input file contents does not crash
+        assert len(make_mermaid_dag_inputfile(spans)) > 10
+        assert len(make_mermaid_gantt_inputfile(spans)) > 10
+
+        # write directory structure from spans
+        write_to_output_dir(spans, output_path)
+
+        files = glob.glob(f"{output_path}/**/*", recursive=True)
+        filenames = [Path(f).name for f in files if Path(f).is_file()]
+
+        assert set(filenames) == {
+            # --- root of output directory ---
+            "pipeline.json",
+            # --- one task in pipeline run ---
+            "task.json",
+            # --- files for single run of task ---
+            "notebook.ipynb",
+            "notebook.html",
+            "run.json",
+            "binary.bin",
+            "README.md",
+        }
+
+    spans = get_test_spans()
+    validate_spans(spans)
+    validate_parsed_spans(spans)
+    validate_cli_tool(spans, tmp_path)

@@ -10,7 +10,7 @@ from opentelemetry.trace.propagation.tracecontext import (
 #
 from pynb_dag_runner.core.dag_runner import task_from_python_function
 from pynb_dag_runner.opentelemetry_helpers import AttributesDict
-from pynb_dag_runner.tasks.task_opentelemetry_logging import _log_artefact
+from pynb_dag_runner.tasks.task_opentelemetry_logging import _log_named_value
 
 #
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook
@@ -73,7 +73,12 @@ def make_jupytext_task_ot(
 
         finally:
             # this is not run if notebook is killed by timeout
-            _log_artefact("notebook.ipynb", evaluated_notebook.filepath.read_text())
+            _log_named_value(
+                name="notebook.ipynb",
+                content=evaluated_notebook.filepath.read_text(),
+                content_type="utf-8",
+                is_file=True,
+            )
 
     return task_from_python_function(
         f=run_notebook,
