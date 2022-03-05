@@ -1,0 +1,33 @@
+FROM ubuntu:20.04
+
+ARG HOST_GID
+ARG HOST_UID
+
+ENV DEBIAN_FRONTEND "noninteractive"
+
+RUN apt-get -y update && \
+    apt-get -y upgrade && \
+    apt-get install -y -q \
+        python3 \
+        python3-pip \
+        entr
+
+RUN groupadd --gid $HOST_GID host_user_group  && \
+    useradd --uid $HOST_UID --gid $HOST_GID -rm --shell /bin/bash host_user
+
+USER host_user
+ENV PATH "/home/host_user/.local/bin:$PATH"
+
+ENV PYTHONPYCACHEPREFIX=/home/host_user/.cache/python
+
+RUN pip3 install --user \
+        pytest==6.2.5 \
+        black==21.12b0 \
+        mypy==0.930
+
+ENV MYPY_CACHE_DIR=/home/host_user/.cache/mypy
+RUN mkdir -p $MYPY_CACHE_DIR
+
+ENV PYTEST_ADDOPTS="-vvv -o cache_dir=/home/host_user/.cache/pytest"
+
+ENTRYPOINT ["/bin/bash", "-c"]
