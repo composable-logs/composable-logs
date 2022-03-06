@@ -11,7 +11,8 @@ RUN apt-get -y update && \
         curl \
         python3 \
         python3-pip \
-        entr
+        entr \
+        tmuxinator
 
 RUN groupadd --gid $HOST_GID host_user_group  && \
     useradd --uid $HOST_UID --gid $HOST_GID -rm --shell /bin/bash host_user

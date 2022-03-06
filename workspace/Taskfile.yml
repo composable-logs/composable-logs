@@ -8,7 +8,7 @@ tasks:
   pytest:
     desc: Run unit tests (pytest)
     cmds:
-      - "{{.WATCH_COMMAND}} pytest -vvv tests"
+      - '{{.WATCH_COMMAND}} bash -c "(date; pytest -vvv tests)"'
 
   mypy:
     desc: Check static mypy type checks (mypy)
@@ -19,3 +19,9 @@ tasks:
     desc: Check that code is Black formatted (black)
     cmds:
       - "{{.WATCH_COMMAND}} black --check --diff ."
+
+  watch-all:
+    desc: Watch unit tests, mypy static tests and black formatting (in tmux session)
+    # exit with Ctrl-B + "kill-session"
+    cmds:
+      - "tmuxinator start"

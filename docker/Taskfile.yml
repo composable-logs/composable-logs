@@ -18,34 +18,66 @@ tasks:
           --tag {{.DOCKER_IMAGE}} \
           .
 
-  run:
-    desc: Run a non-interactive command inside project Docker image
-    summary: |
-      Example use:
-
-      task docker:run -- "ls -al ."
-      task docker:run -- "(printenv; pip3 freeze)"
-    vars:
-      CUSTOM_SWITCHES: '{{default "" .CUSTOM_SWITCHES}}'
-
+  # ----
+  # It seems that the "interactive" setting in Taskfile can not be set dynamically.
+  # Therefore we define two (internal) tasks as below.
+  #
+  # See:
+  #   https://taskfile.dev/#/usage?id=interactive-cli-application
+  #
+  # Since these tasks have no descriptions, the do not show up in "task --list"
+  run-interactive-true:
     cmds:
       - |
-        docker run \
-          --rm -t {{.CUSTOM_SWITCHES}} \
+        {{if eq .IS_INTERACTIVE "true"}}
+          {{.COMMAND}}
+        {{else}}
+          : skipped
+        {{end}}
+    interactive: true
+
+  run-interactive-false:
+    cmds:
+      - |
+        {{if eq .IS_INTERACTIVE "false"}}
+          {{.COMMAND}}
+        {{else}}
+          : skipped
+        {{end}}
+    interactive: false
+
+  run:
+    desc: Run bash command in project Docker image (interactive if IS_INTERACTIVE=true)
+    # Eg.
+    #   task docker:run -- "ls -al ."
+    #   task docker:run -- "(printenv; pip3 freeze)"
+    vars:
+      # if IS_INTERACTIVE is not set, assume false
+      IS_INTERACTIVE: '{{if eq .IS_INTERACTIVE "true"}}true{{else}}false{{end}}'
+      INTERACTIVE_SWITCH: '{{if eq .IS_INTERACTIVE "true"}}-i{{else}}{{end}}'
+      COMMAND: |
+        docker run --rm -t \
+          {{.INTERACTIVE_SWITCH}} \
           --network none \
           --volume {{.PWD}}/workspace:/home/host_user/workspace \
           --workdir /home/host_user/workspace/ \
           {{.DOCKER_IMAGE}} \
-          {{.CLI_ARGS}}
+          "{{.CLI_ARGS}}"
 
-    # Note "interactive" setting can not be set dynamically at the moment,
-    # since input should be boolean (?)
-    interactive: true
+    cmds:
+      - task: run-interactive-false
+        vars:
+          COMMAND: "{{.COMMAND}}"
+          IS_INTERACTIVE: "{{.IS_INTERACTIVE}}"
+      - task: run-interactive-true
+        vars:
+          COMMAND: "{{.COMMAND}}"
+          IS_INTERACTIVE: "{{.IS_INTERACTIVE}}"
 
   shell:
     desc: Start an interactive shell in project Docker image
     cmds:
       - task: run
         vars:
-          CUSTOM_SWITCHES: "-i --entrypoint /bin/bash"
-          CLI_ARGS: ""
+          IS_INTERACTIVE: "true"
+          CLI_ARGS: '/bin/bash' # this is not ideal, we are running "bash -c /bin/bash"
