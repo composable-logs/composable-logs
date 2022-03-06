@@ -1,0 +1,21 @@
+version: "3"
+
+vars:
+  WATCH_MODE: '{{.WATCH_MODE}}'
+  WATCH_COMMAND: '{{if eq .WATCH_MODE "true"}}find . | grep ".py" | entr{{else}}{{end}}'
+
+tasks:
+  pytest:
+    desc: Run unit tests (pytest)
+    cmds:
+      - "{{.WATCH_COMMAND}} pytest -vvv tests"
+
+  mypy:
+    desc: Check static mypy type checks (mypy)
+    cmds:
+      - "{{.WATCH_COMMAND}} mypy static_builder tests"
+
+  black:
+    desc: Check that code is Black formatted (black)
+    cmds:
+      - "{{.WATCH_COMMAND}} black --check --diff ."

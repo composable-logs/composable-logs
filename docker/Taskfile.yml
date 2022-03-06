@@ -1,0 +1,51 @@
+version: "3"
+
+vars:
+  DOCKER_IMAGE: ci-tools-image
+
+tasks:
+  build:
+    desc: Build project Docker image
+    vars:
+      HOST_UID: {sh: "id -u"}
+      HOST_GID: {sh: "id -g"}
+    cmds:
+      - |
+        docker build \
+          --file docker/Dockerfile.base \
+          --build-arg HOST_UID={{.HOST_UID}} \
+          --build-arg HOST_GID={{.HOST_GID}} \
+          --tag {{.DOCKER_IMAGE}} \
+          .
+
+  run:
+    desc: Run a non-interactive command inside project Docker image
+    summary: |
+      Example use:
+
+      task docker:run -- "ls -al ."
+      task docker:run -- "(printenv; pip3 freeze)"
+    vars:
+      CUSTOM_SWITCHES: '{{default "" .CUSTOM_SWITCHES}}'
+
+    cmds:
+      - |
+        docker run \
+          --rm -t {{.CUSTOM_SWITCHES}} \
+          --network none \
+          --volume {{.PWD}}/workspace:/home/host_user/workspace \
+          --workdir /home/host_user/workspace/ \
+          {{.DOCKER_IMAGE}} \
+          {{.CLI_ARGS}}
+
+    # Note "interactive" setting can not be set dynamically at the moment,
+    # since input should be boolean (?)
+    interactive: true
+
+  shell:
+    desc: Start an interactive shell in project Docker image
+    cmds:
+      - task: run
+        vars:
+          CUSTOM_SWITCHES: "-i --entrypoint /bin/bash"
+          CLI_ARGS: ""

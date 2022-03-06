@@ -1,0 +1,26 @@
+version: "3"
+
+includes:
+  docker: ./docker/Taskfile.yml
+
+tasks:
+  "code:pytest":
+    desc: Run unit tests (pytest)
+    cmds:
+      - task: docker:run
+        vars:
+          CLI_ARGS: '"task pytest WATCH_MODE={{.WATCH_MODE}}"'
+
+  "code:mypy":
+    desc: Check static mypy type checks (mypy)
+    cmds:
+      - task: docker:run
+        vars:
+          CLI_ARGS: '"task mypy WATCH_MODE={{.WATCH_MODE}}"'
+
+  "code:black":
+    desc: Check that code is Black formatted (black)
+    cmds:
+      - task: docker:run
+        vars:
+          CLI_ARGS: '"task black WATCH_MODE={{.WATCH_MODE}}"'
