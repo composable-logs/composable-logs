@@ -11,16 +11,10 @@ from .static_builder import process_artifact
 def args():
     parser = ArgumentParser()
     parser.add_argument(
-        "--gh_repo_owner",
+        "--github_repository",
         required=True,
         type=str,
-        help="Github repository owner (organization or user name)",
-    )
-    parser.add_argument(
-        "--gh_repo_name",
-        required=True,
-        type=str,
-        help="Github repo name with artefacts to download",
+        help="Github repo owner and name. eg. myorg/myrepo",
     )
     parser.add_argument(
         "--output_dir",
@@ -32,8 +26,13 @@ def args():
 
 
 def entry_point():
-    gh_repo_owner = args().gh_repo_owner
-    gh_repo_name = args().gh_repo_name
+
+    github_repository = args().github_repository
+    if len(github_repository.split("/")) != 2:
+        raise ValueError("github_repository parameter should be in format owner/repo-name")
+
+    gh_repo_owner, gh_repo_name = github_repository.split("/")
+
     output_dir = args().output_dir
 
     print("gh_repo_owner   :", gh_repo_owner)
