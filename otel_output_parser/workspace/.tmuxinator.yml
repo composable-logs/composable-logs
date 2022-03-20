@@ -1,0 +1,16 @@
+# See, https://github.com/tmuxinator/tmuxinator
+
+name: watch_tests
+root: ~/workspace/
+
+tmux_options: -f .tmux.conf
+
+startup_window: watch_tests
+
+windows:
+  - watch_tests:
+      layout: main-vertical
+      panes:
+        - task pytest WATCH_MODE=true
+        - task mypy WATCH_MODE=true
+        - task black WATCH_MODE=true

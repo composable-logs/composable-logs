@@ -1,0 +1,17 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "code:watch-all - watch all Python tests",
+            "type": "shell",
+            "command": "task watch-all",
+            "group": "none",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new",
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+    ]
+}
