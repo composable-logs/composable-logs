@@ -1,0 +1,38 @@
+version: "3"
+
+includes:
+  docker: ./docker/Taskfile.yml
+
+vars:
+  # unless set, assume WATCH_MODE is false
+  WATCH_MODE: '{{if eq .WATCH_MODE "true"}}true{{else}}false{{end}}'
+
+tasks:
+  "code:pytest":
+    desc: Run unit tests (pytest)
+    cmds:
+      - task: docker:run
+        vars:
+          CLI_ARGS: "task pytest WATCH_MODE={{.WATCH_MODE}}"
+
+  "code:mypy":
+    desc: Check static mypy type checks (mypy)
+    cmds:
+      - task: docker:run
+        vars:
+          CLI_ARGS: "task mypy WATCH_MODE={{.WATCH_MODE}}"
+
+  "code:black":
+    desc: Check that code is Black formatted (black)
+    cmds:
+      - task: docker:run
+        vars:
+          CLI_ARGS: "task black WATCH_MODE={{.WATCH_MODE}}"
+
+  "code:watch-all":
+    desc: Watch all tests in tmux session
+    cmds:
+      - task: docker:run
+        vars:
+          CLI_ARGS: "task watch-all"
+          IS_INTERACTIVE: "true"
