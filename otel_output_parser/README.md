@@ -39,6 +39,3 @@ Individual tasks are run as eg `task docker:build`.
 
 - Inside Docker dev-container, the `code:watch-all` task can be run using
   "Ctrl + Shift + P" -> "Run Task" and select the "code:watch-all" task.
-
-## License
-(c) Matias Dahl 2021-2022, MIT, see [LICENSE.md](./LICENSE.md).
