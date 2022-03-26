@@ -67,28 +67,16 @@ def github_repo_artifact_zips(
     """
 
     if github_repository is not None:
-        if len(github_repository.split("/")) != 2:
-            raise ValueError(
-                "github_repository parameter should be in format owner/repo-name"
-            )
-
-        gh_repo_owner, gh_repo_name = github_repository.split("/")
-        print("Fetching artefacts from Github")
-        print(" - repo_owner   :", gh_repo_owner)
-        print(" - repo_name    :", gh_repo_name)
-
         # fetch artifacts from Github, and possibly cache them to local directory
-        for entry in list_artifacts_for_repo(
-            repo_owner=gh_repo_owner, repo_name=gh_repo_name
-        ):
+
+        print("Fetching artefacts from Github : ", github_repository)
+        for entry in list_artifacts_for_repo(github_repository=github_repository):
             if entry["expired"]:
                 continue
 
             artifact_id: str = str(entry["id"])
             artifact_zip: bytes = download_artifact(
-                repo_owner=gh_repo_owner,
-                repo_name=gh_repo_name,
-                artifact_id=artifact_id,
+                github_repository=github_repository, artifact_id=artifact_id
             )
 
             if zip_cache_dir is not None:
