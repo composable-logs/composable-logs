@@ -56,7 +56,7 @@ def list_artifacts_for_repo(repo_owner: str, repo_name: str) -> List[Dict]:
     )
 
 
-def download_artifact(repo_owner: str, repo_name: str, artifact_id: int) -> bytes:
+def download_artifact(repo_owner: str, repo_name: str, artifact_id: str) -> bytes:
     """
     Download artifact from Github repo
 

@@ -91,6 +91,11 @@ def ensure_dir_exist(p: Path) -> Path:
 
 
 def process_artifact(zip_content: bytes, output_dir: Path):
+
+    if output_dir is None:
+        print(" -- not output directory provided, no output written --")
+        return
+
     pipeline_artefacts, task_iterator = get_pipeline_artifacts(zip_content)
     pipeline_id: str = (
         bytes_to_json(pipeline_artefacts["pipeline.json"])
