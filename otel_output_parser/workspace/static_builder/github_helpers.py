@@ -35,9 +35,19 @@ def _paginator(operation, per_page=30, **kwargs) -> Iterable[Dict]:
     assert count == result["total_count"]
 
 
-def list_artifacts_for_repo(repo_owner: str, repo_name: str) -> List[Dict]:
+def _validate_github_repo_setup(github_repository: str):
+    if len(github_repository.split("/")) != 2:
+        raise ValueError(
+            "github_repository parameter should be in format owner/repo-name"
+        )
+
+    if os.getenv("GITHUB_TOKEN") is None:
+        raise Exception("GITHUB_TOKEN should be set")
+
+
+def list_artifacts_for_repo(github_repository: str) -> List[Dict]:
     """
-    List all artefacts in a Github repo.
+    List all artefacts in a Github repo (in format owner/repo-name).
 
     Environment variable GITHUB_TOKEN should contain valid token (either token
     generated for an action run, or a Github personal access token).
@@ -45,10 +55,12 @@ def list_artifacts_for_repo(repo_owner: str, repo_name: str) -> List[Dict]:
     The required scope for the token is documented here:
     https://docs.github.com/en/rest/reference/actions#artifacts
 
-    See above link for strucuture of return values.
+    See above link for strucuture of return values (a list of Python dict:s).
     """
-    api = GhApi()
+    _validate_github_repo_setup(github_repository)
 
+    api = GhApi()
+    repo_owner, repo_name = github_repository.split("/")
     return list(
         _paginator(
             api.actions.list_artifacts_for_repo, owner=repo_owner, repo=repo_name
@@ -56,7 +68,7 @@ def list_artifacts_for_repo(repo_owner: str, repo_name: str) -> List[Dict]:
     )
 
 
-def download_artifact(repo_owner: str, repo_name: str, artifact_id: int) -> bytes:
+def download_artifact(github_repository: str, artifact_id: str) -> bytes:
     """
     Download artifact from Github repo
 
@@ -66,12 +78,11 @@ def download_artifact(repo_owner: str, repo_name: str, artifact_id: int) -> byte
     Note:
      - download artifact api did not seem to work with GhApi library
     """
-    token = os.getenv("GITHUB_TOKEN")
-    if token is None:
-        raise Exception("GITHUB_TOKEN should be set")
+    _validate_github_repo_setup(github_repository)
 
+    token = os.getenv("GITHUB_TOKEN")
     endpoint = "https://api.github.com/repos/"
-    url = f"{repo_owner}/{repo_name}/actions/artifacts/{artifact_id}/zip"
+    url = f"{github_repository}/actions/artifacts/{artifact_id}/zip"
     response = requests.get(
         endpoint + url,
         headers={"authorization": f"Bearer {token}"},
