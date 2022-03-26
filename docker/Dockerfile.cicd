@@ -4,6 +4,8 @@
 FROM pynb-dag-runner-base
 
 COPY requirements.txt /home/host_user/
+
+# See https://github.com/jupyter/nbconvert/issues/1736 re jinja2 constraint
 RUN pip3 install --user -r /home/host_user/requirements.txt
 
 RUN pip3 install --user \
