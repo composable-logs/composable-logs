@@ -5,13 +5,14 @@ from argparse import ArgumentParser
 from .github_helpers import list_artifacts_for_repo, download_artifact
 from .static_builder import process_artifact, ensure_dir_exist
 
-
 # Run as:
 # $ pip install -e .
 #
-# Github token should have public repo scope (for personal access token)
+# Set Github token (should have public repo scope, for personal access token)
 # $ export GITHUB_TOKEN="..."
-# $ static_builder --github_repository pynb-dag-runner/mnist-digits-demo-pipeline --output_dir ./output
+#
+# Download artifact into cache directory, parse into output directory
+# $ static_builder --zip_cache_dir ./cache --github_repository pynb-dag-runner/mnist-digits-demo-pipeline --output_dir ./output
 #
 
 
@@ -33,7 +34,7 @@ def args():
         "--output_dir",
         required=False,
         type=Path,
-        help="Output directory",
+        help="Output directory for parsed content (json:s and logged artifacts)",
     )
     return parser.parse_args()
 
@@ -48,22 +49,20 @@ def github_repo_artifact_zips(
 
     At least one argument should be set (ie. not None).
 
-    ------------------+---------------+-------------------------------------------------
-    github_repository | zip_cache_dir | Returns
-    ------------------+---------------+-------------------------------------------------
-    None              | None          | Not valid
-    ------------------+---------------+-------------------------------------------------
-    Set               | None          | Return iterator with all artifacts fetched from
-                      |               | a Github repo.
-    ------------------+---------------+-------------------------------------------------
-    Set               | Set           | Return iterator with all artifacts from the
-                      |               | Github repo, and write the artifacts to cache
-                      |               | directory.
-    ------------------+---------------+-------------------------------------------------
-    None              | Set           | Return iterator with zip artifacts in cache
-                      |               | directory.
-    ------------------+---------------+-------------------------------------------------
+    Input parameter combinations and actions:
 
+    1) github_repository=None, zip_cache_dir=None
+       Not possible
+
+    2) github_repository=Set, zip_cache_dir=None
+       Return iterator with all zip artifacts fetched from the Github repo.
+
+    3) github_repository=None, zip_cache_dir set
+       Return iterator with all zip artifacts fetched from the cache directory.
+
+    3) github_repository set, zip_cache_dir set
+       Return iterator with all zip artifacts from the Github repo, and also write
+       each zip artifacts to cache directory.
     """
 
     if github_repository is not None:
@@ -89,8 +88,7 @@ def github_repo_artifact_zips(
     elif zip_cache_dir is not None and github_repository is None:
         # use local cache; no requests to Github
         for f in zip_cache_dir.glob("*.zip"):
-            print(f, type(f))
-            yield Path(f).read_bytes()
+            yield f.read_bytes()
 
     else:
         assert github_repository is None and zip_cache_dir is None
