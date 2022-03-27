@@ -3,8 +3,10 @@ from pathlib import Path
 from functools import lru_cache
 from argparse import ArgumentParser
 
+#
 from .github_helpers import list_artifacts_for_repo, download_artifact
-from .static_builder import linearize_log_events, ensure_dir_exist
+from .static_builder import linearize_log_events
+from common_helpers.utils import ensure_dir_exist
 
 """
 Run as:
