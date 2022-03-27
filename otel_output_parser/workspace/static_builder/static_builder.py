@@ -85,10 +85,19 @@ def get_pipeline_artifacts(
 # ---- process one zip file; write artifacts/jsons to directory structure ----
 
 
-def _linearize_log_events(zip_content: bytes) -> Iterable[Any]:
+def linearize_log_events(zip_content: bytes) -> Iterable[Any]:
     """
-    Return summaries in sought format (see linearize_log_events) without
-    all_children_ids field.
+    Linearize log events in zip artifact into iterator of dicts with keys:
+
+     - type ("pipeline", "task", "run")
+     - id: (uuid or otel span id as string)
+     - parent_id:
+        - None (when type=pipeline)
+        - parent pipeline's id (when type=task)
+        - parent task's id (when type=run)
+     - metadata: (pipeline.json, task.json, or run.json depending on type)
+     - artifacts: list of dicts with "file_name", "artifact_path, "content" (see below)
+
     """
     pipeline_artefacts, task_iterator = get_pipeline_artifacts(zip_content)
     pipeline_metadata = bytes_to_json(pipeline_artefacts["pipeline.json"])
@@ -155,40 +164,3 @@ def _linearize_log_events(zip_content: bytes) -> Iterable[Any]:
                     for k, v in run_artefacts.items()
                 ],
             }
-
-
-def linearize_log_events(zip_content: bytes) -> Iterable[Any]:
-    """
-    Linearize log events in zip artifact into iterator of dicts with keys:
-
-     - type ("pipeline", "task", "run")
-     - id: (uuid or otel span id as string)
-     - parent_id:
-        - None (when type=pipeline)
-        - parent pipeline's id (when type=task)
-        - parent task's id (when type=run)
-     - all_children_ids: [list of id:s to children (queried recursively)]
-     - metadata: (pipeline.json, task.json, or run.json depending on type)
-     - artifacts: list of dicts with "file_name", "artifact_path, "content" (see below)
-
-    """
-    result = list(_linearize_log_events(zip_content))
-
-    # Construct graph of parent-child relationships between loggen events:
-    #
-    #     pipeline <= task <= run
-    #
-    # with <= representing one-to-many relationships (eg. one pipeline may contain
-    # many tasks)
-    edges = []
-    for summary in result:
-        s_parent_id, s_id = summary["parent_id"], summary["id"]
-
-        if s_parent_id is not None:
-            assert s_id is not None
-            edges.append((s_parent_id, s_id))
-
-    # add `all_children_ids` field to summaries
-    g = Graph(set(edges))
-    for summary in result:
-        yield {**summary, "all_children_ids": list(g.all_children_of(summary["id"]))}
