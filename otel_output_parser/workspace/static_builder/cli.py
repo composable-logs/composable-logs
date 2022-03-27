@@ -1,4 +1,6 @@
-from typing import Any, Iterable, Optional
+import json
+
+from typing import Any, List, Iterable, Optional
 from pathlib import Path
 from functools import lru_cache
 from argparse import ArgumentParser
@@ -6,7 +8,7 @@ from argparse import ArgumentParser
 #
 from .github_helpers import list_artifacts_for_repo, download_artifact
 from .static_builder import linearize_log_events
-from common_helpers.utils import ensure_dir_exist
+from common_helpers.utils import ensure_dir_exist, del_key
 
 """
 Run as:
@@ -106,10 +108,75 @@ def github_repo_artifact_zips(
         raise ValueError("Both github_repository and zip_cache_dir can not be None")
 
 
+# --- sinks for processing {pipeline, task, run} summaries ----
+
+
+class StaticMLFlowDataSink:
+    """
+    Stateful sink for outputting ML Flow static data
+    """
+
+    def __init__(self, output_static_mlflow_data: Optional[Path]):
+        self.output_static_mlflow_data: Optional[Path] = output_static_mlflow_data
+        self.summaries: List[Any] = []
+
+    def push(self, summary):
+        if self.output_static_mlflow_data is None:
+            return
+
+        self.summaries.append(
+            {
+                **summary,
+                # overwrite artifacts with list of entries where (the large)
+                # "content" data has been deleted to save memory.
+                "artifacts": [
+                    del_key(entry, "content") for entry in summary["artifacts"]
+                ],
+            }
+        )
+
+    def close(self):
+        if self.output_static_mlflow_data is None:
+            return
+
+        # Construct graph of parent-child relationships between loggen events:
+        #
+        #     pipeline <= task <= run
+        #
+        # with <= representing one-to-many relationships (eg. one pipeline may contain
+        # many tasks)
+        edges = []
+        for summary in self.summaries:
+            s_parent_id, s_id = summary["parent_id"], summary["id"]
+
+            if s_parent_id is not None:
+                assert s_id is not None
+                edges.append((s_parent_id, s_id))
+
+        # add `all_children_ids` field to summaries
+        from common_helpers.graph import Graph
+
+        g = Graph(set(edges))
+        aug_summaries = {
+            summary["id"]: {
+                **del_key(summary, "id"),
+                "all_children_ids": list(g.all_children_of(summary["id"])),
+            }
+            for summary in self.summaries
+        }
+
+        self.output_static_mlflow_data.write_text(
+            f"export const STATIC_DATA = {json.dumps(aug_summaries, indent=2)};"
+        )
+
+
 def write_attachment_sink(output_dir: Path, summary):
     """
     Stateless sink: write attachments in a {pipeline, task, run}-summary to
-    output directory
+    output directory.
+
+    After a summary object has been processed, all attachments can be released
+    from memory.
     """
     for artifact in summary["artifacts"]:
         ensure_dir_exist(output_dir / artifact["artifact_path"]).write_bytes(
@@ -123,11 +190,17 @@ def entry_point():
     print("zip_cache_dir              :", args().zip_cache_dir)
     print("output_static_mlflow_data  :", args().output_static_mlflow_data)
 
+    # if output_static_mlflow_data is None, this sink is no-op
+    static_mlflow_data_sink = StaticMLFlowDataSink(args().output_static_mlflow_data)
+
     for artifact_zip in github_repo_artifact_zips(
         github_repository=args().github_repository,
         zip_cache_dir=args().zip_cache_dir,
     ):
         for summary in linearize_log_events(artifact_zip):
             write_attachment_sink(args().output_dir, summary)
+            static_mlflow_data_sink.push(summary)
+
+    static_mlflow_data_sink.close()
 
     print("Done")
