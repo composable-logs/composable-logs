@@ -90,51 +90,83 @@ def ensure_dir_exist(p: Path) -> Path:
     return p
 
 
-def process_artifact(zip_content: bytes, output_dir: Path):
+def linearize_log_events(zip_content: bytes):
+    """
+    Linearize log events in zip artifact into iterator of dicts with keys:
 
-    if output_dir is None:
-        print(" -- not output directory provided, no output written --")
-        return
+     - type (pipeline, task, run)
+     - id: (uuid or otel span id)
+     - parent_id:
+        - None (when type=pipeline)
+        - parent pipeline's id (when type=task)
+        - parent task's id (when type=run)
+     - metadata: (pipeline.json, task.json, or run.json depending on type)
+     - artifacts: list of dicts with "file_name", "artifact_path, "content" (see below)
+
+    """
 
     pipeline_artefacts, task_iterator = get_pipeline_artifacts(zip_content)
-    pipeline_id: str = (
-        bytes_to_json(pipeline_artefacts["pipeline.json"])
-        # -
-        ["attributes"]["pipeline.pipeline_run_id"]
-    )
+    pipeline_metadata = bytes_to_json(pipeline_artefacts["pipeline.json"])
+    pipeline_id: str = pipeline_metadata["attributes"]["pipeline.pipeline_run_id"]
 
-    print()
-    print(f"pipeline-id {pipeline_id}")
-
-    for k, v in pipeline_artefacts.items():
-        print(f" - writing pipeline-artefact {k} ({len(v)} bytes)")
-        ensure_dir_exist(output_dir / "pipeline" / pipeline_id / k).write_bytes(v)
+    yield {
+        "type": "pipeline",
+        "id": pipeline_id,
+        "parent_id": None,
+        "metadata": pipeline_metadata,
+        "artifacts": [
+            {
+                "file_name": k,
+                "artifact_path": str(Path("pipeline") / pipeline_id / k),
+                "content": v,
+            }
+            for k, v in pipeline_artefacts.items()
+        ],
+    }
 
     for task_artefacts, run_iterator in task_iterator:
-        task_id: str = bytes_to_json(task_artefacts["task.json"])["span_id"]
-        print(f"    - task_id {task_id}*")
+        task_metadata = bytes_to_json(task_artefacts["task.json"])
+        task_id: str = task_metadata["span_id"]
 
-        for k, v in task_artefacts.items():
-            print(f"      writing task-artefact {k} ({len(v)} bytes)")
-            ensure_dir_exist(
-                output_dir / "pipeline" / pipeline_id / "task" / task_id / k
-            ).write_bytes(v)
+        yield {
+            "type": "task",
+            "id": task_id,
+            "parent_id": pipeline_id,
+            "metadata": task_metadata,
+            "artifacts": [
+                {
+                    "file_name": k,
+                    "artifact_path": str(
+                        Path("pipeline") / pipeline_id / "task" / task_id / k
+                    ),
+                    "content": v,
+                }
+                for k, v in task_artefacts.items()
+            ],
+        }
 
         for run_artefacts in run_iterator:
-            run_id: str = bytes_to_json(run_artefacts["run.json"])["span_id"]
-            print(f"       - run_id {run_id}")
-
-            for k, v in run_artefacts.items():
-                print(f"         writing run-artefact {k} ({len(v)}) bytes)")
-                ensure_dir_exist(
-                    output_dir
-                    / "pipeline"
-                    / pipeline_id
-                    / "task"
-                    / task_id
-                    / "run"
-                    / run_id
-                    / k
-                ).write_bytes(v)
-
-    print("Done. Processed all pipeline, task and run:s")
+            run_metadata = bytes_to_json(run_artefacts["run.json"])
+            run_id = run_metadata["span_id"]
+            yield {
+                "type": "run",
+                "id": run_id,
+                "parent_id": task_id,
+                "metadata": run_metadata,
+                "artifacts": [
+                    {
+                        "file_name": k,
+                        "artifact_path": str(
+                            Path("pipeline")
+                            / pipeline_id
+                            / "task"
+                            / task_id
+                            / "run"
+                            / run_id
+                            / k
+                        ),
+                        "content": v,
+                    }
+                    for k, v in run_artefacts.items()
+                ],
+            }

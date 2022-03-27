@@ -1,21 +1,24 @@
 from typing import Any, Iterable, Optional
 from pathlib import Path
+from functools import lru_cache
 from argparse import ArgumentParser
 
 from .github_helpers import list_artifacts_for_repo, download_artifact
-from .static_builder import process_artifact, ensure_dir_exist
+from .static_builder import linearize_log_events, ensure_dir_exist
 
-# Run as:
-# $ pip install -e .
-#
-# Set Github token (should have public repo scope, for personal access token)
-# $ export GITHUB_TOKEN="..."
-#
-# Download artifact into cache directory, parse into output directory
-# $ static_builder --zip_cache_dir ./cache --github_repository pynb-dag-runner/mnist-digits-demo-pipeline --output_dir ./output
-#
+"""
+Run as:
+$ pip install -e .
+
+Set Github token (should have public repo scope, for personal access token):
+$ export GITHUB_TOKEN="..."
+
+Download artifact into cache directory, parse into output directory:
+$ static_builder --zip_cache_dir ./cache --github_repository pynb-dag-runner/mnist-digits-demo-pipeline --output_dir ./output
+"""
 
 
+@lru_cache
 def args():
     parser = ArgumentParser()
     parser.add_argument(
@@ -32,7 +35,7 @@ def args():
     )
     parser.add_argument(
         "--output_dir",
-        required=False,
+        required=True,
         type=Path,
         help="Output directory for parsed content (json:s and logged artifacts)",
     )
@@ -104,7 +107,14 @@ def entry_point():
         github_repository=args().github_repository,
         zip_cache_dir=args().zip_cache_dir,
     ):
+        linear_events = linearize_log_events(artifact_zip)
 
-        process_artifact(artifact_zip, output_dir=args().output_dir)
+        for run_summary in linear_events:
+            for art in run_summary["artifacts"]:
+                print(f"- writing {art['artifact_path']} ({len(art['content'])} bytes)")
+
+                ensure_dir_exist(args().output_dir / art["artifact_path"]).write_bytes(
+                    art["content"]
+                )
 
     print("Done")
