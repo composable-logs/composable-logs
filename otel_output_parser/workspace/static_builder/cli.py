@@ -1,10 +1,15 @@
+import json
 from typing import Any, Iterable, Optional
 from pathlib import Path
 from functools import lru_cache
 from argparse import ArgumentParser
 
+#
 from .github_helpers import list_artifacts_for_repo, download_artifact
-from .static_builder import linearize_log_events, ensure_dir_exist
+from .static_builder import linearize_log_events
+from common_helpers.graph import Graph
+from common_helpers.utils import ensure_dir_exist
+from common_helpers.opentelemetry_helpers import iso8601_to_epoch_ms
 
 """
 Run as:
@@ -38,6 +43,12 @@ def args():
         required=True,
         type=Path,
         help="Output directory for parsed content (json:s and logged artifacts)",
+    )
+    parser.add_argument(
+        "--output_static_mlflow_data",
+        required=False,
+        type=Path,
+        help="Output file for static mlflow js-file",
     )
     return parser.parse_args()
 
@@ -98,23 +109,31 @@ def github_repo_artifact_zips(
         raise ValueError("Both github_repository and zip_cache_dir can not be None")
 
 
+# ----- stateful sinks for receiving summaries ----
+
+
+def write_attachment_sink(output_dir: Path, summary):
+    """
+    Stateless sink: write attachments in a {pipeline, task, run}-summary to
+    output directory
+    """
+    for artifact in summary["artifacts"]:
+        ensure_dir_exist(output_dir / artifact["artifact_path"]).write_bytes(
+            artifact["content"]
+        )
+
+
 def entry_point():
-    print("output_dir         :", args().output_dir)
-    print("github_repository  :", args().github_repository)
-    print("zip_cache_dir      :", args().zip_cache_dir)
+    print("output_dir                 :", args().output_dir)
+    print("github_repository          :", args().github_repository)
+    print("zip_cache_dir              :", args().zip_cache_dir)
+    print("output_static_mlflow_data  :", args().output_static_mlflow_data)
 
     for artifact_zip in github_repo_artifact_zips(
         github_repository=args().github_repository,
         zip_cache_dir=args().zip_cache_dir,
     ):
-        linear_events = linearize_log_events(artifact_zip)
-
-        for run_summary in linear_events:
-            for art in run_summary["artifacts"]:
-                print(f"- writing {art['artifact_path']} ({len(art['content'])} bytes)")
-
-                ensure_dir_exist(args().output_dir / art["artifact_path"]).write_bytes(
-                    art["content"]
-                )
+        for summary in linearize_log_events(artifact_zip):
+            write_attachment_sink(args().output_dir, summary)
 
     print("Done")

@@ -13,7 +13,7 @@ tasks:
   mypy:
     desc: Check static mypy type checks (mypy)
     cmds:
-      - "{{.WATCH_COMMAND}} mypy static_builder tests"
+      - "{{.WATCH_COMMAND}} mypy --ignore-missing-imports static_builder tests common_helpers"
 
   black:
     desc: Check that code is Black formatted (black)

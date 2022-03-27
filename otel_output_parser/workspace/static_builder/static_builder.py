@@ -1,8 +1,11 @@
-import io, json
+import io
 
-from typing import Any, List, Dict, Tuple, Union
+from typing import Any, List, Dict, Tuple, Union, Iterable
 from pathlib import Path
 from zipfile import ZipFile
+
+#
+from common_helpers.utils import bytes_to_json
 
 
 # ---- Implement get_pipeline_artifacts from content of zip file ----
@@ -81,21 +84,12 @@ def get_pipeline_artifacts(
 # ---- process one zip file; write artifacts/jsons to directory structure ----
 
 
-def bytes_to_json(b: bytes) -> Any:
-    return json.loads(b.decode("utf-8"))
-
-
-def ensure_dir_exist(p: Path) -> Path:
-    p.parent.mkdir(parents=True, exist_ok=True)
-    return p
-
-
-def linearize_log_events(zip_content: bytes):
+def linearize_log_events(zip_content: bytes) -> Iterable[Any]:
     """
     Linearize log events in zip artifact into iterator of dicts with keys:
 
-     - type (pipeline, task, run)
-     - id: (uuid or otel span id)
+     - type ("pipeline", "task", "run")
+     - id: (uuid or otel span id as string)
      - parent_id:
         - None (when type=pipeline)
         - parent pipeline's id (when type=task)
@@ -104,7 +98,6 @@ def linearize_log_events(zip_content: bytes):
      - artifacts: list of dicts with "file_name", "artifact_path, "content" (see below)
 
     """
-
     pipeline_artefacts, task_iterator = get_pipeline_artifacts(zip_content)
     pipeline_metadata = bytes_to_json(pipeline_artefacts["pipeline.json"])
     pipeline_id: str = pipeline_metadata["attributes"]["pipeline.pipeline_run_id"]

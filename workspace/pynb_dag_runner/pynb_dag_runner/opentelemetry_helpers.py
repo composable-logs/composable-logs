@@ -1,3 +1,9 @@
+#### NOTE/TODO: Selected functions (only used for parsing/testing)
+#### should be moved to separate otel_output_parser package.
+####
+#### Already duplicated: iso8601_to_epoch_s
+####
+
 import glob
 from pathlib import Path
 from typing import Any, List, Mapping, Set, Optional, MutableMapping
