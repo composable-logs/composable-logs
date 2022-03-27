@@ -35,3 +35,18 @@ class Graph(Generic[Node]):
         return iter_to_set(
             from_node for from_node, to_node in self.edges if node == to_node
         )
+
+    def _all_children_of(self, node: Node) -> Iterable[Node]:
+        # - no cycle checking
+        # - may return multiple copies of node if there are two path between two nodes
+        #   in the graph.
+        for child_node in self.children_of(node):
+            yield child_node
+            for grand_child_node in self._all_children_of(child_node):
+                yield grand_child_node
+
+    def all_children_of(self, node: Node) -> Set[Node]:
+        """
+        Recursively find all children to a node in a graph.
+        """
+        return set(self._all_children_of(node))

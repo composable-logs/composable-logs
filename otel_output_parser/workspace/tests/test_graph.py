@@ -30,3 +30,9 @@ def test_graph_parents_children():
     assert g.parents_of(3) == {2}
     assert g.parents_of(4) == {1}
     assert g.parents_of(5) == {2, 4}
+
+    assert g.all_children_of(1) == {2, 3, 4, 5}
+    assert g.all_children_of(2) == {3, 5}
+    assert g.all_children_of(3) == set()
+    assert g.all_children_of(4) == {5}
+    assert g.all_children_of(5) == set()
