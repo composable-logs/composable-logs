@@ -8,7 +8,8 @@ from argparse import ArgumentParser
 #
 from .github_helpers import list_artifacts_for_repo, download_artifact
 from .static_builder import linearize_log_events
-from common_helpers.utils import ensure_dir_exist, del_key
+from common_helpers.utils import ensure_dir_exist, del_key, iso8601_to_epoch_ms
+from common_helpers.graph import Graph
 
 """
 Run as:
@@ -139,7 +140,7 @@ class StaticMLFlowDataSink:
         if self.output_static_mlflow_data is None:
             return
 
-        # Construct graph of parent-child relationships between loggen events:
+        # Construct graph of parent-child relationships between logged events:
         #
         #     pipeline <= task <= run
         #
@@ -154,16 +155,49 @@ class StaticMLFlowDataSink:
                 edges.append((s_parent_id, s_id))
 
         # add `all_children_ids` field to summaries
-        from common_helpers.graph import Graph
 
         g = Graph(set(edges))
+
+        def to_epoch(summary_type, summary_metadata):
+            assert ("start_time" in summary_metadata) == (summary_type != "pipeline")
+            assert ("end_time" in summary_metadata) == (summary_type != "pipeline")
+
+            if summary_type != "pipeline":
+                return {
+                    **summary_metadata,
+                    "start_time": iso8601_to_epoch_ms(summary_metadata["start_time"]),
+                    "end_time": iso8601_to_epoch_ms(summary_metadata["end_time"]),
+                }
+            else:
+                # TODO: see below
+                return summary_metadata
+
         aug_summaries = {
             summary["id"]: {
                 **del_key(summary, "id"),
+                "metadata": to_epoch(summary["type"], summary["metadata"]),
                 "all_children_ids": list(g.all_children_of(summary["id"])),
             }
             for summary in self.summaries
         }
+
+        # Manually fill in pipeline run times from min-max of children summaries
+        # // TODO: this would not be necessary after pipeline level-tasks have
+        # otel spans, see above.
+        for _, summary in aug_summaries.items():
+            if summary["type"] == "pipeline":
+                all_children = [aug_summaries[k] for k in summary["all_children_ids"]]
+                assert (
+                    len(all_children) > 0
+                ), "pipeline tasks should have subtasks -- delete these if needed?"
+
+                summary["metadata"]["start_time"] = min(
+                    s["metadata"]["start_time"] for s in all_children
+                )
+                summary["metadata"]["end_time"] = max(
+                    s["metadata"]["end_time"] for s in all_children
+                )
+        # -----
 
         self.output_static_mlflow_data.write_text(
             f"export const STATIC_DATA = {json.dumps(aug_summaries, indent=2)};"
