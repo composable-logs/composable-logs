@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="pynb_dag_runner_ciutils",
+    name="otel_output_parser",
     author="Matias Dahl",
     author_email="matias.dahl@iki.fi",
     license="MIT",
