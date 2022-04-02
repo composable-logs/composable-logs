@@ -5,16 +5,16 @@ ARG HOST_UID
 
 ENV DEBIAN_FRONTEND "noninteractive"
 
-RUN apt-get -y update && \
-    apt-get -y upgrade && \
-    apt-get install -y -q \
+RUN apt-get -qq -y update && \
+    apt-get -qq -y upgrade && \
+    apt-get -qq -y install --no-install-recommends \
         curl \
         python3 \
         python3-pip \
         entr \
         tmuxinator
 
-RUN groupadd --gid $HOST_GID host_user_group  && \
+RUN groupadd --gid $HOST_GID host_user_group && \
     useradd --uid $HOST_UID --gid $HOST_GID -rm --shell /bin/bash host_user
 
 USER host_user
@@ -24,7 +24,7 @@ ENV PYTHONPYCACHEPREFIX=/home/host_user/.cache/python
 
 RUN pip3 install --user \
         pytest==6.2.5 \
-        black==21.12b0 \
+        black==22.3.0 \
         mypy==0.930 \
         ghapi==0.1.19 \
         requests==2.27.1 \
