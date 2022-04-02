@@ -27,7 +27,8 @@ RUN pip3 install --user \
         black==21.12b0 \
         mypy==0.930 \
         ghapi==0.1.19 \
-        requests==2.27.1
+        requests==2.27.1 \
+        python-dateutil==2.8.2
 
 
 # Install Taskfile, see https://taskfile.dev/#/installation
