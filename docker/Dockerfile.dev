@@ -6,7 +6,7 @@ FROM pynb-dag-runner-cicd
 #  - VS Code devcontainer
 
 USER root
-RUN apt-get install -y -q entr
+RUN apt-get install -y -qq --no-install-recommends entr
 USER host_user
 
 RUN : && \

@@ -11,7 +11,7 @@ RUN pip3 install --user -r /home/host_user/requirements.txt
 RUN pip3 install --user \
         pytest==6.2.5 \
         pytest-asyncio==0.16.0 \
-        black==21.12b0 \
+        black==22.3.0 \
         mypy==0.930
 
 ENV MYPY_CACHE_DIR=/home/host_user/.cache/mypy
