@@ -68,9 +68,12 @@ def ok_notebook_run_spans() -> Spans:
     return rec.spans
 
 
-def test__jupytext_notebook_task__ok_notebook__parsed_spans__parameters_inherit(
+def test__jupytext_notebook_task__ok_notebook__parsed_spans(
     ok_notebook_run_spans: Spans,
 ):
+    # test parsed spans:
+    #   - pipeline, task, run attributes
+    #   - notebook is logged as artifact
     pipeline_dict, task_it = get_pipeline_iterators(ok_notebook_run_spans)
     expected_pipeline_attributes = {"pipeline.foo": "bar"}
     assert expected_pipeline_attributes == pipeline_dict["attributes"]
