@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Iterable, Mapping, MutableMapping, Tuple, Set, List
+from typing import Any, Dict, Iterable, Mapping, MutableMapping, Tuple, Set, List
 
 #
 from pynb_dag_runner.opentelemetry_helpers import (
@@ -138,20 +138,25 @@ def _get_logged_named_values(spans: Spans, task_run_top_span) -> Mapping[str, An
 
 
 def _run_iterator(
-    spans: Spans, task_top_span
+    task_attributes: Dict[str, Any], spans: Spans, task_top_span
 ) -> Iterable[Tuple[RunDict, Iterable[ArtefactDict]]]:
     for task_run_top_span in (
         spans.bound_under(task_top_span)
         .filter(["name"], "retry-call")
         .sort_by_start_time()
     ):
+        # get all run attributes including attributes inherited from parent task
+        # and pipeline.
         run_dict = {
             **_key_span_details(task_run_top_span),
-            "attributes": (
-                spans.bound_inclusive(task_run_top_span)
-                #
-                .get_attributes(allowed_prefixes={"run.", "task.", "pipeline."})
-            ),
+            "attributes": {
+                **task_attributes,
+                **(
+                    spans.bound_inclusive(task_run_top_span)
+                    #
+                    .get_attributes(allowed_prefixes={"run."})
+                ),
+            },
             "logged_values": _get_logged_named_values(spans, task_run_top_span),
         }
         yield run_dict, _artefact_iterator(spans, task_run_top_span)
@@ -159,18 +164,25 @@ def _run_iterator(
     return iter([])
 
 
-def _task_iterator(spans: Spans) -> Iterable[Tuple[TaskDict, Iterable[RunDict]]]:
+def _task_iterator(
+    pipeline_attributes: Dict[str, Any], spans: Spans
+) -> Iterable[Tuple[TaskDict, Iterable[RunDict]]]:
     for task_top_span in spans.filter(["name"], "execute-task").sort_by_start_time():
-        task_dict = {
-            **_key_span_details(task_top_span),
-            "attributes": (
+        # get all task attributes including attributes inherited from pipeline
+        task_attributes = {
+            **pipeline_attributes,
+            **(
                 spans.bound_inclusive(task_top_span)
-                #
-                .get_attributes(allowed_prefixes={"task.", "pipeline."})
+                # --
+                .get_attributes(allowed_prefixes={"task."})
             ),
         }
+        task_dict = {
+            **_key_span_details(task_top_span),
+            "attributes": task_attributes,
+        }
 
-        yield task_dict, _run_iterator(spans, task_top_span)
+        yield task_dict, _run_iterator(task_attributes, spans, task_top_span)
 
     return iter([])
 
@@ -184,9 +196,11 @@ def get_pipeline_iterators(
 
     Input is all OpenTelemetry spans logged for one pipeline run.
     """
+    pipeline_attributes = spans.get_attributes(allowed_prefixes={"pipeline."})
+
     pipeline_dict = {
         "task_dependencies": list(extract_task_dependencies(spans)),
-        "attributes": spans.get_attributes(allowed_prefixes={"pipeline."}),
+        "attributes": pipeline_attributes,
     }
 
-    return pipeline_dict, _task_iterator(spans)
+    return pipeline_dict, _task_iterator(pipeline_attributes, spans)

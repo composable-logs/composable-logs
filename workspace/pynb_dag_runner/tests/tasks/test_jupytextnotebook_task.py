@@ -1,5 +1,7 @@
 import datetime, glob, json
 from pathlib import Path
+from functools import lru_cache
+
 
 #
 import pytest
@@ -36,44 +38,72 @@ def assert_no_exceptions(spans: Spans):
             print(json.dumps(e, indent=2))
 
 
-def isotimestamp_normalized():
-    """
-    Return ISO timestamp modified (by replacing : with _) so that it can be used
-    as part of a directory or file name.
-
-    Eg "YYYY-MM-DDTHH-MM-SS.ffffff+00-00"
-
-    This is useful to generate output directories that are guaranteed to not exist.
-    """
-    return datetime.datetime.now(datetime.timezone.utc).isoformat().replace(":", "-")
+TEST_NOTEBOOK_PATH = (Path(__file__).parent) / "jupytext_test_notebooks"
 
 
 def make_test_nb_task(
     nb_name: str, max_nr_retries: int, parameters={}, timeout_s: float = 10.0
 ):
-    nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
+    # nb_path: Path = (Path(__file__).parent) / "jupytext_test_notebooks"
     return make_jupytext_task_ot(
-        notebook=JupytextNotebook(nb_path / nb_name),
-        tmp_dir=nb_path,
+        notebook=JupytextNotebook(TEST_NOTEBOOK_PATH / nb_name),
+        tmp_dir=TEST_NOTEBOOK_PATH,
         timeout_s=timeout_s,
         max_nr_retries=max_nr_retries,
         parameters=parameters,
     )
 
 
-def test__jupytext_notebook_task__run_ok_notebook():
-    NB_PATH = str((Path(__file__).parent)) + "/jupytext_test_notebooks/notebook_ok.py"
+@pytest.fixture
+@lru_cache
+def ok_notebook_run_spans() -> Spans:
+    with SpanRecorder() as rec:
+        jupytext_task = make_test_nb_task(
+            nb_name="notebook_ok.py",
+            max_nr_retries=2,
+            parameters={"pipeline.foo": "bar", "task.variable_a": "task-value"},
+        )
+        _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
-    def get_test_spans():
-        with SpanRecorder() as rec:
-            jupytext_task = make_test_nb_task(
-                nb_name="notebook_ok.py",
-                max_nr_retries=2,
-                parameters={"pipeline.foo": "bar", "task.variable_a": "task-value"},
-            )
-            _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
+    return rec.spans
 
-        return rec.spans
+
+def test__jupytext_notebook_task__ok_notebook__parsed_spans__parameters_inherit(
+    ok_notebook_run_spans: Spans,
+):
+    pipeline_dict, task_it = get_pipeline_iterators(ok_notebook_run_spans)
+    expected_pipeline_attributes = {"pipeline.foo": "bar"}
+    assert expected_pipeline_attributes == pipeline_dict["attributes"]
+
+    for task_dict, run_it in [one(task_it)]:  # type: ignore
+        expected_task_attributes = {
+            **expected_pipeline_attributes,
+            "task.variable_a": "task-value",
+            "task.max_nr_retries": 2,
+            "task.notebook": str(TEST_NOTEBOOK_PATH / "notebook_ok.py"),
+            "task.num_cpus": 1,
+            "task.task_type": "jupytext",
+            "task.timeout_s": 10.0,
+        }
+        assert expected_task_attributes == task_dict["attributes"]
+
+        for run_dict, run_artefact_it in [one(run_it)]:  # type: ignore
+            expected_run_attributes = {
+                **expected_pipeline_attributes,
+                **expected_task_attributes,
+                "run.retry_nr": 0,
+            }
+            assert expected_run_attributes == run_dict["attributes"]
+
+            artefacts = {a["name"]: a for a in run_artefact_it}
+            assert set(artefacts.keys()) == {"notebook.ipynb"}
+
+            assert artefacts["notebook.ipynb"]["type"] == "utf-8"
+            assert len(artefacts["notebook.ipynb"]["content"]) > 1000
+
+
+def test__jupytext_notebook_task__ok_notebook__main_tests(ok_notebook_run_spans: Spans):
+    NB_PATH = str(TEST_NOTEBOOK_PATH / "notebook_ok.py")
 
     def validate_spans(spans: Spans):
         assert len(spans.exception_events()) == 0
@@ -139,7 +169,8 @@ def test__jupytext_notebook_task__run_ok_notebook():
                     "run.retry_nr": 0,
                     "task.num_cpus": 1,
                     "task.timeout_s": 10.0,
-                    # TODO: all pipeline and task attributes are not listed here
+                    **expected_pipeline_attributes,
+                    **expected_task_attributes,
                 }
 
                 # check that one notebooks artefact should be logged
@@ -150,9 +181,8 @@ def test__jupytext_notebook_task__run_ok_notebook():
                         "content",
                     }
 
-    spans = get_test_spans()
-    validate_spans(spans)
-    validate_parsed_spans(spans)
+    validate_spans(ok_notebook_run_spans)
+    validate_parsed_spans(ok_notebook_run_spans)
 
 
 def test__jupytext_notebook_task__always_fail():
