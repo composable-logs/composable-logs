@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Generic, TypeVar, List, Sequence, Tuple, Optional
+from typing import Any, Generic, TypeVar, List, Iterable, Sequence, Tuple, Optional
 
 A = TypeVar("A")
 
@@ -103,7 +103,7 @@ def read_jsonl(path: Path):
     return [json.loads(span_line) for span_line in path.read_text().splitlines()]
 
 
-def one(xs: Sequence[A]) -> A:
+def one(xs: Iterable[A]) -> A:
     """
     Assert that input can be converted into list with only one element, and
     return that element.
