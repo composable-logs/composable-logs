@@ -84,7 +84,7 @@ def github_repo_artifact_zips(
 
         print("Fetching artefacts from Github : ", github_repository)
         for entry in list_artifacts_for_repo(github_repository=github_repository):
-            if entry["expired"] or ("pipeline-outputs" not in entry["name"]):
+            if entry["expired"] or ("opentelemetry-outputs" not in entry["name"]):
                 continue
 
             artifact_id: str = str(entry["id"])
