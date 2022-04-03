@@ -1,7 +1,7 @@
-import datetime, glob, json
+import glob, json
 from pathlib import Path
 from functools import lru_cache
-
+from typing import Any, Dict
 
 #
 import pytest
@@ -78,7 +78,7 @@ def test__jupytext_notebook_task__ok_notebook__parsed_spans(
     expected_pipeline_attributes = {"pipeline.foo": "bar"}
     assert expected_pipeline_attributes == pipeline_dict["attributes"]
 
-    for task_dict, run_it in [one(task_it)]:  # type: ignore
+    for task_dict, run_it in [one(task_it)]:
         expected_task_attributes = {
             **expected_pipeline_attributes,
             "task.variable_a": "task-value",
@@ -91,7 +91,7 @@ def test__jupytext_notebook_task__ok_notebook__parsed_spans(
         assert expected_task_attributes == task_dict["attributes"]
 
         for run_dict, run_artefact_it in [one(run_it)]:  # type: ignore
-            expected_run_attributes = {
+            expected_run_attributes: Dict[str, Any] = {
                 **expected_pipeline_attributes,
                 **expected_task_attributes,
                 "run.retry_nr": 0,
@@ -153,7 +153,7 @@ def test__jupytext_notebook_task__ok_notebook__main_tests(ok_notebook_run_spans:
 
             assert task_dict["status"] == {"status_code": "OK"}  # type: ignore
 
-            expected_task_attributes = {
+            expected_task_attributes: Dict[str, Any] = {
                 "task.variable_a": "task-value",
                 "task.max_nr_retries": 2,
                 "task.notebook": NB_PATH,
@@ -161,20 +161,19 @@ def test__jupytext_notebook_task__ok_notebook__main_tests(ok_notebook_run_spans:
                 "task.task_type": "jupytext",
                 "task.timeout_s": 10.0,
             }
-            assert task_dict["attributes"] == {  # type: ignore
+            assert {
                 **expected_pipeline_attributes,
                 **expected_task_attributes,
-            }
+            } == task_dict["attributes"]
 
             for run_dict, artefact_it in [one(run_it)]:  # type: ignore
                 assert run_dict.keys() == common_keys | {"logged_values"}
-                assert run_dict["attributes"] == {
+                expected_run_attributes: Dict[str, Any] = {
                     "run.retry_nr": 0,
-                    "task.num_cpus": 1,
-                    "task.timeout_s": 10.0,
                     **expected_pipeline_attributes,
                     **expected_task_attributes,
                 }
+                assert expected_run_attributes == run_dict["attributes"]
 
                 # check that one notebooks artefact should be logged
                 for artefact_dict in [one(artefact_it)]:
