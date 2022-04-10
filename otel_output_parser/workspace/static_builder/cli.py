@@ -213,9 +213,9 @@ def write_attachment_sink(output_dir: Path, summary):
     from memory.
     """
     for artifact in summary["artifacts"]:
-        ensure_dir_exist(output_dir / artifact["artifact_path"]).write_bytes(
-            artifact["content"]
-        )
+        ensure_dir_exist(
+            output_dir / summary["artifacts_location"] / artifact["name"]
+        ).write_bytes(artifact["content"])
 
 
 def entry_point():

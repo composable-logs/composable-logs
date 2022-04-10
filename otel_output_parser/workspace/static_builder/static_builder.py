@@ -108,11 +108,12 @@ def linearize_log_events(zip_content: bytes) -> Iterable[Any]:
         "id": pipeline_id,
         "parent_id": None,
         "metadata": pipeline_metadata,
+        "artifacts_location": str(Path("pipeline") / pipeline_id),
         "artifacts": [
             {
-                "file_name": k,
-                "artifact_path": str(Path("pipeline") / pipeline_id / k),
+                "name": k,
                 "content": v,
+                "size": len(v),
             }
             for k, v in pipeline_artefacts.items()
         ],
@@ -127,13 +128,14 @@ def linearize_log_events(zip_content: bytes) -> Iterable[Any]:
             "id": task_id,
             "parent_id": pipeline_id,
             "metadata": task_metadata,
+            "artifacts_location": str(
+                Path("pipeline") / pipeline_id / "task" / task_id
+            ),
             "artifacts": [
                 {
-                    "file_name": k,
-                    "artifact_path": str(
-                        Path("pipeline") / pipeline_id / "task" / task_id / k
-                    ),
+                    "name": k,
                     "content": v,
+                    "size": len(v),
                 }
                 for k, v in task_artefacts.items()
             ],
@@ -147,19 +149,14 @@ def linearize_log_events(zip_content: bytes) -> Iterable[Any]:
                 "id": run_id,
                 "parent_id": task_id,
                 "metadata": run_metadata,
+                "artifacts_location": str(
+                    Path("pipeline") / pipeline_id / "task" / task_id / "run" / run_id
+                ),
                 "artifacts": [
                     {
-                        "file_name": k,
-                        "artifact_path": str(
-                            Path("pipeline")
-                            / pipeline_id
-                            / "task"
-                            / task_id
-                            / "run"
-                            / run_id
-                            / k
-                        ),
+                        "name": k,
                         "content": v,
+                        "size": len(v),
                     }
                     for k, v in run_artefacts.items()
                 ],
