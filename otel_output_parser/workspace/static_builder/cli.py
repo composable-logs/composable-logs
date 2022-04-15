@@ -40,7 +40,7 @@ def args():
     )
     parser.add_argument(
         "--output_dir",
-        required=True,
+        required=False,
         type=Path,
         help="Output directory for parsed content (json:s and logged artifacts)",
     )
@@ -48,7 +48,7 @@ def args():
         "--output_static_mlflow_data",
         required=False,
         type=Path,
-        help="Output file for static mlflow js-file",
+        help="Output file path for static mlflow js-file",
     )
     return parser.parse_args()
 
@@ -199,12 +199,12 @@ class StaticMLFlowDataSink:
                 )
         # -----
 
-        self.output_static_mlflow_data.write_text(
+        ensure_dir_exist(self.output_static_mlflow_data).write_text(
             f"export const STATIC_DATA = {json.dumps(aug_summaries, indent=2)};"
         )
 
 
-def write_attachment_sink(output_dir: Path, summary):
+def write_attachment_sink(output_dir: Optional[Path], summary):
     """
     Stateless sink: write attachments in a {pipeline, task, run}-summary to
     output directory.
@@ -212,10 +212,13 @@ def write_attachment_sink(output_dir: Path, summary):
     After a summary object has been processed, all attachments can be released
     from memory.
     """
+    if output_dir is None:
+        return
+
     for artifact in summary["artifacts"]:
-        ensure_dir_exist(output_dir / artifact["artifact_path"]).write_bytes(
-            artifact["content"]
-        )
+        ensure_dir_exist(
+            output_dir / summary["artifacts_location"] / artifact["name"]
+        ).write_bytes(artifact["content"])
 
 
 def entry_point():
