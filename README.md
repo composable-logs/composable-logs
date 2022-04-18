@@ -1,5 +1,7 @@
 # `pynb-dag-runner` Python library
 
+
+
 > **py_dag_runner** is a light-weight open source Python library for running pipelines of Python functions and/or Jupter notebooks.
 
 Main features:
@@ -20,9 +22,23 @@ An implication of storing output as files is that `py_dag_runner` is independent
 
 A limitation of this approach is that there is no real-time monitoring. For interactive viewing, output files can be inspected with a file viewer. Or, alternatively, artefacts can be uploaded to ML Flow for off-line inspection.
 
-###  Demo pipeline, see [mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline) repo
+## ML Ops demo pipeline
+
+The below shows an example ML pipeline that trains a model for detecting hand written digits. Moreover, it explores how the size of the training set influences model performance:
 
 ![task-dependencies.png](./assets/task-dependencies.png)
+
+Using `pynb-dag-runner`, this pipeline is implemented in the below repo
+- [mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline)
+
+This repo has Github Actions conifgured to run the pipeline daily (on a Github hosted runner), and results are saved as build artifacts.
+
+Past pipeline results can be inspected from the (static) mlflow site:
+- [https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+
+This is built using the custom clone of mlflow [pynb-dag-runner/mlflow](https://github.com/pynb-dag-runner/mlflow).
+
+(**Caveat:** The demo pipeline is currently being refactored. All steps have not yet refactored, and are not seen in the above links.)
 
 ## Notes
 
