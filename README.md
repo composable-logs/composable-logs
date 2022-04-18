@@ -1,7 +1,7 @@
 # `pynb-dag-runner`
 **py_dag_runner** is a open source Python library for running pipelines of Jupter notebooks. Main features:
 
-### Tasks are executed in parallel using the [Ray](https://www.ray.io/) framework
+### (Notebook) tasks are executed in parallel using the [Ray](https://www.ray.io/) framework
  - With a DAG one can define in which order tasks should run.
  - Tasks can run in parallel (subject to DAG constraints).
  - Currently `pynb-dag-runner` only support single node Ray clusters.
