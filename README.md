@@ -1,4 +1,4 @@
-# `pynb-dag-runner` Python library
+# `pynb-dag-runner`
 **py_dag_runner** is a open source Python library for running pipelines of Jupter notebooks. Main features:
 
 ### Tasks are executed in parallel using the [Ray](https://www.ray.io/) framework
