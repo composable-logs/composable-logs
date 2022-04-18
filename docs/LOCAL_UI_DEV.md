@@ -10,7 +10,7 @@ cd /some-work-dir/
 #  - convert these into format that can be compiled into static website
 git clone git@github.com:pynb-dag-runner/pynb-dag-runner.git
 
-# The mlflow clone repo contains a form of the official mlflow project.
+# The mlflow clone repo contains a fork of the official mlflow project.
 # This fork supports building static websites.
 git clone git@github.com:pynb-dag-runner/mlflow.git --branch static_mlflow
 ```
