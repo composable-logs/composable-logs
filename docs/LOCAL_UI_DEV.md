@@ -18,7 +18,7 @@ git clone git@github.com:pynb-dag-runner/mlflow.git --branch static_mlflow
 The below steps will also use test pipeline run logs produced from the [mnist-demo-pipeline repo](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline), but this repo does not need to be cloned locally.
 
 ## Download test data
-Here we download test data using a PAT (Personal Access Token), see [docs](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) if these are not familar. A (possibly safer) approach could be to manually download artifacts from the Github UI.
+Here we download test data using a PAT (Personal Access Token), see [docs](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) if these are not familar. A (safer) approach (that avoids using a PAT) would be to manually download artifacts from the Github UI.
 
 ### 1. Generate PAT in Github UI
  - Note that the PAT will have access to everything the logged in user has access to (for selected scopes). So assign minimum priviledges to the PAT:
@@ -48,8 +48,7 @@ static_builder \
 #### 2b. Delete the token created above using Github UI
 
 #### 2c. Parse zip file content into form suitable for for static ML Flow website
-Notes:
-- this does not require network/API access and uses only files in the `./cache` directory.
+- this step does not require network/API access and uses only files in the `./cache` directory.
 - this will delete any previous content in `./static_output` directory.
 
 ```bash
@@ -63,7 +62,7 @@ static_builder \
 
 ### 3. Copy data into mlflow repo
 
-Copy the outputs into mlflow repo:
+Copy the outputs into the mlflow repo:
 
 ```bash
 # See step above where repos where cloned:
@@ -81,4 +80,4 @@ cp \
 
 ### 4. Build static mlflow/run in watch mode
 
-See `makefile` in `./mlflow/server/js/` directory of mlflow-repo
+See `makefile` in the `./mlflow/server/js/` directory of the `static_mlflow` branch of the cloned mlflow-repo

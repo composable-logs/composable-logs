@@ -3,7 +3,7 @@
 
 ### Tasks are executed in parallel using the [Ray](https://www.ray.io/) framework
  - With a DAG one can define in which order tasks should run.
- - Tasks run in parallel (subject to DAG constraints).
+ - Tasks can run in parallel (subject to DAG constraints).
  - Currently `pynb-dag-runner` only support single node Ray clusters.
 
 ### Pipeline outputs are saved using the [OpenTelemetry](https://opentelemetry.io/) standard
@@ -11,9 +11,9 @@
   - Pipeline configuration.
   - Parameters used to trigger tasks/notebooks.
   - Any logged images, metrics, rendered notebooks, or even models.
-  - Timing and other outcomes (eg., did a task fail, succeed, timeout, any retries).
+  - Timing and other outcomes (eg., did a task fail, succeed, timeout, retries).
 - Effectively, this means that after a pipeline has run all relevant information can be stored as one json file. Alternatively, this can be expanded into a directory structure, or the events can be redirected into any service that support OpenTelemetry (span events).
-- Use of OpenTelemetry is possible since Ray supports OpenTelmetry.
+- Use of OpenTelemetry is possible since Ray supports OpenTelemetry.
 
 ### Reporting using custom static version of [mlflow](https://mlflow.org/)
 - OpenTelemetry files emitted from pipeline runs can be converted into a static website (built using a custom version of mlflow).
@@ -23,7 +23,7 @@
 
 The advantage of this approach is that pipelines can be be run without any cloud infrastructure except a Github account (see below).
 
-The main limitation compared to other options, is that there is no real-time monitoring.
+A main limitation compared to other options, is that there is no real-time monitoring.
 
 See [docs/NOTES.md](docs/NOTES.md) for further comments about the implementation and dependencies.
 
@@ -33,7 +33,7 @@ The below shows an example ML pipeline that trains a model for detecting hand wr
 ![task-dependencies.png](./assets/task-dependencies.png)
 
 Using `pynb-dag-runner`, this pipeline is implemented in the below repo
-- [mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline)
+- [pynb-dag-runner/mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline)
 
 This repo has Github Actions conifgured to run the pipeline daily (on a Github hosted runner), and results are saved as build artifacts.
 
