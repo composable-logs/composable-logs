@@ -1,8 +1,12 @@
 import os
-from typing import List, Mapping, Optional
+from typing import List, Mapping, Optional, TypeVar
 
 
-def _dict_filter_none_values(d: Mapping[str, Optional[str]]) -> Mapping[str, str]:
+K = TypeVar("K")
+V = TypeVar("V")
+
+
+def _dict_filter_none_values(d: Mapping[K, Optional[V]]) -> Mapping[K, V]:
     return {k: v for k, v in d.items() if v is not None}
 
 
