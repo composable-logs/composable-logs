@@ -6,24 +6,29 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
-def _dict_filter_none_values(d: Mapping[K, Optional[V]]) -> Mapping[K, V]:
-    return {k: v for k, v in d.items() if v is not None}
+def _dict_filter_none_values(a_dict: Mapping[K, Optional[V]]) -> Mapping[K, V]:
+    return {k: v for k, v in a_dict.items() if v is not None}
 
 
 def get_github_env_variables() -> Mapping[str, str]:
     """
-    Returns a dict with key-values representing details/environment variables for a task
-    running as a Github action. All Github environment variables are prefixed with
-    "pipeline.github.".
+    Returns a Python dict with key-values representing Github and Github actions
+    details. These are set as environment variables when code is run run as a Github
+    action task.
 
-    Eg., the key "pipeline.github.actor" contains the Github username who triggered
-    the task run.
+    The selected list of environment variables being read is listed below.
 
-    If no github-environment variables are set, this function returns an empty
-    dictionary.
+    The full list of available variables (with documentation):
+    https://docs.github.com/en/actions/learn-github-actions/environment-variables#default-environment-variables
 
-    For documentation and explanation of variables, see:
-    https://docs.github.com/en/actions/learn-github-actions/environment-variables
+    Notes:
+    - If no Github-environment variables are set (eg. code is run locally), this
+      function returns an empty dictionary. (Ie., keys with none values are removed
+      from output).
+
+    - In the returned dictionary, variables are placed in lower case and prefixed with
+      pipeline.github. For example, the key "pipeline.github.actor" contains the
+      Github username who triggered the task run.
     """
     gh_env_vars: List[str] = [
         #
@@ -38,9 +43,6 @@ def get_github_env_variables() -> Mapping[str, str]:
         "GITHUB_WORKFLOW",
         # human readable description of gha job
         #
-        "GITHUB_ACTION_REF",
-        # (?) not documented in above web page but seen with "printenv". empty?
-        #
         "RUNNER_NAME",
         # where was task run. eg "Hosted Agent"
         #
@@ -48,7 +50,9 @@ def get_github_env_variables() -> Mapping[str, str]:
         # eg "nnnnnnnnnnnn". This can be used to link back to job run page on Github
         #
         "GITHUB_ACTOR",
-        # user name triggering task
+        # user name triggering task.
+        # See also:
+        #   https://github.community/t/who-will-be-the-github-actor-when-a-workflow-runs-on-a-schedule/17369
         #
         "GITHUB_JOB",
         # name of gha job
