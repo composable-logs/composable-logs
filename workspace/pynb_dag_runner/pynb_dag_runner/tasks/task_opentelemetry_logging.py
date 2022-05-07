@@ -58,19 +58,21 @@ class SerializedData:
             # https://docs.python.org/3/library/base64.html#security-considerations
             return cls("bytes", "base64", base64.b64encode(content).decode("utf-8"))
 
-        json_data = json.dumps(content)
-        if isinstance(content, bool):
-            # Note: isinstance(True, int) == True, so we first test for bool
-            return cls("bool", "json", json_data)
-        elif isinstance(content, int):
-            return cls("int", "json", json_data)
-        elif isinstance(content, float):
-            return cls("float", "json", json_data)
-        elif content == json.loads(json_data):
-            # input data is JSON serializable
-            return cls("json", "json", json_data)
-        else:
-            raise ValueError(f"Input format not supported {type(content)}")
+        try:
+            json_data = json.dumps(content)
+            if isinstance(content, bool):
+                # Note: isinstance(True, int) == True, so we first test for bool
+                return cls("bool", "json", json_data)
+            elif isinstance(content, int):
+                return cls("int", "json", json_data)
+            elif isinstance(content, float):
+                return cls("float", "json", json_data)
+            else:
+                # input data is JSON serializable (json.dumps does not crash)
+                return cls("json", "json", json_data)
+        except Exception as e:
+            raise RuntimeError(f"Unable to parse {str(content)[:1000]}") from e
+
 
 
 # ----
@@ -118,6 +120,9 @@ def _log_named_value(
 
     if not isinstance(name, str):
         raise ValueError(f"name {name} should be string when logging a named-value")
+
+    if content_type not in ["bytes", "utf8"]:
+        print(f" - Logging {name} ({content_type}) :", str(content)[:1000])
 
     def _log(span: Span):
         span.set_attribute("name", name)
