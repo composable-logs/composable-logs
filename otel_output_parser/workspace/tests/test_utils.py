@@ -13,7 +13,7 @@ from common_helpers.utils import (
 
 def test_bytes_to_json():
     python_data = ["Smile 😊😊😊😊😊!!", 123]
-    byte_array = bytes(json.dumps(python_data), "utf8")
+    byte_array = bytes(json.dumps(python_data), "utf-8")
 
     assert python_data == bytes_to_json(byte_array)
 
