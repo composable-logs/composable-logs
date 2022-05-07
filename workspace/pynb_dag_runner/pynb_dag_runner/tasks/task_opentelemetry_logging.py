@@ -121,7 +121,7 @@ def _log_named_value(
     if not isinstance(name, str):
         raise ValueError(f"name {name} should be string when logging a named-value")
 
-    if content_type not in ["bytes", "utf8"]:
+    if content_type not in ["bytes", "utf-8"]:
         print(f" - Logging {name} ({content_type}) :", str(content)[:1000])
 
     def _log(span: Span):
