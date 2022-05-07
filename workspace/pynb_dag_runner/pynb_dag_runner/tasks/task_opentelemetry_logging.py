@@ -74,7 +74,6 @@ class SerializedData:
             raise RuntimeError(f"Unable to parse {str(content)[:1000]}") from e
 
 
-
 # ----
 
 
