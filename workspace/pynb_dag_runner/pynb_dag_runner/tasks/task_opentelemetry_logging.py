@@ -1,6 +1,6 @@
 import base64, json, tempfile, os
 from pathlib import Path
-from typing import Any, Callable, Optional, Mapping, Union
+from typing import Any, Callable, Dict, Optional, Mapping, Union
 from dataclasses import dataclass
 
 #
@@ -12,6 +12,9 @@ import ray
 from opentelemetry.trace.propagation.tracecontext import (
     TraceContextTextMapPropagator,
 )
+
+#
+from pynb_dag_runner.opentelemetry_helpers import Spans
 
 # ---- encode/decode functions -----
 
@@ -138,6 +141,42 @@ def _log_named_value(
         span_name="artefact" if is_file else "named-value",
         traceparent=traceparent,
     )
+
+
+def _read_logged_serialized_data(spans: Spans, filter_name: str):
+    """
+    Inverse of _log_named_value; read all logged artifacts/named values from
+    a collection of spans.
+
+    The return value is a key-value dictionary with deserialized values.
+
+    If there are multiple values logged under the same name, the last logged value
+    is used.
+    """
+    assert filter_name in ["artefact", "named-value"]
+
+    values = {}
+    for s0 in spans.filter(["name"], filter_name).sort_by_start_time(reverse=True):
+        data_attr = s0["attributes"]
+        value = SerializedData(
+            type=data_attr["type"],
+            encoding=data_attr["encoding"],
+            encoded_content=data_attr["content_encoded"],
+        ).decode()
+        value_name = data_attr["name"]
+
+        if value_name not in values:
+            values[value_name] = value
+
+    return values
+
+
+def get_logged_artifacts(spans: Spans) -> Dict[str, Any]:
+    return _read_logged_serialized_data(spans, filter_name="artefact")
+
+
+def get_logged_values(spans: Spans) -> Dict[str, Any]:
+    return _read_logged_serialized_data(spans, filter_name="named-value")
 
 
 class PydarLogger:
