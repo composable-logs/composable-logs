@@ -1,50 +1,36 @@
 # `pynb-dag-runner`
-**py_dag_runner** is a open source Python library for running pipelines of Jupter notebooks. Main features:
+## Overview and motivation
 
-### (Notebook) tasks are executed in parallel using the [Ray](https://www.ray.io/) framework
- - With a DAG one can define in which order tasks should run.
- - Tasks can run in parallel (subject to DAG constraints).
- - Currently `pynb-dag-runner` only support single node Ray clusters.
+**py_dag_runner** is an OSS Python library for running DAGs -- or pipelines -- of Python notebooks on a Ray
+cluster with OpenTelemetry logging. For reporting and experiment tracking, the OpenTelemetry
+logs can be converted into a static website. This is accomplished using a custom fork of MLFlow
+that builds static websites that can be deployed without an API backend.
 
-### Pipeline outputs are saved using the [OpenTelemetry](https://opentelemetry.io/) standard
-- Pipeline telemetry is emitted using the OpenTelemetry (open) standard. This includes:
-  - Pipeline configuration.
-  - Parameters used to trigger tasks/notebooks.
-  - Any logged images, metrics, rendered notebooks, or even models.
-  - Timing and other outcomes (eg., did a task fail, succeed, timeout, retries).
-- Effectively, this means that after a pipeline has run all relevant information can be stored as one json file. Alternatively, this can be expanded into a directory structure, or the events can be redirected into any service that support OpenTelemetry (span events).
-- Use of OpenTelemetry is possible since Ray supports OpenTelemetry.
+Thus, **py_dag_runner** can run (small scale data) pipelines
+using only services provided with a free Github account:
+- Github Actions: for scheduling and compute
+- Github build artifacts: to persists OpenTelemetry logs of pipeline runs
+- Github Pages: to host MLFlow-based static reporting site
 
-### Reporting using custom static version of [mlflow](https://mlflow.org/)
-- OpenTelemetry files emitted from pipeline runs can be converted into a static website (built using a custom version of mlflow).
-- See [demo hosted on Github Pages](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/).
+**py_dag_runner** includes a demo pipeline that illustrates this setup:
 
-----
+### Demo `mnist-digits-demo-pipeline` pipeline running on Github infrastructure
+- Demo reporting site: **https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/**
+- This read-only static site is hosted on Github Pages. It is built using a modified version of MLFlow and does not use a backend.
+- The site reports (eg logged metrics, artifacts, rendered notebooks) for:
+  - pipeline runs scheduled to run daily
+  - pipeline runs triggered by pull requests
+- See the below diagrams for more details
 
-The advantage of this approach is that pipelines can be be run without any cloud infrastructure except a Github account (see below).
+### Demo pipeline DAG
 
-A main limitation compared to other options, is that there is no real-time monitoring.
-
-See [docs/NOTES.md](docs/NOTES.md) for further comments about the implementation and dependencies.
-
-## ML Ops demo pipeline
-The below shows an example ML pipeline that trains a model for detecting hand written digits. Moreover, it explores how the size of the training set influences model performance:
+The pipeline explores how size of training set influences model performance.
 
 ![task-dependencies.png](./assets/task-dependencies.png)
 
-Using `pynb-dag-runner`, this pipeline is implemented in the below repo
-- [pynb-dag-runner/mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline)
+### Demo pipeline architecture
 
-This repo has Github Actions conifgured to run the pipeline daily (on a Github hosted runner), and results are saved as build artifacts.
-
-Past pipeline results can be inspected from the (static) mlflow site:
-- [https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
-
-This is built using the custom clone of mlflow [pynb-dag-runner/mlflow](https://github.com/pynb-dag-runner/mlflow).
-
-(**Caveat:** The demo pipeline is currently being refactored. All steps have not yet refactored, and are not seen in the above links.)
-
-This example pipeline setup is illustrated below:
+The below shows in more detail how Github services are used:
 
 ```mermaid
 graph BT;
@@ -91,6 +77,47 @@ web_static_mlflow_logs -.- web_static_mlflow
 Internet --> web_static_mlflow
 ```
 
+## Key repositories
+
+There are three repos:
+### [pynb-dag-runner/mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline)
+ - Repo for the mnist demo pipeline (Python, notebooks, GHA definitions)
+
+### [pynb-dag-runner/pynb-dag-runner](https://github.com/pynb-dag-runner/pynb-dag-runner)
+ - Repo for the main library (Python, Ray, OpenTelemetry). This is used when running the demo pipeline.
+
+### [pynb-dag-runner/mlflow](https://github.com/pynb-dag-runner/mlflow).
+ - A slightly modified version of MLFlow, that can build static MLFlow-like sites where all metadata is included in the front end.
+ - The demo site linked [above](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline) is built using this repo.
+
+## Main features and dependencies
+
+**py_dag_runner** is a open source Python library for running pipelines of Jupter notebooks
+or Python functions.
+
+### (Notebook) tasks are executed in parallel using the [Ray](https://www.ray.io/) framework
+ - With a DAG one can define in which order tasks should run.
+ - Tasks can run in parallel (subject to DAG constraints).
+ - Currently `pynb-dag-runner` only support single node Ray clusters.
+
+### Pipeline outputs are saved using the [OpenTelemetry](https://opentelemetry.io/) standard
+- Pipeline telemetry is emitted using the OpenTelemetry (open) standard. This includes:
+  - Pipeline configuration.
+  - Parameters used to trigger tasks/notebooks.
+  - Any logged images, metrics, rendered notebooks, or even models.
+  - Timing and other outcomes (eg., did a task fail, succeed, timeout, retries).
+- Effectively, this means that after a pipeline has run all relevant information can be stored as one json file. Alternatively, this can be expanded into a directory structure, or the events can be redirected into any service that support OpenTelemetry (span events).
+- Use of OpenTelemetry is possible since Ray supports OpenTelemetry.
+
+### Reporting using custom static version of [MLFlow](https://mlflow.org/)
+- OpenTelemetry files emitted from pipeline runs can be converted into a static website (built using a custom version of mlflow).
+- See [demo hosted on Github Pages](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/).
+- A limitation with a static website is that reporting is not real time.
+
+----
+
+See [docs/NOTES.md](docs/NOTES.md) for further comments about the implementation and dependencies.
+
 ## Local development
 Development environments are dockerized, and makefile:s should be available for most common tasks. See:
 
@@ -102,10 +129,16 @@ The Github actions in the `pynb-dag-runner` and `mnist-digits-demo-pipeline` rep
 
 Instructions assume linux-based setup (eg. ubuntu), but should also work on macs with some changes (or at least on non-M1 ones).
 
-## Contact
-Please note that this is experimental and 🚧🚧🚧.
+## Ideas, feedback and contributions welcome
 
-A motivation for this work is to make it easier to set up and work together (on pipelines). If you would like to discuss an idea or question, please raise an [issue](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline/issues) or contact me via email.
+This is WIP and all feedback is welcome.
+
+To contribute, the best way is likely to first open an issue or send an email.
+
+#### Motivation
+- Develop more options for working together on (small scale) open source/open data pipelines
+- Experiment how MLOps can scale down to a minimum setup
+- Learning
 
 ## License
 (c) Matias Dahl 2021-2022, MIT, see [LICENSE.md](./LICENSE.md).
