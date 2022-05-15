@@ -130,9 +130,15 @@ class Spans:
     def get_by_span_id(self, span_id) -> SpanDict:
         return one([span for span in self if get_span_id(span) == span_id])
 
-    def sort_by_start_time(self):
+    def sort_by_start_time(self, reverse=False):
         return Spans(
-            list(sorted(self, key=lambda s: dp.parse(s["start_time"]).timestamp()))
+            list(
+                sorted(
+                    self,
+                    key=lambda s: dp.parse(s["start_time"]).timestamp(),
+                    reverse=reverse,
+                )
+            )
         )
 
     def __len__(self):
