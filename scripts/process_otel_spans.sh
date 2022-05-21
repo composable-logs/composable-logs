@@ -42,7 +42,6 @@ echo "--- Converting: Mermaid input file for Gantt diagram -> png"
 echo "==============================================================="
 $SCRIPT_DIRECTORY/render_mermaid.sh $OUTPUT_BASEDIR/gantt.mmd $OUTPUT_BASEDIR/gantt-diagram.png
 $SCRIPT_DIRECTORY/render_mermaid.sh $OUTPUT_BASEDIR/dag.mmd $OUTPUT_BASEDIR/dag-diagram.png
-rm $OUTPUT_BASEDIR/gantt.mmd $OUTPUT_BASEDIR/dag.mmd
 
 echo "==============================================================="
 echo "--- Converting: Done"
