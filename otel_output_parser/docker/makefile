@@ -14,6 +14,11 @@ build:
 	    .
 
 run-command:
+	echo "-----"
+	echo "DOCKER_RUN_ARGS= $(DOCKER_RUN_ARGS)"
+	echo "-----"
+	echo "COMMAND= $(COMMAND)"
+	echo "-----"
 	docker run --rm -t \
 	    $(DOCKER_RUN_ARGS) \
 	    --volume $$(pwd)/../workspace:/home/host_user/workspace \
