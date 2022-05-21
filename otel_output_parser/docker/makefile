@@ -16,7 +16,6 @@ build:
 run-command:
 	docker run --rm -t \
 	    $(DOCKER_RUN_ARGS) \
-	    --network none \
 	    --volume $$(pwd)/../workspace:/home/host_user/workspace \
 	    --workdir /home/host_user/workspace/ \
 	    ci-tools-image \
