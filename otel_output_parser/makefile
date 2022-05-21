@@ -19,7 +19,7 @@ docker-run-command:
 	(\
 	    cd docker; \
 		make run-command \
-	        DOCKER_RUN_ARGS=$(DOCKER_RUN_ARGS) \
+	        DOCKER_RUN_ARGS="$(DOCKER_RUN_ARGS)" \
 	        COMMAND="$(COMMAND)" \
 	)
 
