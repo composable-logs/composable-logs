@@ -11,6 +11,6 @@ windows:
   - watch_tests:
       layout: main-vertical
       panes:
-        - task pytest WATCH_MODE=true
-        - task mypy WATCH_MODE=true
-        - task black WATCH_MODE=true
+        - make pytest WATCH_MODE=1
+        - make mypy WATCH_MODE=1
+        - make black WATCH_MODE=1
