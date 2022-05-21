@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 .PHONY: build run-command shell
 
-# --
+# ---
 
 build:
 	docker \
@@ -15,7 +15,7 @@ build:
 
 run-command:
 	docker run --rm -t \
-	    $(ARGS) \
+	    $(DOCKER_RUN_ARGS) \
 	    --network none \
 	    --volume $$(pwd)/../workspace:/home/host_user/workspace \
 	    --workdir /home/host_user/workspace/ \
@@ -25,5 +25,5 @@ run-command:
 shell:
 	# Open shell in docker image
 	make run-command \
-	    ARGS="-i" \
+	    DOCKER_RUN_ARGS="-i" \
 	    COMMAND="/bin/bash"
