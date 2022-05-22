@@ -1,38 +1,17 @@
-# ci-utils
-Utils/scripts for running pynb-dag-runner in Github actions and processing output run logs
-
-## Local setup
-(Tested on Ubuntu system)
-
-### Taskfile
-This project uses [Taskfile](https://taskfile.dev/) (a yaml-based tool similar to makefile)
-for common project task definitions.
-
-### Installation
-For install instructions, see `https://taskfile.dev/#/installation`.
-
-Eg., if `~/.local/bin` is in `$PATH`, Taskfile can be installed for the user as:
-```bash
-sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
-```
-
-Verify that the Taskfile is installed by running `task --version`.
-
+# `otel_output_parser`
+Utils/scripts for:
+- parsing OpenTelemetry logs emitted from pynb-dag-runner
+- download Build Artifacts from Github actions
+- scripts for converting OpenTelemetry logs into a static MLFlow website.
 ### List of project tasks
-After taskfile is installed, running `task --list` shows a list of available tasks:
 
-```
-task: Available tasks for this project:
-* code:black: 		Check that code is Black formatted (black)
-* code:mypy: 		Check static mypy type checks (mypy)
-* code:pytest: 		Run unit tests (pytest)
-* code:watch-all: 	Watch all tests in tmux session
-* docker:build: 	Build project Docker image
-* docker:run: 		Run bash command in project Docker image (interactive if IS_INTERACTIVE=true)
-* docker:shell: 	Start an interactive shell in project Docker image
-```
+```bash
+# run all tests in (w tmuxinator)
+make docker-tmux-watch-all-tests
 
-Individual tasks are run as eg `task docker:build`.
+# Run pytests (optionally in watch mode, with filtering)
+make docker-pytest [WATCH_MODE=1] [PYTEST_FILTER="test_name_search_string"]
+```
 
 ## VS Code development
 - Set up VS Code (TBD)

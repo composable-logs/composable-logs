@@ -15,6 +15,7 @@ on:
 
   workflow_dispatch:
 
+# Note: the below does not test code under otel_output_parser
 
 jobs:
   run-all-tests:
