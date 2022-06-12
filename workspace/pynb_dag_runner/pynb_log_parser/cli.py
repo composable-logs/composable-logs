@@ -165,16 +165,21 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
 
 
 def make_link_to_task_run(task_run_dict) -> str:
-    # TODO: for now only link to pipeline run; after we introduce stable link
-    # to runs, we can create a direct link to the task run page
-    repo_owner, repo_name = task_run_dict["attributes"][
-        "pipeline.github.repository"
-    ].split("/")
+    # -- This is not provided during unit tests
+    if "pipeline.github.repository" in task_run_dict["attributes"]:
+        repo_owner, repo_name = task_run_dict["attributes"][
+            "pipeline.github.repository"
+        ].split("/")
+
+        host = f"https://{repo_owner}.github.io/{repo_name}"
+    else:
+        host = "."
+
     pipeline_id = task_run_dict["attributes"]["pipeline.pipeline_run_id"]
-    # run_id = task_run_dict["span_id"]
+    #run_id = task_run_dict["span_id"]
 
     return (
-        f"https://{repo_owner}.github.io/{repo_name}/#/experiments/0/runs/{pipeline_id}"
+        f"{host}/#/experiments/0/runs/{pipeline_id}"
     )
 
 
