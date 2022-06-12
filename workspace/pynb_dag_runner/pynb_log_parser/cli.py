@@ -176,11 +176,9 @@ def make_link_to_task_run(task_run_dict) -> str:
         host = "."
 
     pipeline_id = task_run_dict["attributes"]["pipeline.pipeline_run_id"]
-    #run_id = task_run_dict["span_id"]
+    # run_id = task_run_dict["span_id"]
 
-    return (
-        f"{host}/#/experiments/0/runs/{pipeline_id}"
-    )
+    return f"{host}/#/experiments/0/runs/{pipeline_id}"
 
 
 def make_mermaid_dag_inputfile(spans: Spans):
@@ -234,7 +232,7 @@ def make_mermaid_dag_inputfile(spans: Spans):
         if task_dict["attributes"]["task.task_type"] != "jupytext":
             raise Exception(f"Unknown task type for {task_dict}")
 
-        linkify = lambda *args: make_link(*args, last_run_dict)
+        linkify = lambda x, ys: make_link(x, ys, last_run_dict)
 
         output_lines += [
             f"    {dag_node_id(task_dict['span_id'])}"
