@@ -31,6 +31,8 @@ $SCRIPT_DIRECTORY/parse_otel_spans.sh \
     output_filepath_mermaid_gantt \
     $OUTPUT_BASEDIR/gantt.mmd
 
+# The below also outputs dag-nolinks.mmd without html links to github.
+# That is used below to create png.
 $SCRIPT_DIRECTORY/parse_otel_spans.sh \
     $PYTHON_DOCKER_IMAGE_NAME \
     $OPENTELEMETRY_SPANS_JSON_FILEPATH \
@@ -41,7 +43,7 @@ echo "==============================================================="
 echo "--- Converting: Mermaid input file for Gantt diagram -> png"
 echo "==============================================================="
 $SCRIPT_DIRECTORY/render_mermaid.sh $OUTPUT_BASEDIR/gantt.mmd $OUTPUT_BASEDIR/gantt-diagram.png
-$SCRIPT_DIRECTORY/render_mermaid.sh $OUTPUT_BASEDIR/dag.mmd $OUTPUT_BASEDIR/dag-diagram.png
+$SCRIPT_DIRECTORY/render_mermaid.sh $OUTPUT_BASEDIR/dag-nolinks.mmd $OUTPUT_BASEDIR/dag-diagram.png
 
 echo "==============================================================="
 echo "--- Converting: Done"
