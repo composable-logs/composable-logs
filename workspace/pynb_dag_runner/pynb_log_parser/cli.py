@@ -307,10 +307,11 @@ def entry_point():
         # v--- temp hack
         # - Converting mmd with html links to png does not work so remove any link
         nolinks_dag_mmd_content: str = (
-            # --
             re.sub(r"<a href=.*?>", "", dag_mmd_content)
-            # --
-            .replace("</a>", "").replace("🔗", "")
+            .replace("</a>", "")
+            .replace("🔗", "")
+            .replace("<b>", "")
+            .replace("</b>", "")
         )
 
         nolinks_output_path: Path = dag_output_path.with_name(
