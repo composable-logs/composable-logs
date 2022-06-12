@@ -175,10 +175,14 @@ def make_link_to_task_run(task_run_dict) -> str:
     else:
         host = "."
 
-    pipeline_id = task_run_dict["attributes"]["pipeline.pipeline_run_id"]
-    # run_id = task_run_dict["span_id"]
+    task_id = (
+        task_run_dict["attributes"]["task.notebook"]
+        # -
+        .split("/")[-1].replace(".py", "")
+    )
+    run_span_id = task_run_dict["span_id"]
 
-    return f"{host}/#/experiments/0/runs/{pipeline_id}"
+    return f"{host}/#/experiments/{task_id}/runs/{run_span_id}"
 
 
 def make_mermaid_dag_inputfile(spans: Spans):
