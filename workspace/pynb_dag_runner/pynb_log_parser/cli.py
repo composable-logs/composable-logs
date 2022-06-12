@@ -1,4 +1,4 @@
-import datetime
+import datetime, re
 from pathlib import Path
 from argparse import ArgumentParser
 from typing import List, Tuple
@@ -291,4 +291,23 @@ def entry_point():
         )
 
     if args().output_filepath_mermaid_dag is not None:
-        args().output_filepath_mermaid_dag.write_text(make_mermaid_dag_inputfile(spans))
+        dag_output_path: Path = args().output_filepath_mermaid_dag
+        assert dag_output_path.suffix == ".mmd"
+
+        dag_mmd_content: str = make_mermaid_dag_inputfile(spans)
+        dag_output_path.write_text(dag_mmd_content)
+
+        # v--- temp hack
+        # - Converting mmd with html links to png does not work so remove any link
+        nolinks_dag_mmd_content: str = (
+            # --
+            re.sub(r"<a href=.*?>", "", dag_mmd_content)
+            # --
+            .replace("</a>", "").replace("🔗", "")
+        )
+
+        nolinks_output_path: Path = dag_output_path.with_name(
+            dag_output_path.name.replace(".mmd", "-nolinks.mmd")
+        )
+        nolinks_output_path.write_text(nolinks_dag_mmd_content)
+        # ^---
