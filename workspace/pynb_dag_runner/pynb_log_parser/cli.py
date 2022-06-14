@@ -1,7 +1,7 @@
-import datetime
+import datetime, re
 from pathlib import Path
 from argparse import ArgumentParser
-
+from typing import List, Tuple
 
 #
 from pynb_dag_runner.helpers import read_json, write_json
@@ -164,6 +164,27 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     return "\n".join(output_lines)
 
 
+def make_link_to_task_run(task_run_dict) -> str:
+    # -- This is not provided during unit tests
+    if "pipeline.github.repository" in task_run_dict["attributes"]:
+        repo_owner, repo_name = task_run_dict["attributes"][
+            "pipeline.github.repository"
+        ].split("/")
+
+        host = f"https://{repo_owner}.github.io/{repo_name}"
+    else:
+        host = "."
+
+    task_id = (
+        task_run_dict["attributes"]["task.notebook"]
+        # -
+        .split("/")[-1].replace(".py", "")
+    )
+    run_span_id = task_run_dict["span_id"]
+
+    return f"{host}/#/experiments/{task_id}/runs/{run_span_id}"
+
+
 def make_mermaid_dag_inputfile(spans: Spans):
     """
     Generate input file for Mermaid diagram generator for creating dependency diagram
@@ -184,7 +205,7 @@ def make_mermaid_dag_inputfile(spans: Spans):
         # span_id:s are of form "0x<hex>" and can not be used as Mermaid node_ids as-is.
         return f"TASK_SPAN_ID_{span_id}"
 
-    def dag_node_description(task_dict) -> str:
+    def dag_node_description(task_dict) -> Tuple[str, List[str]]:
         assert task_dict["attributes"]["task.task_type"] == "jupytext"
 
         out_lines = []
@@ -192,29 +213,34 @@ def make_mermaid_dag_inputfile(spans: Spans):
             if k.startswith("task.") and k not in ["task.task_type", "task.notebook"]:
                 out_lines += [f"{k}={v}"]
 
+        # here one could potentially also add total length of task w.
+        # outcome status (success/failure)
         return (
-            '"'
-            + "<br />".join(
-                [
-                    task_dict["attributes"]["task.notebook"] + " (jupytext task)",
-                    # here one could potentially also add total length of task w.
-                    # outcome status (success/failure)
-                    "",
-                ]
-                + list(sorted(out_lines))
-            )
-            + '"'
+            task_dict["attributes"]["task.notebook"] + " (jupytext task)",
+            list(sorted(out_lines)),
         )
 
-    for task_dict, _ in task_it:
-        print("task", task_dict)
+    def make_link(desc: str, attrs: List[str], last_run_dict) -> str:
+        url: str = make_link_to_task_run(last_run_dict)
+        link_html_text: str = f"<b>{desc} 🔗</b> <br />" + "<br />".join(attrs)
+
+        return (
+            f"<a href='{url}' style='text-decoration: none; color: black;'>"
+            f"{link_html_text}"
+            f"</a>"
+        )
+
+    for task_dict, run_it in task_it:
+        last_run_dict, _ = list(run_it)[-1]
 
         if task_dict["attributes"]["task.task_type"] != "jupytext":
             raise Exception(f"Unknown task type for {task_dict}")
 
+        linkify = lambda x, ys: make_link(x, ys, last_run_dict)
+
         output_lines += [
             f"    {dag_node_id(task_dict['span_id'])}"
-            f"[{dag_node_description(task_dict)}]"
+            f"""["{linkify(*dag_node_description(task_dict))}"]"""
         ]
 
     for span_id_from, span_id_to in pipeline_dict["task_dependencies"]:
@@ -272,4 +298,24 @@ def entry_point():
         )
 
     if args().output_filepath_mermaid_dag is not None:
-        args().output_filepath_mermaid_dag.write_text(make_mermaid_dag_inputfile(spans))
+        dag_output_path: Path = args().output_filepath_mermaid_dag
+        assert dag_output_path.suffix == ".mmd"
+
+        dag_mmd_content: str = make_mermaid_dag_inputfile(spans)
+        dag_output_path.write_text(dag_mmd_content)
+
+        # v--- temp hack
+        # - Converting mmd with html links to png does not work so remove any link
+        nolinks_dag_mmd_content: str = (
+            re.sub(r"<a href=.*?>", "", dag_mmd_content)
+            .replace("</a>", "")
+            .replace("🔗", "")
+            .replace("<b>", "")
+            .replace("</b>", "")
+        )
+
+        nolinks_output_path: Path = dag_output_path.with_name(
+            dag_output_path.name.replace(".mmd", "-nolinks.mmd")
+        )
+        nolinks_output_path.write_text(nolinks_dag_mmd_content)
+        # ^---

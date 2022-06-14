@@ -389,7 +389,10 @@ def test__jupytext_notebook_task__otel_logging_from_notebook(tmp_path: Path):
             jupytext_task = make_test_nb_task(
                 nb_name="notebook_otel_logging.py",
                 max_nr_retries=1,
-                parameters={"task.variable_a": "task-value"},
+                parameters={
+                    "task.variable_a": "task-value",
+                    "pipeline.pipeline_run_id": "12345",
+                },
             )
             _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 

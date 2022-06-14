@@ -155,7 +155,7 @@ def _run_iterator(
     for task_run_top_span in (
         spans.bound_under(task_top_span)
         .filter(["name"], "retry-call")
-        .sort_by_start_time()
+        .sort_by_start_time()  # TODO: sort by run.retry_nr instead
     ):
         # get all run attributes including attributes inherited from parent task
         # and pipeline.
