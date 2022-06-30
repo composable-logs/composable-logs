@@ -1,7 +1,6 @@
-## Sphinx documentation for `pynb-dag-runner`
-
-The `/sphinx-docs` folder contains documentation and tooling for building
-the documentation web site.
+The `/sphinx-docs`-folder contains:
+- documentation
+- scripts (using Sphinx) for building the documentation web site.
 
 ## Build locally
 
