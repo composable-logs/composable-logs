@@ -3,9 +3,19 @@ The `/sphinx-docs`-folder contains:
 - scripts (using Sphinx) for building the documentation web site.
 
 ## Build locally
+In `<repo-root>/sphinx-docs` directory:
 
 ```bash
-make help
+pip3 install -U sphinx==5.0.2
+
+# generate static html pages into sphinx-docs/build/html directory
+make html
+
+# start webserver (in another terminal)
+cd build/html
+python3 -m http.server --bind 0.0.0.0 4200
+
+# open 127.0.0.1:4200 in local browser
 ```
 
 ## License note
