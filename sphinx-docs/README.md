@@ -35,7 +35,7 @@ under the Sphinx project's two clause BSD license, see:
 - https://github.com/sphinx-doc/sphinx/tree/5.x/sphinx/templates/quickstart
 - https://www.sphinx-doc.org/en/master/man/sphinx-quickstart.html
 
-This note only address the inital files created by the Sphinx quickstart tool.
+This note only address the initial setup created by the Sphinx quickstart tool.
 All subsequent modifications and contributions (unless otherwise noted) are
-licensed under the main project license, see [LICENSE.md](../LICENSE.md)
-in the repo root.
+licensed under the pynb-dag-runner main project license, see
+[LICENSE.md](../LICENSE.md) in the repo root.
