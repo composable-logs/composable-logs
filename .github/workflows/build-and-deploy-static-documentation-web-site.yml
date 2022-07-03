@@ -1,0 +1,55 @@
+name: "Build and deploy static pynb-dag-runner documentation site to Github pages"
+
+on:
+  push:
+    branches:
+    - development
+    paths:
+    - 'docs/**'
+
+# grant write access to update repo's static website
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy-documentation-site:
+    name: Build and deploy documentation
+
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: false
+        persist-credentials: true
+
+    - name: "Build docker image"
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        cd docs
+        make docker-build
+
+    - name: "Build static site"
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        cd docs
+        make clean docker-mkdocs-build
+
+    - name: "Deploy static site"
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        cd docs/www-root
+        find .
+        du -hs *
+        # ---
+        git init
+        git checkout -b gh-pages
+        git add -A
+        git config --local user.email "gh-automation-bot@github.com"
+        git config --local user.name "GitHub Action Bot"
+        git commit -m "update"
+        git push --force \
+          https://my_token_user:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git \
+          gh-pages:gh-pages

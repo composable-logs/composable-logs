@@ -12,9 +12,26 @@ docker-build:
 .PHONY: docker-mkdocs-serve
 docker-mkdocs-serve:
 	docker run \
-	    -it --rm \
+	    -t --rm \
 		-p 4200:4200 \
 		-v $$(pwd):/home/host_user/docs \
 		--workdir /home/host_user/docs \
 		pynb-dag-runner-docs \
 		"mkdocs serve --dev-addr 0.0.0.0:4200"
+
+.PHONY: docker-mkdocs-build
+docker-mkdocs-build:
+	docker run \
+	    -t --rm \
+	    -v $$(pwd):/home/host_user/docs \
+	    --workdir /home/host_user/docs \
+	    pynb-dag-runner-docs "\
+	        mkdocs build \
+	            --clean \
+	            --strict \
+	            --site-dir /home/host_user/docs/www-root \
+		"
+
+.PHONY: clean
+clean:
+	rm -rf www-root
