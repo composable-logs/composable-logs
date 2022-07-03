@@ -1,6 +1,6 @@
 docker/JUPYTER_TOKEN
 
-# build files --
+# build files
 **/build/
 **/dist/
 **/*.egg-info/
