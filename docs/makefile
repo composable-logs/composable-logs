@@ -1,0 +1,20 @@
+SHELL := /bin/bash
+
+.PHONY: docker-build
+docker-build:
+	docker build \
+	    --file Dockerfile \
+	    --build-arg HOST_UID=$$(id -u) \
+	    --build-arg HOST_GID="$$(id -g)" \
+	    --tag pynb-dag-runner-docs \
+	    .
+
+.PHONY: docker-mkdocs-serve
+docker-mkdocs-serve:
+	docker run \
+	    -it --rm \
+		-p 4200:4200 \
+		-v $$(pwd):/home/host_user/docs \
+		--workdir /home/host_user/docs \
+		pynb-dag-runner-docs \
+		"mkdocs serve --dev-addr 0.0.0.0:4200"

@@ -12,6 +12,10 @@ on:
     types: [opened, synchronize, reopened]
     branches:
       - development
+    paths-ignore:
+      - docs/**
+      - LICENSE.md
+      - README.md
 
   workflow_dispatch:
 

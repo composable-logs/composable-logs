@@ -1,0 +1,38 @@
+site_name: pynb-dag-runner
+
+theme:
+  name: material
+
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+
+  # Github logo for showing repo stats, see repo_-keys below
+  icon:
+    repo: fontawesome/brands/github
+
+repo_url: https://github.com/pynb-dag-runner/pynb-dag-runner
+repo_name: pynb-dag-runner
+
+
+#
+# The nav feature is rather briefly documentated:
+#   https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/
+#
+# For more advanced features, see relation between nav-field
+# in mkdocs-material homepage
+#
+#   https://github.com/squidfunk/mkdocs-material/blob/master/mkdocs.yml
+#
+# versus actual page
+#
+#   https://squidfunk.github.io/mkdocs-material/
+#
+nav:
+  - Home:
+    - Welcome: index.md
+    - Contact: contact.md
+    - Contributions: contributions.md
+  - Reference:
+    - OpenTelemetry schema: ref/spans.md
