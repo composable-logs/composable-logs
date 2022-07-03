@@ -14,5 +14,9 @@ RUN groupadd --gid $HOST_GID host_user_group  && \
 USER host_user
 
 ENV PYTHONPYCACHEPREFIX=/home/host_user/.cache/python
+ENV PATH "/home/host_user/.local/bin:$PATH"
+
+COPY requirements.txt /home/host_user/
+RUN pip3 install --user -r /home/host_user/requirements.txt
 
 ENTRYPOINT ["/bin/bash", "-c"]
