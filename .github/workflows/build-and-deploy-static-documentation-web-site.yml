@@ -6,8 +6,8 @@ on:
     - trigger-docs-build
     #branches:
     #- development
-    #paths:
-    #  - docs/**
+    paths:
+    - docs/**
 
 # grant write access to update repo's static website
 permissions:
@@ -42,7 +42,16 @@ jobs:
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
-        cd docs/site_dir
-        pwd
-
+        cd docs/www-root
         find .
+        du -hs *
+        # ---
+        git init
+        git checkout -b gh-pages
+        git add -A
+        git config --local user.email "gh-automation-bot@github.com"
+        git config --local user.name "GitHub Action Bot"
+        git commit -m "update"
+        git push --force \
+          https://my_token_user:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git \
+          gh-pages:gh-pages
