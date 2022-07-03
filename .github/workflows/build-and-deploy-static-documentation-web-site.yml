@@ -1,0 +1,29 @@
+name: "Build and deploy static pynb-dag-runner documentation site to Github pages"
+
+on:
+  push:
+    branches:
+      - development
+    #paths:
+    #  - docs/**
+
+# grant write access to update repo's static website
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy-documentation-site:
+    name: Build and deploy documentation
+
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: false
+        persist-credentials: true
+
+    - name: "Build docker image"
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        echo 123
