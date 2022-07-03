@@ -2,6 +2,8 @@ name: "Build and deploy static pynb-dag-runner documentation site to Github page
 
 on:
   push:
+    branches:
+    - trigger-docs-build
     #branches:
     #- development
     #paths:
@@ -26,4 +28,21 @@ jobs:
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
-        echo 123
+        cd docs
+        make docker-build
+
+    - name: "Build static site"
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        cd docs
+        make clean docker-mkdocs-build
+
+    - name: "Deploy static site"
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        cd docs/site_dir
+        pwd
+
+        find .

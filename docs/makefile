@@ -18,3 +18,20 @@ docker-mkdocs-serve:
 		--workdir /home/host_user/docs \
 		pynb-dag-runner-docs \
 		"mkdocs serve --dev-addr 0.0.0.0:4200"
+
+.PHONY: docker-mkdocs-build
+docker-mkdocs-build:
+	docker run \
+	    -it --rm \
+	    -v $$(pwd):/home/host_user/docs \
+	    --workdir /home/host_user/docs \
+	    pynb-dag-runner-docs "\
+	        mkdocs build \
+	            --clean \
+	            --strict \
+	            --site-dir /home/host_user/docs/site_dir \
+		"
+
+.PHONY: site_dir
+clean:
+	rm -rf site_dir
