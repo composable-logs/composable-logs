@@ -29,9 +29,9 @@ docker-mkdocs-build:
 	        mkdocs build \
 	            --clean \
 	            --strict \
-	            --site-dir /home/host_user/docs/site_dir \
+	            --site-dir /home/host_user/docs/www-root \
 		"
 
-.PHONY: site_dir
+.PHONY: clean
 clean:
-	rm -rf site_dir
+	rm -rf www-root
