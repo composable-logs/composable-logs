@@ -7,7 +7,7 @@ on:
     #branches:
     #- development
     paths:
-    - docs/**
+    - 'docs/**'
 
 # grant write access to update repo's static website
 permissions:
