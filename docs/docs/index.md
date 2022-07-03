@@ -1,6 +1,6 @@
 # pynb-dag-runner
 
-index file
+this is in the `docs/docs/index.md` file
 
 ## Subsection 1
 ... todo ...
