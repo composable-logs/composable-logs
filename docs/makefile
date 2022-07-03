@@ -12,7 +12,7 @@ docker-build:
 .PHONY: docker-mkdocs-serve
 docker-mkdocs-serve:
 	docker run \
-	    -it --rm \
+	    -t --rm \
 		-p 4200:4200 \
 		-v $$(pwd):/home/host_user/docs \
 		--workdir /home/host_user/docs \
@@ -22,7 +22,7 @@ docker-mkdocs-serve:
 .PHONY: docker-mkdocs-build
 docker-mkdocs-build:
 	docker run \
-	    -it --rm \
+	    -t --rm \
 	    -v $$(pwd):/home/host_user/docs \
 	    --workdir /home/host_user/docs \
 	    pynb-dag-runner-docs "\
