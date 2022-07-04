@@ -61,7 +61,7 @@ repo_name: pynb-dag-runner (MIT)
 #
 nav:
   - Home:
-    - Welcome: home/index.md
+    - Welcome: index.md
     - Contributions: home/contributions.md
     - Contact: contact/index.md
   - Live demos: live-demos/mnist-digits-demo-pipeline.md
