@@ -1,6 +1,11 @@
 site_name: pynb-dag-runner
 
 markdown_extensions:
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -45,8 +50,7 @@ nav:
     - Welcome: home/index.md
     - Contributions: home/contributions.md
     - Contact: contact/index.md
-  - Live demos:
-    - mnist-digits-demo-pipeline: live-demos/mnist-digits-demo-pipeline.md
+  - Live demos: live-demos/mnist-digits-demo-pipeline.md
   - Next steps: next-steps/index.md
   - OpenTelemetry schema:
     - OpenTelemetry schema: ref/spans.md
