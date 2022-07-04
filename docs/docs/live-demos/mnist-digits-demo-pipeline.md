@@ -1,7 +1,13 @@
+---
+hide:
+  #- navigation
+  - toc
+---
+
 A goal of `pynb-dag-runner` is to make it easy to deploy data/ml pipelines with
 no (or with minimal) cloud infrastructure.
 
-Currently there is one live demo pipeline that illustrates how `pynb-dag-runner` works in practice.
+Currently there is one live demo pipeline `mnist-digits-demo-pipeline` illustrating this in practice.
 
 ## `mnist-digits-demo-pipeline`
 
