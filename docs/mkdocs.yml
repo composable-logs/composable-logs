@@ -1,5 +1,34 @@
 site_name: pynb-dag-runner
 
+markdown_extensions:
+  # --- below from ---
+  # https://squidfunk.github.io/mkdocs-material/reference/code-blocks/
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+  # --- below from ---
+  # https://squidfunk.github.io/mkdocs-material/reference/icons-emojis/#configuration
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+
+  # --- below from ---
+  # https://squidfunk.github.io/mkdocs-material/reference/diagrams/#configuration
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+  # --- below from ---
+  # https://squidfunk.github.io/mkdocs-material/reference/lists/#configuration
+  - pymdownx.tasklist:
+     custom_checkbox: true
+
 theme:
   name: material
 
@@ -7,13 +36,14 @@ theme:
     - navigation.tabs
     - navigation.sections
     - navigation.expand
+    - navigation.indexes
 
   # Github logo for showing repo stats, see repo_-keys below
   icon:
     repo: fontawesome/brands/github
 
 repo_url: https://github.com/pynb-dag-runner/pynb-dag-runner
-repo_name: pynb-dag-runner
+repo_name: pynb-dag-runner (MIT)
 
 
 #
@@ -31,8 +61,11 @@ repo_name: pynb-dag-runner
 #
 nav:
   - Home:
-    - Welcome: index.md
-    - Contact: contact.md
-    - Contributions: contributions.md
-  - Reference:
+    - Welcome: home/index.md
+    - Contributions: home/contributions.md
+    - Contact: contact/index.md
+  - Live demos: live-demos/mnist-digits-demo-pipeline.md
+  - Next steps: next-steps/index.md
+  - OpenTelemetry schema:
     - OpenTelemetry schema: ref/spans.md
+  - Contact: contact/index.md
