@@ -1,4 +1,13 @@
+---
+
+Note: below documentation in progress of being moved to documentation site
+
+https://pynb-dag-runner.github.io/pynb-dag-runner/
+
+---
+
 # `pynb-dag-runner`
+
 ## Overview and motivation
 
 **py_dag_runner** is an OSS Python library for running DAGs -- or pipelines -- of Python notebooks on a Ray
@@ -27,55 +36,6 @@ using only services provided with a free Github account:
 The pipeline explores how size of training set influences model performance.
 
 ![task-dependencies.png](./assets/task-dependencies.png)
-
-### Demo pipeline architecture
-
-The below shows in more detail how Github services are used:
-
-```mermaid
-graph BT;
-%%graph LR;
-
-subgraph "Laptop"
-    laptop[Local pipeline <br> development]
-end
-
-subgraph "Github services"
-       git_repo[Git repo: Notebooks, unit tests, DAG definitions]
-
-       subgraph "Github hosted actions runner (2 CPU, 7 GB RM, 14 GB SSD)"
-          subgraph "Ray cluster"
-            tests[Tests <br> Unit, Type checks, Formatting]
-            run_pipeline["Run pynb-dag-runner pipeline"]
-            otel_logs["OpenTelemetry logged spans<br>(inc. logged notebooks, images, metrics, and artifacts)"]
-          end
-       end
-
-       subgraph "GitHub Build artifacts"
-          build_artifacts[Pipeline OpenTelemetry outputs persisted for max 90 days]
-       end
-
-       subgraph "Github Pages"
-          subgraph "Data pipeline monitoring and reporting"
-             web_static_mlflow[Custom statically built version of ML Flow for hosting static data]
-             web_static_mlflow_data[Logged notebooks, images, metrics]
-             web_static_mlflow_logs[Pipeline run logs]
-          end
-    end
-end
-
-laptop ---->|git push| git_repo
-git_repo ---->|GHA: trigger on PR | tests
-git_repo ---->|GHA: trigger on PR, on schedule | run_pipeline
-run_pipeline --> otel_logs
-otel_logs ---> |GHA| build_artifacts
-
-build_artifacts --->|GHA| web_static_mlflow
-
-web_static_mlflow_data -.- web_static_mlflow
-web_static_mlflow_logs -.- web_static_mlflow
-Internet --> web_static_mlflow
-```
 
 ## Key repositories
 
