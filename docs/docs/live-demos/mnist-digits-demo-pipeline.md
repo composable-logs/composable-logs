@@ -65,12 +65,19 @@ graph LR
          (hosted as a static site and built from pipeline run logs).
 - [x] Outcomes of pipeline runs (both scheduled- and PR- pipeline runs) can be inspected in the
       Experiment tracker (see above, this is hosted as a static website and build using a fork of MLFlow).
-- [x] This setup does not require any databases or tracking servers (eg. for task execution,
-      like Airflow) or for experiment tracking (eg. ML tracking server, like an MLFlow backend).
 
 This setup could be used to run public open source -- open data pipelines using only a free personal Github account.
 
 ### Architecture and use of Github services
+
+A special feature of the below architecture is that each run of the pipeline can be executed
+serverless using ephemeral compute resources. So, after a pipeline has run, we only need to persist
+the (OpenTelemetry) logs of that run, and those are stored as one immutable JSON file per pipeline run.
+
+In other words, the architecture does not include any tracking servers that need to run 24/7
+(eg. for task execution, like Airflow) or for experiment tracking (eg. for ML tracking,
+like an MLFlow backend). In particular, the architecture does not include any databases.
+
 ``` mermaid
 graph BT;
 
@@ -114,7 +121,7 @@ web_static_mlflow_data -.- web_static_mlflow
 web_static_mlflow_logs -.- web_static_mlflow
 Internet --> web_static_mlflow
 ```
-### Run locally
+### Run the pipeline locally
 
 ``` bash
 git clone --recurse-submodules git@github.com:pynb-dag-runner/mnist-digits-demo-pipeline.git
