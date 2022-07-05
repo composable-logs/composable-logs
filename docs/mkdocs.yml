@@ -29,6 +29,10 @@ markdown_extensions:
   - pymdownx.tasklist:
      custom_checkbox: true
 
+  # --- below based on ---
+  # https://squidfunk.github.io/mkdocs-material/reference/admonitions/#configuration
+  - admonition
+
 theme:
   name: material
 
