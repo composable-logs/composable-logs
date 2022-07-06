@@ -24,7 +24,6 @@ For example, the demo ML training pipeline linked above runs using only services
 ``` mermaid
 graph TB;
 
-
 subgraph " "
 Git[Git repository]
 Developer[Developer, <br />local development]
@@ -32,7 +31,7 @@ Developer[Developer, <br />local development]
 Developer --> Git
   subgraph "Stateless execution"
     subgraph "<b>Execution driver</b> (pynb-dag-runner)"
-        Code[Notebook codes]
+        Code[Codes]
     end
 
     subgraph "<b>Execution backend</b> (Ray cluster)"
