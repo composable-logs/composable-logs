@@ -8,10 +8,10 @@ hide:
 
 A main feature of `pynb-dag-runner` is that pipelines can execute on stateless compute infrastructure (that may be ephemeral, serverless).
 So, a 24/7 running database that records past runs or logged metrics is not needed.
-Rather, when `pynb-dag-runner` executes a pipeline, key events (and logged artifacts) are emitted using the [OpenTelemetry standard](https://opentelemetry.io/).
+Rather, when `pynb-dag-runner` executes a pipeline, all key events (and logged artifacts) are emitted using the [OpenTelemetry standard](https://opentelemetry.io/).
 Thus, after a pipeline has completed, a complete immutable record of the run can be persisted as a JSON file to a data lake (as one option).
 
-For reporting, `pynb-dag-runner` can currently convert pipeline logs into a static website, see the [example website](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/) generated from daily runs of the `mnist-digits-demo-pipeline` [example pipeline](/live-demos/mnist-digits-demo-pipeline/).
+For reporting and experiment tracking, `pynb-dag-runner` can currently convert pipeline logs into a static website, see the [example website](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/) generated from daily runs of the `mnist-digits-demo-pipeline` [example pipeline](/live-demos/mnist-digits-demo-pipeline/).
 This is done with a modified version of the MLFlow UI.
 
 A main motivation for developing `pynb-dag-runner` is to have a framework to run pipelines on limited or no cloud infrastructure.
@@ -76,7 +76,16 @@ end
     Ray does have support for larger clusters (with support for public clouds and Kubernetes, [details](https://docs.ray.io/en/latest/cluster/deploy.html)).
     However, execution on multi-node Ray clusters is not supported by `pynb-dag-runner` (at least yet).
 
-## Use cases and motivation
+!!! info
+    On use of OpenTelemetry: When pipelines are logged with OpenTelemetry, they could potentially be correlated with other (system) metrics. Eg.
+
+    - To troubleshoot a failed data ingestion task, it can be useful to view its network input/output.
+    - Before deploying a long running ML-training job, it might be useful to monitor GPU/CPU loads. Eg. is it 10% or 90%.
+
+    Details on this would need to be investigated, tbd. Is this feasible?
+
+
+## Use cases and scope
 
 - `pynb-dag-runner` can currently run public pipelines using only services provided with a (free, personal) Github account. See [demo setup](/live-demos/mnist-digits-demo-pipeline/).
   Since this can be scheduled to run daily, one could:
@@ -84,13 +93,9 @@ end
     - Run (smaller scale) public data pipelines that process and report on open data.
     - Showcase how to use a library with a publicly running pipeline.
 
-- Reproducible science: The analysis for a paper can be scheduled to run eg. every month, potentially with updated dependencies.
-
-- (Motivating OpenTelemetry): When pipelines logs use OpenTelemetry format, they could potentially be correlated with other (system) metrics. Eg.
-
-    - To troubleshoot a failed data ingestion task, it can be useful to view its network input/output.
-    - Before deploying a long running ML-training job, it might be useful to monitor GPU/CPU loads. Eg. is it 10% or 90%.
-    - Details on this would need to be investigated, tbd.
+- Improve the tooling to collaborate on notebooks and public open source pipelines.
+- Offer example pipeline(s) exploring how MLOps can scale down to minimum "free tier" setups.
+- Reproducible science: schedule the analysis for a paper to run eg. every month, potentially with updated dependencies.
 
 ## Status
 

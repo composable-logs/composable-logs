@@ -1,4 +1,4 @@
-# Related projects to `pynb-dag-runner`
+# Projects with similarity to `pynb-dag-runner`
 
 ML pipeline deployment tools (part of MLOps) are now actively developed.
 
