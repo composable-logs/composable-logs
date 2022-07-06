@@ -72,10 +72,8 @@ nav:
         - Contact and contributions: contact/index.md  # redirect
       - Technical matters:
         - Use of notebooks: home/use-of-notebooks.md
-        - OpenTelemetry schema: ref/spans.md
+        - OpenTelemetry schema: home/opentelemetry-span-format.md
         - Related projects: home/related-projects.md
   - Live demos: live-demos/mnist-digits-demo-pipeline.md
   - Next steps: next-steps/index.md
-  - OpenTelemetry schema:
-    - OpenTelemetry schema: ref/spans.md
   - Contact: contact/index.md
