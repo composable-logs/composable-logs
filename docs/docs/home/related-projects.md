@@ -1,13 +1,16 @@
-# List of related/similar projects
+# Related projects to `pynb-dag-runner`
 
-The below collects projects relevant to `pynb-dag-runner`.
-
-Since ML pipeline deployment tools (part of MLOps) are currently a very active
-area of development, this list is not complete.
+ML pipeline deployment tools (part of MLOps) are now actively developed.
 
 Additions and corrections are welcome.
 
 ## Open source projects
+
+
+### ZenML
+- Also includes support for running pipelines on Github actions compute infra, [6/2022 blog post](https://blog.zenml.io/github-actions-orchestrator/). However, the setup seems to require cloud storage.
+- [https://zenml.io](https://zenml.io)
+
 ### SAME (**S**elf **A**ssembling **M**achine Learning **E**nvironments)
 
 - Open source project to improve workflow for developing and deploying Jupyter notebooks. The SAME framework supports:
