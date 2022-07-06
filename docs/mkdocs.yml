@@ -64,16 +64,10 @@ repo_name: pynb-dag-runner (MIT)
 #   https://squidfunk.github.io/mkdocs-material/
 #
 nav:
-  - Home:
-      - Intro:
-        - "What is pynb-dag-runner?": home/index.md
-        - Getting started: home/getting-started.md
-        - Future directions: home/future-directions.md
-        - Contact and contributions: contact/index.md  # redirect
-      - Technical matters:
-        - Use of notebooks: home/use-of-notebooks.md
-        - OpenTelemetry schema: home/opentelemetry-span-format.md
-        - Related projects: home/related-projects.md
-  - Live demos: live-demos/mnist-digits-demo-pipeline.md
+  - Intro:
+    - "What is pynb-dag-runner?": home/index.md
+    - Related projects: home/related-projects.md
+    - OpenTelemetry schema: home/opentelemetry-span-format.md
+  - Demo: live-demos/mnist-digits-demo-pipeline.md
   - Next steps: next-steps/index.md
   - Contact: contact/index.md
