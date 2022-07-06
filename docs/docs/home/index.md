@@ -94,8 +94,8 @@ end
     - Showcase how to use a library with a publicly running pipeline.
 
 - Improve the tooling to collaborate on notebooks and public open source pipelines.
-- Offer example pipelines that show how MLOps can scale down to a minimum setup.
-- Reproducible science: The analysis for a paper can be scheduled to run eg. every month, potentially with updated dependencies.
+- Offer example pipeline(s) exploring how MLOps can scale down to minimum "free tier" setups.
+- Reproducible science: schedule the analysis for a paper to run eg. every month, potentially with updated dependencies.
 
 ## Status
 
