@@ -1,4 +1,4 @@
-# OpenTelemetry span format reference
+# OpenTelemetry schema
 
 TODO
 

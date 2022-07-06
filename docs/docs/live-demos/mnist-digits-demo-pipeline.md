@@ -8,7 +8,7 @@ A main goal of `pynb-dag-runner` is to make it easy to deploy data/ml pipelines 
 
 Currently there is one live demo pipeline `mnist-digits-demo-pipeline` illustrating this in practice.
 
-## `mnist-digits-demo-pipeline`
+## Demo pipeline: `mnist-digits-demo-pipeline`
 
 This pipeline trains a model for recognizing hand written digits from a toy MNIST data set included in sklearn library.
 
@@ -118,7 +118,7 @@ Internet --> web_static_mlflow
 ```
 
 !!! info
-    The demo does not deploy the model as an REST API, but the trained model is saved in ONNX format. Thus, it could eg. be included into a website.
+    The demo does not deploy the trained model as an REST API, but the trained model is saved in ONNX format. Thus, it could eg. be included into a website.
 
 
 ### Run the pipeline locally
