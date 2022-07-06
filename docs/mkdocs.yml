@@ -72,15 +72,15 @@ plugins:
 #
 nav:
   - Home:
-     Intro:
-      - "What is pynb-dag-runner?": home/index.md
-      - Notebook support: home/notebook-support.md
-      - Similar projects: home/similar-projects.md
-     Development:
-      - Key repositories: dev/index.md
-      - Local dev setup: dev/local-dev.md
-      - Local UI dev setup: dev/local-ui-dev.md
-      - OpenTelemetry schema: dev/opentelemetry-span-format.md
+     - Intro:
+        - "What is pynb-dag-runner?": home/index.md
+        - Notebook support: home/notebook-support.md
+        - Similar projects: home/similar-projects.md
+     - Development:
+        - Key repositories: dev/index.md
+        - Local dev setup: dev/local-dev.md
+        - Local UI dev setup: dev/local-ui-dev.md
+        - OpenTelemetry schema: dev/opentelemetry-span-format.md
   - Demo pipeline: live-demos/mnist-digits-demo-pipeline.md
 
   - Next steps: next-steps/index.md
