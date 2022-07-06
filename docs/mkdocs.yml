@@ -70,7 +70,8 @@ nav:
   - Intro:
     - "What is pynb-dag-runner?": home/index.md
     - Notebook support: home/notebook-support.md
-    - Related projects: home/related-projects.md
+    - Key repositories: home/repositories.md
+    - Similar projects: home/similar-projects.md
     - OpenTelemetry schema: home/opentelemetry-span-format.md
   - Demo pipeline: live-demos/mnist-digits-demo-pipeline.md
   - Next steps: next-steps/index.md
