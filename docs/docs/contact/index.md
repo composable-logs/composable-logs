@@ -1,7 +1,25 @@
-# Feedback and ideas welcome
+---
+hide:
+  #- navigation
+  - toc
+---
+# Feedback, ideas and contributions are welcome
 
-This is WIP and any feedback, ideas, questions etc. are welcome :smile:.
+This is work in progress, and any contributions/ideas are welcome, eg.
 
-Please either open an issue on Github or send an email.
+- potential use cases, related projects
+- feedback, questions, bugs
+- PRs, documentation
 
-For contact info, see my [Github profile](https://github.com/matiasdahl).
+If you interested in contributing, see also [Next steps](/next-steps).
+For larger changes, please contact me first or file an issue.
+
+Contact info: [https://github.com/matiasdahl](https://github.com/matiasdahl)
+
+---
+
+###
+
+Consider :star::star::star: the main repo (see top bar).
+
+Thank you!
