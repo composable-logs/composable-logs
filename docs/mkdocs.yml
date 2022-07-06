@@ -49,7 +49,10 @@ theme:
 repo_url: https://github.com/pynb-dag-runner/pynb-dag-runner
 repo_name: pynb-dag-runner (MIT)
 
-
+plugins:
+    - redirects:
+        redirect_maps:
+            'index.md': 'home/index.md'
 #
 # The nav feature is rather briefly documentated:
 #   https://squidfunk.github.io/mkdocs-material/setup/setting-up-navigation/
