@@ -5,9 +5,9 @@ potential use cases, etc. are all welcome.
 
 Please either open an issue on Github or send an email.
 
-If you interested in contrbuting, it is probably best to first open an issue, see also [Next steps](/next-steps).
+If you interested in contributing, see also [Next steps](/next-steps).
 
-For contact info, see my [Github profile](https://github.com/matiasdahl).
+For contact info, see [https://github.com/matiasdahl](https://github.com/matiasdahl)
 
 ---
 
