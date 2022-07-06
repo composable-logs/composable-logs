@@ -8,15 +8,13 @@ A main goal of `pynb-dag-runner` is to make it easy to deploy data/ml pipelines 
 
 Currently there is one live demo pipeline `mnist-digits-demo-pipeline` illustrating this in practice.
 
-The demo does not deploy the model as an REST API, but the trained model is saved in ONNX format. Thus, it could eg. be included into a website.
-
 ## `mnist-digits-demo-pipeline`
 
 This pipeline trains a model for recognizing hand written digits from a toy MNIST data set included in sklearn library.
 
-- Github: [https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline)
-- Public experiment tracker: [https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+- **Public experiment tracker: [https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)**
 
+---
 
 ### Pipeline task DAG
 
@@ -118,6 +116,11 @@ web_static_mlflow_data -.- web_static_mlflow
 web_static_mlflow_logs -.- web_static_mlflow
 Internet --> web_static_mlflow
 ```
+
+!!! info
+    The demo does not deploy the model as an REST API, but the trained model is saved in ONNX format. Thus, it could eg. be included into a website.
+
+
 ### Run the pipeline locally
 
 ``` bash
