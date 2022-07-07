@@ -10,13 +10,26 @@ Currently there is one live demo pipeline `mnist-digits-demo-pipeline` illustrat
 
 ## Demo pipeline: `mnist-digits-demo-pipeline`
 
+Public experiment tracker (static site hosted on Github Pages): **[https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)**
+
+![screenshot-task-list.png](screenshot-task-list.png)
+
+### Main features
+
+- [x] The pipeline is scheduled to run every day and for all pull requests to the repo.
+- [x] The pipeline runs without any cloud infrastructure, and pipeline uses only services provided with a (free personal) public Github account:
+       - Use **Github Actions** for compute resources, and for orchestration.
+       - Use **Github Build Artifacts** for storing pipeline run logs.
+       - Use **Github Pages** for pipeline/task tracker and ML-experiment tracker
+         (hosted as a static site and built from pipeline run logs).
+- [x] Outcomes of pipeline runs (both scheduled- and PR- pipeline runs) can be inspected in the Experiment tracker (see above, this is hosted as a static website and build using a fork of MLFlow).
+
+This setup could be used to run public open source -- open data pipelines using only a free personal Github account.
+### Pipeline task DAG
+
 This pipeline trains a model for recognizing hand written digits from a toy MNIST data set included in sklearn library.
 
-- **Public experiment tracker: [https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)**
-
----
-
-### Pipeline task DAG
+As shown below, the pipeline explores how performance depends on the size of the training set.
 
 ``` mermaid
 
@@ -49,21 +62,6 @@ graph LR
     TASK_SPAN_ID_0x276bb1087b500b48 --> TASK_SPAN_ID_0x18b163a530a74e8b
     TASK_SPAN_ID_0xefbc89de2baee79f --> TASK_SPAN_ID_0x35f37ef6c7ccaf05
 ```
-
-
-### Main features
-
-- [x] The pipeline is scheduled to run every day and for all pull requests to the repo.
-- [x] The pipeline runs without any cloud infrastructure, and
-      pipeline uses only services provided with a (free personal)
-      Github account:
-       - Use **Github Actions** for compute resources, and for orchestration.
-       - Use **Github Build Artifacts** for storing pipeline run logs.
-       - Use **Github Pages** for pipeline/task tracker and ML-experiment tracker
-         (hosted as a static site and built from pipeline run logs).
-- [x] Outcomes of pipeline runs (both scheduled- and PR- pipeline runs) can be inspected in the Experiment tracker (see above, this is hosted as a static website and build using a fork of MLFlow).
-
-This setup could be used to run public open source -- open data pipelines using only a free personal Github account.
 
 ### Architecture and use of Github services
 
