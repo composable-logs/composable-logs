@@ -31,7 +31,7 @@ Additions and corrections are welcome.
 - Gitlab is currently (7/2022) improving support for ML workflows.
 
     - This includes (plans for) better support for notebooks and per-repo MLFlow support.
-    - Available as open source?
+    - Open source?
 
 - [GitLab MLFlow Integration - What Why and How, Youtube (8 mins)](https://www.youtube.com/watch?v=V4hos3VFeC4)
 - [https://about.gitlab.com/handbook/engineering/incubation/mlops/](https://about.gitlab.com/handbook/engineering/incubation/mlops/)
