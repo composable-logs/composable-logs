@@ -12,7 +12,6 @@ This is work in progress, and any contributions/ideas are welcome, eg.
 - PRs, documentation
 
 If you interested in contributing, see also [Next steps](/next-steps).
-For larger changes, please contact me first or file an issue.
 
 Contact info: [https://github.com/matiasdahl](https://github.com/matiasdahl)
 

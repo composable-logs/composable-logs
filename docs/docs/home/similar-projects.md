@@ -6,6 +6,9 @@ Additions and corrections are welcome.
 
 ## Open source projects
 
+### MLFlow 2.0
+- [Blog annoucement 6/2022](https://databricks.com/blog/2022/06/29/introducing-mlflow-pipelines-with-mlflow-2-0.html)
+- Includes workflow (pipeline)-level reporting (similar as done in `pynb-dag-runner`)
 
 ### ZenML
 - Also includes support for running pipelines on Github actions compute infra, [6/2022 blog post](https://blog.zenml.io/github-actions-orchestrator/). However, the setup seems to require cloud storage.
@@ -28,6 +31,7 @@ Additions and corrections are welcome.
 - Gitlab is currently (7/2022) improving support for ML workflows.
 
     - This includes (plans for) better support for notebooks and per-repo MLFlow support.
+    - Open source?
 
 - [GitLab MLFlow Integration - What Why and How, Youtube (8 mins)](https://www.youtube.com/watch?v=V4hos3VFeC4)
 - [https://about.gitlab.com/handbook/engineering/incubation/mlops/](https://about.gitlab.com/handbook/engineering/incubation/mlops/)

@@ -4,6 +4,8 @@ hide:
   - toc
 ---
 
+# What is `pynb-dag-runner`?
+
 **`pynb-dag-runner`** is an open source Python framework for running Python (notebook) ML/data pipelines.
 
 A main feature of `pynb-dag-runner` is that pipelines can execute on stateless compute infrastructure (that may be ephemeral, serverless).
