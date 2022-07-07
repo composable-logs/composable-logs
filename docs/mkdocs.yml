@@ -46,9 +46,25 @@ theme:
     - navigation.expand
     #- navigation.indexes
 
-  # Github logo for showing repo stats, see repo_-keys below
   icon:
+    # Github logo for showing repo stats, see repo_-keys below
     repo: fontawesome/brands/github
+
+    # top left site logo
+    #logo: material/fast-forward-outline
+    #logo: material/fast-forward
+    #logo: material/dots-circle
+    #logo: fontawesome/solid/circle-nodes
+    #logo: fontawesome/solid/angles-right
+    logo: fontawesome/solid/angle-right
+
+  # ---
+  # To find icons:
+  #   - select "Icon, bundled" under "Logo" section in below link;
+  #   - click on "+" to open the icon search.
+  #
+  # https://squidfunk.github.io/mkdocs-material/setup/changing-the-logo-and-icons/#__tabbed_1_2
+  #
 
 repo_url: https://github.com/pynb-dag-runner/pynb-dag-runner
 repo_name: pynb-dag-runner
