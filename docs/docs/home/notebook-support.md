@@ -1,4 +1,4 @@
-- `pynb-dag-runner` supports tasks defined in Jupyter Python notebooks, but can also run pure Python tasks (should be verified)
+- `pynb-dag-runner` supports tasks defined in Jupyter Python notebooks, but can also run pure Python tasks (to verify)
 - All tasks in the [demo pipeline](/live-demos/mnist-digits-demo-pipeline/) are notebooks.
 - In git, notebooks source files (with code) are assumed to be in the [Jupytext<sup><sup><sub>:material-launch:</sub></sup></sup>](https://jupytext.readthedocs.io/en/latest/) format.
 - Jupytext notebook source files:
