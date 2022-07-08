@@ -1,4 +1,5 @@
 site_name: pynb-dag-runner
+site_url: https://pynb-dag-runner.github.io/pynb-dag-runner/
 
 markdown_extensions:
   # --- below from ---
@@ -15,6 +16,10 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:materialx.emoji.twemoji
       emoji_generator: !!python/name:materialx.emoji.to_svg
+
+  # --- needed for image caption ---
+  # See: https://squidfunk.github.io/mkdocs-material/reference/images/
+  - md_in_html
 
   # --- below from ---
   # https://squidfunk.github.io/mkdocs-material/reference/diagrams/#configuration
@@ -69,6 +74,10 @@ theme:
 
 repo_url: https://github.com/pynb-dag-runner/pynb-dag-runner
 repo_name: pynb-dag-runner
+
+# Disable "Edit" button linking to Github, see
+# https://www.mkdocs.org/user-guide/configuration/
+edit_uri: ""
 
 plugins:
     - redirects:
