@@ -9,19 +9,33 @@ hide:
 **`pynb-dag-runner`** is an open source Python framework for running Python (notebook) ML/data pipelines.
 
 A main feature of `pynb-dag-runner` is that pipelines can execute on stateless compute infrastructure (that may be ephemeral, serverless).
-So, a 24/7 running database that records past runs or logged metrics is not needed.
-Rather, when `pynb-dag-runner` executes a pipeline, all key events (and logged artifacts) are emitted using the [OpenTelemetry standard](https://opentelemetry.io/).
-Thus, after a pipeline has completed, a complete immutable record of the run can be persisted as a JSON file to a data lake (as one option).
+So, a 24/7 running database or service to record past runs or metrics is not needed.
+Rather, when `pynb-dag-runner` executes a pipeline, all key events (and logged artifacts) are emitted using the [OpenTelemetry standard<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io/).
+Thus, after a pipeline has completed, an immutable record of the run can be persisted as a JSON file to a data lake (as one storage option).
 
-For reporting and experiment tracking, `pynb-dag-runner` can currently convert pipeline logs into a static website, see the [example website](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/) generated from daily runs of the `mnist-digits-demo-pipeline` [example pipeline](/live-demos/mnist-digits-demo-pipeline/).
-This is done with a modified version of the MLFlow UI.
+For reporting and experiment tracking, the structured logs can be converted into various formats.
+Currently, `pynb-dag-runner` can convert logs into a static website that can be deployed eg. to Github Pages.
+
+## Demo ML training pipeline
 
 A main motivation for developing `pynb-dag-runner` is to have a framework to run pipelines on limited or no cloud infrastructure.
-For example, the demo ML training pipeline linked above runs using only services provided with a (free, personal) Github account, and the UI is hosted as a static website.
+The [Demo pipeline](../live-demos/)-section in this documentation describe in more detail
+how one eg. deploy and run a pipeline using only services provided with a (free, personal) Github account.
 
----
+<figure markdown>
+  [![screenshot-task-list.png](../live-demos/screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+  <figcaption>
+  <b><a href="https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/">
+  https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/
+  </a></b>
+  </figcaption>
+  <figcaption>
+  Demo pipeline: Public task and experiment tracker on Github Pages.
+  The UI is based on a modified version of the MLFlow.
+  </figcaption>
+</figure>
 
-##### Overall architecture for `pynb-dag-runner` pipeline runs
+## Architecture for `pynb-dag-runner` pipelines
 
 ``` mermaid
 graph TB;
@@ -74,8 +88,8 @@ end
 ```
 
 !!! info
-    The task execution framework for `pynb-dag-runner` is built using the [Ray framework](https://www.ray.io/ray-core), and pipeline tasks can run in parallel.
-    Ray does have support for larger clusters (with support for public clouds and Kubernetes, [details](https://docs.ray.io/en/latest/cluster/deploy.html)).
+    The task execution framework for `pynb-dag-runner` is built using the [Ray framework<sup><sup><sub>:material-launch:</sub></sup></sup>](https://www.ray.io/ray-core), and pipeline tasks can run in parallel.
+    Ray does have support for larger clusters (with support for public clouds and Kubernetes, [details<sup><sup><sub>:material-launch:</sub></sup></sup>](https://docs.ray.io/en/latest/cluster/deploy.html)).
     However, execution on multi-node Ray clusters is not supported by `pynb-dag-runner` (at least yet).
 
 !!! info
@@ -89,7 +103,7 @@ end
 
 ## Use cases and scope
 
-- `pynb-dag-runner` can currently run public pipelines using only services provided with a (free, personal) Github account. See [demo setup](/live-demos/mnist-digits-demo-pipeline/).
+- `pynb-dag-runner` can currently run public pipelines using only services provided with a (free, personal) Github account.
   Since this can be scheduled to run daily, one could:
 
     - Run (smaller scale) public data pipelines that process and report on open data.
@@ -105,4 +119,4 @@ This is work in progress (and even the name `pynb-dag-runner` might change :smil
 
 The project is already usable, but not for critical workloads.
 
-[Feedback, ideas and contributions welcome!](/contact)
+[Feedback, ideas and contributions welcome!](../contact)

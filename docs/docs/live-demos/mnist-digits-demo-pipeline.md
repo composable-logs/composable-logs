@@ -10,9 +10,13 @@ Currently there is one live demo pipeline `mnist-digits-demo-pipeline` illustrat
 
 ## Demo pipeline: `mnist-digits-demo-pipeline`
 
-Public experiment tracker (static site hosted on Github Pages): **[https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)**
+**Public experiment tracker (hosted on Github Pages):** [https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline<sup><sup><sub>:material-launch:</sub></sup></sup>](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
 
-![screenshot-task-list.png](screenshot-task-list.png)
+<figure markdown>
+  [![screenshot-task-list.png](../live-demos/screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+</figure>
+
+**Code repo:** [https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline)
 
 ### Main features
 
@@ -138,9 +142,9 @@ make test-and-run-pipeline
 **Notes**
 
 - After the pipeline has run, results and outputs can be inspected in the `pipeline-outputs`-directory.
-- For further details, please see the demo pipeline repo, [link](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline).
+- For further details, please see the [mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline) repo.
 - In the above, `make test-and-run-pipeline` is currently slow.
-  Please see [Next steps](/next-steps/) for plans to address this.
+  Please see [Next steps](../next-steps/) for plans to address this.
 
 ### Notes and possible limitations
 - Compute resources provided for free by Github are limited. This could be improved with a more powerful self-hosted runner.
