@@ -2,7 +2,7 @@
 
 !!! info
     `pynb-dag-runner` uses the (open) OpenTelemetry standard for logging everything.
-    In more detail, log messages are emitted as [OpenTelemetry span:s](https://opentelemetry.io/docs/concepts/observability-primer/#spans).
+    In more detail, log messages are emitted as [OpenTelemetry span:s<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io/docs/concepts/observability-primer/#spans).
 
     Similar to MLFlow, `pynb-dag-runner` can log metrics, images and other artifacts.
     In addition, `pynb-dag-runner` logs run data like:

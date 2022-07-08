@@ -8,7 +8,7 @@
 - Inside container ensure that the "Python" extension is installed (`ms-python.python` also published by Microsoft) if it is not automatically installed. When installed and enabled, the lower row will show the Python version in use inside the container.
 - To start tests (unit tests, black, and mypy) in watch mode, start the task "pynb_dag_runner library - watch and run all tasks" (`Ctrl` + `Shift` + `P`).
 
-For more details, see VS Code remote development [link](https://code.visualstudio.com/docs/remote/remote-overview).
+For more details, see VS Code remote development, [docs<sup><sup><sub>:material-launch:</sub></sup></sup>](https://code.visualstudio.com/docs/remote/remote-overview).
 
 ### Run tests and build Python wheel file
 

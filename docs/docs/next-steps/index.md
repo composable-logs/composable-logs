@@ -7,7 +7,7 @@ For example, in the `mnist-demo-pipeline` demo pipeline, the actual pipeline
 tasks executes in ~2 minutes,
 but entire pipeline (with website update) takes total of ~50 minutes with all overhead
 (when run on Github actions, see
-[logs](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline/actions)).
+[Github action logs<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline/actions)).
 
 Subtasks:
 

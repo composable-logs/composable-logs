@@ -7,12 +7,12 @@ Additions and corrections are welcome.
 ## Open source projects
 
 ### MLFlow 2.0
-- [Blog annoucement 6/2022](https://databricks.com/blog/2022/06/29/introducing-mlflow-pipelines-with-mlflow-2-0.html)
+- [Blog annoucement 6/2022<sup><sup><sub>:material-launch:</sub></sup></sup>](https://databricks.com/blog/2022/06/29/introducing-mlflow-pipelines-with-mlflow-2-0.html)
 - Includes workflow (pipeline)-level reporting (similar as done in `pynb-dag-runner`)
 
 ### ZenML
-- Also includes support for running pipelines on Github actions compute infra, [6/2022 blog post](https://blog.zenml.io/github-actions-orchestrator/). However, the setup seems to require cloud storage.
-- [https://zenml.io](https://zenml.io)
+- Also includes support for running pipelines on Github actions compute infra, [6/2022 blog post<sup><sup><sub>:material-launch:</sub></sup></sup>](https://blog.zenml.io/github-actions-orchestrator/). However, the setup seems to require cloud storage.
+- [https://zenml.io<sup><sup><sub>:material-launch:</sub></sup></sup>](https://zenml.io)
 
 ### SAME (**S**elf **A**ssembling **M**achine Learning **E**nvironments)
 
@@ -22,8 +22,8 @@ Additions and corrections are welcome.
     - easy deployment to production on various execution backends (like eg. Kubeflow, Azure functions, etc);
     - declarative configuration.
 
-- [Project presentation at Reinforce AI Conference 5/2022, Youtube (37 mins)](https://www.youtube.com/watch?v=akAH1btyxnI)
-- [https://sameproject.ml/](https://sameproject.ml/)
+- [Project presentation at Reinforce AI Conference 5/2022, Youtube (37 mins)<sup><sup><sub>:material-launch:</sub></sup></sup>](https://www.youtube.com/watch?v=akAH1btyxnI)
+- [https://sameproject.ml/<sup><sup><sub>:material-launch:</sub></sup></sup>](https://sameproject.ml/)
 
 ## Other
 
@@ -33,5 +33,5 @@ Additions and corrections are welcome.
     - This includes (plans for) better support for notebooks and per-repo MLFlow support.
     - Open source?
 
-- [GitLab MLFlow Integration - What Why and How, Youtube (8 mins)](https://www.youtube.com/watch?v=V4hos3VFeC4)
-- [https://about.gitlab.com/handbook/engineering/incubation/mlops/](https://about.gitlab.com/handbook/engineering/incubation/mlops/)
+- [GitLab MLFlow Integration - What Why and How, Youtube (8 mins)<sup><sup><sub>:material-launch:</sub></sup></sup>](https://www.youtube.com/watch?v=V4hos3VFeC4)
+- [https://about.gitlab.com/handbook/engineering/incubation/mlops/<sup><sup><sub>:material-launch:</sub></sup></sup>](https://about.gitlab.com/handbook/engineering/incubation/mlops/)

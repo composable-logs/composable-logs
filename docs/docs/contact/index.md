@@ -11,9 +11,9 @@ This is work in progress, and any contributions/ideas are welcome, eg.
 - feedback, questions, bugs
 - PRs, documentation
 
-If you interested in contributing, see also [Next steps](/next-steps).
+If you interested in contributing, see also [Next steps](../next-steps).
 
-Contact info: [https://github.com/matiasdahl](https://github.com/matiasdahl)
+Contact info: [https://github.com/matiasdahl<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/matiasdahl)
 
 ---
 
