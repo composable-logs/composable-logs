@@ -6,7 +6,7 @@ Instead the key data during a pipeline run are emitted using the [OpenTelemetry 
 Since structured logs can be directed to a file (as one option), this can be used to run pipelines on limited or no cloud infrastructure.
 Eg. one can use Github actions for compute and Github pages for reporting.
 
-**Please see the `pynb-dag-runner` documentation site for details and demo:**
+**Please see the documentation for details and demo:**
 - **https://pynb-dag-runner.github.io/pynb-dag-runner**
 
 Any feedback/ideas welcome!
