@@ -56,8 +56,9 @@ theme:
     #logo: material/dots-circle
     #logo: fontawesome/solid/circle-nodes
     #logo: fontawesome/solid/angles-right
-    logo: fontawesome/solid/angle-right
-
+    #logo: fontawesome/solid/angle-right
+    #logo: material/play-box-outline
+    logo: material/chevron-right-box-outline
   # ---
   # To find icons:
   #   - select "Icon, bundled" under "Logo" section in below link;
