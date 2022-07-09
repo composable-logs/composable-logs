@@ -1,7 +1,6 @@
 <div align="center">
-
-  <a href="https://github.com/pynb-dag-runner/pynb-dag-runner/actions/workflows/ci.yml">![example1](https://github.com/pynb-dag-runner/pynb-dag-runner/actions/workflows/ci.yml/badge.svg)</a>
-  <a href="https://github.com/pynb-dag-runner/pynb-dag-runner/blob/development/LICENSE.md">![example2](https://img.shields.io/badge/license-MIT-blue)</a>
+  <a href="https://github.com/pynb-dag-runner/pynb-dag-runner/actions/workflows/ci.yml">![automated tests](https://github.com/pynb-dag-runner/pynb-dag-runner/actions/workflows/ci.yml/badge.svg)</a>
+  <a href="https://github.com/pynb-dag-runner/pynb-dag-runner/blob/development/LICENSE.md">![license=mit](https://img.shields.io/badge/license-MIT-blue)</a>
 </div>
 
 ---
