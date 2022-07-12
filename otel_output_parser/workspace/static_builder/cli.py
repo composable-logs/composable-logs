@@ -88,9 +88,12 @@ def github_repo_artifact_zips(
                 continue
 
             artifact_id: str = str(entry["id"])
-            artifact_zip: bytes = download_artifact(
+            artifact_zip: Optional[bytes] = download_artifact(
                 github_repository=github_repository, artifact_id=artifact_id
             )
+
+            if artifact_zip is None:
+                continue  # artifact could have expired after list was created?
 
             if zip_cache_dir is not None:
                 cache_file: Path = zip_cache_dir / (artifact_id + ".zip")

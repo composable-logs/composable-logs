@@ -1,5 +1,5 @@
 import os
-from typing import Dict, List, Iterable
+from typing import Dict, List, Iterable, Optional
 
 #
 
@@ -68,7 +68,7 @@ def list_artifacts_for_repo(github_repository: str) -> List[Dict]:
     )
 
 
-def download_artifact(github_repository: str, artifact_id: str) -> bytes:
+def download_artifact(github_repository: str, artifact_id: str) -> Optional[bytes]:
     """
     Download artifact from Github repo
 
@@ -88,6 +88,13 @@ def download_artifact(github_repository: str, artifact_id: str) -> bytes:
         headers={"authorization": f"Bearer {token}"},
         allow_redirects=True,
     )
+    if response.status_code == 410:
+        print(
+            " - Got error code 410 (Gone): Could the content "
+            "have expired after downloading list of artifacts?"
+        )
+        return None
+
     if response.status_code != requests.codes.ok:
         raise Exception(f"Request failed with code {response.status_code}")
 
