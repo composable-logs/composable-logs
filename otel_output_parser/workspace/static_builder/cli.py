@@ -179,6 +179,7 @@ class StaticMLFlowDataSink:
             summary["id"]: {
                 **del_key(summary, "id"),
                 "metadata": to_epoch(summary["type"], summary["metadata"]),
+                "all_children_ids": list(g.all_children_of(summary["id"])),
             }
             for summary in self.summaries
         }
