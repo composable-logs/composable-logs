@@ -1,6 +1,17 @@
 import glob
 from pathlib import Path
-from typing import Any, List, Mapping, Set, Optional, MutableMapping
+from typing import (
+    Any,
+    Dict,
+    Generic,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+)
 
 # Note eg "from opentelemetry import trace" fails mypy
 import opentelemetry as otel
@@ -109,6 +120,68 @@ def is_parent_child(span_parent: SpanDict, span_child: SpanDict) -> bool:
     )
 
 
+### --- Tree data structure helper ---
+
+NodeId = TypeVar("NodeId")
+
+
+class TreeNode(Generic[NodeId]):
+    """
+    Tree node with an (immutable) id and a mutable list of child id:s.
+    """
+
+    def __init__(self, node_id: NodeId):
+        self.node_id: NodeId = node_id
+        self.child_ids: List[NodeId] = []
+
+    def add_child_id(self, child_id: NodeId):
+        if child_id in self.child_ids:
+            raise ValueError(
+                f"TreeNode {self.node_id}: "
+                f"The id={child_id} is already a child id for this node. "
+                f"Current child_id:s = {self.child_ids}."
+            )
+        self.child_ids.append(child_id)
+
+
+# Represent graph edge (n1 -> n2) as tuple (n1, n2).
+# In this case, n1 is "parent node", and n2 is "child node".
+Edge = Tuple[NodeId, NodeId]
+
+
+class TreeSet(Generic[NodeId]):
+    """
+    Represet a Tree (with one root node) or a set of Tree:s (multiple root nodes)
+    """
+
+    def __init__(
+        self,
+        root_ids: Set[NodeId],
+        all_node_ids: Set[NodeId],
+        node_id_to_treenode: Dict[NodeId, TreeNode[NodeId]],
+    ):
+        self.root_ids: Set[NodeId] = root_ids
+        self.all_node_ids: Set[NodeId] = all_node_ids
+        self.node_id_to_treenode: Dict[NodeId, TreeNode[NodeId]] = node_id_to_treenode
+
+    @classmethod
+    def from_edges(cls, edges: Set[Edge[NodeId]]):
+        all_node_ids: Set[NodeId] = set(flatten(edges))
+
+        # Create TreeNode:s and connect them according to the edge data
+        tree_nodes: Dict[NodeId, TreeNode[NodeId]] = {
+            node_id: TreeNode(node_id) for node_id in all_node_ids
+        }
+
+        for child_id, parent_id in edges:
+            tree_nodes[parent_id].add_child_id(child_id)
+
+        # Find the tree root(s) by finding node_id(s) that have no parent.
+        root_ids: Set[NodeId] = all_node_ids - set(child_id for (child_id, _) in edges)
+
+        return cls(root_ids, all_node_ids, tree_nodes)
+
+
 class Spans:
     """
     Container for Python dictionaries with OpenTelemetry span:s
@@ -127,8 +200,8 @@ class Spans:
 
         return Spans([span for span in self.spans if match(span, keys, value)])
 
-    def get_by_span_id(self, span_id) -> SpanDict:
-        return one([span for span in self if get_span_id(span) == span_id])
+    # def get_by_span_id(self, span_id) -> SpanDict:
+    #    return one([span for span in self if get_span_id(span) == span_id])
 
     def sort_by_start_time(self, reverse=False):
         return Spans(
