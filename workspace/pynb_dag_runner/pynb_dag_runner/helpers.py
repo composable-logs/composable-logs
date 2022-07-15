@@ -4,6 +4,8 @@ from typing import Any, Generic, TypeVar, List, Iterable, Sequence, Tuple, Optio
 
 A = TypeVar("A")
 
+# --- range helper functions ---
+
 
 def range_is_empty(range):
     assert range.step == 1
@@ -33,17 +35,56 @@ def range_intersect(range1, range2) -> bool:
     return not range_is_empty(range_intersection(range1, range2))
 
 
+# --- sequence helper functions ---
+
+
+def _is_iterable(maybe_iterable):
+    # see: https://stackoverflow.com/questions/1952464
+    # In particular, this should return False for strings
+    return isinstance(maybe_iterable, (set, tuple, list))
+
+
 def flatten(xss):
-    assert isinstance(xss, list)
     result = []
 
     for xs in xss:
-        if isinstance(xs, list):
+        if _is_iterable(xs):
             result += flatten(xs)
         else:
-            result += [xs]
+            result.append(xs)
 
     return result
+
+
+def pairs(xs: Sequence[A]) -> Sequence[Tuple[A, A]]:
+    """
+    From a list of entries return list of subsequent entries.
+
+    The function assumes the input list has at least 2 entries.
+
+    Eg. [1, 2, 3, 4] -> [(1, 2), (2, 3), (3, 4)]
+    """
+    if len(xs) <= 1:
+        return []
+    return list(zip(xs[:-1], xs[1:]))
+
+
+def one(xs: Iterable[A]) -> A:
+    """
+    Assert that input can be converted into list with only one element, and
+    return that element.
+    """
+    xs_list = list(xs)
+    if not len(xs_list) == 1:
+        raise Exception(
+            "one: Expected input with only one element, "
+            f"but input has length {len(xs_list)}."
+        )
+
+    return xs_list[0]
+
+
+# --- function helper functions ---
 
 
 def compose(*fs):
@@ -65,57 +106,6 @@ def compose(*fs):
         return lambda *xs: compose(*fs_outers)(f_innermost(*xs))
     else:
         return f_innermost
-
-
-def pairs(xs: Sequence[A]) -> Sequence[Tuple[A, A]]:
-    """
-    From a list of entries return list of subsequent entries.
-
-    The function assumes the input list has at least 2 entries.
-
-    Eg. [1, 2, 3, 4] -> [(1, 2), (2, 3), (3, 4)]
-    """
-    if len(xs) <= 1:
-        return []
-    return list(zip(xs[:-1], xs[1:]))
-
-
-def read_json(filepath: Path) -> Any:
-    with open(filepath, "r") as f:
-        return json.load(f)
-
-
-def write_json(filepath: Path, obj: Any):
-    """
-    Write object as JSON object to filepath (and create directories if needed).
-    """
-
-    # ensure base directory for filepath exists
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-
-    with open(filepath, "w") as f:
-        json.dump(obj, f, indent=2)
-
-
-def read_jsonl(path: Path):
-    assert path.is_file()
-
-    return [json.loads(span_line) for span_line in path.read_text().splitlines()]
-
-
-def one(xs: Iterable[A]) -> A:
-    """
-    Assert that input can be converted into list with only one element, and
-    return that element.
-    """
-    xs_list = list(xs)
-    if not len(xs_list) == 1:
-        raise Exception(
-            "one: Expected input with only one element, "
-            f"but input has length {len(xs_list)}."
-        )
-
-    return xs_list[0]
 
 
 class Try(Generic[A]):
@@ -144,3 +134,29 @@ class Try(Generic[A]):
             return self_tuple == other_tuple
         else:
             return False
+
+
+# --- file I/O helper functions ---
+
+
+def read_json(filepath: Path) -> Any:
+    with open(filepath, "r") as f:
+        return json.load(f)
+
+
+def write_json(filepath: Path, obj: Any):
+    """
+    Write object as JSON object to filepath (and create directories if needed).
+    """
+
+    # ensure base directory for filepath exists
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(filepath, "w") as f:
+        json.dump(obj, f, indent=2)
+
+
+def read_jsonl(path: Path):
+    assert path.is_file()
+
+    return [json.loads(span_line) for span_line in path.read_text().splitlines()]

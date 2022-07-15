@@ -17,6 +17,8 @@ from pynb_dag_runner.helpers import (
     pairs,
 )
 
+# --- range helper functions ---
+
 
 def test_range_empty():
     assert range_is_empty(range(0, 0))
@@ -56,16 +58,52 @@ def test_ranges():
     assert range_is_empty(range_intersection(range(1, 10), range(100, 1000)))
 
 
+# --- sequence helper functions ---
+
+
 def test_flatten():
     def flatten2(xss):
         assert flatten(flatten(xss)) == flatten(xss)
         return flatten(xss)
 
     assert flatten2([]) == flatten2([[]]) == flatten2([[], [], [[]]]) == []
+
+    assert flatten2([None, (None, None, [None])]) == [None, None, None, None]
     assert flatten2([1, [2]]) == [1, 2]
     assert flatten2([1, [2], [[[3]]]]) == [1, 2, 3]
     assert flatten2([[1, 2, 3, [4]]]) == [1, 2, 3, 4]
-    assert flatten2(list(range(10))) == list(range(10))
+
+    # should accept list, tuples, and sets
+    for t in [list, tuple, set]:
+        assert flatten2(t(range(10))) == list(range(10))
+        assert flatten2(t([])) == []
+
+    # mixed types
+    r1 = flatten2([(99, 22), {(1, 2), (3, 4), (4, 5)}])
+    assert list(sorted(r1)) == [1, 2, 3, 4, 4, 5, 22, 99]
+
+    # strings should not be expanded
+    assert flatten2(["abc", ("bar", "zoo")]) == ["abc", "bar", "zoo"]
+
+
+def test_pairs():
+    assert pairs([]) == []
+    assert pairs([1]) == []
+    assert pairs([1, 2]) == [(1, 2)]
+    assert pairs([1, 2, 3]) == [(1, 2), (2, 3)]
+    assert pairs([1, 2, 3, 4]) == [(1, 2), (2, 3), (3, 4)]
+
+
+def test_one():
+    assert one([1]) == 1
+
+
+def test_one_raises_exception():
+    with pytest.raises(Exception):
+        assert one([1, 2])
+
+
+# --- function helper functions ---
 
 
 def test_compose():
@@ -85,12 +123,7 @@ def test_compose():
     assert compose(h2)("u", "v") == "h2(u, v)" == h2("u", "v")
 
 
-def test_pairs():
-    assert pairs([]) == []
-    assert pairs([1]) == []
-    assert pairs([1, 2]) == [(1, 2)]
-    assert pairs([1, 2, 3]) == [(1, 2), (2, 3)]
-    assert pairs([1, 2, 3, 4]) == [(1, 2), (2, 3), (3, 4)]
+# --- file I/O helper functions ---
 
 
 def test_write_read_json(tmp_path: Path):
@@ -102,12 +135,3 @@ def test_write_read_json(tmp_path: Path):
 
         write_json(test_path, test_obj)
         assert read_json(test_path) == test_obj
-
-
-def test_one():
-    assert one([1]) == 1
-
-
-def test_one_raises_exception():
-    with pytest.raises(Exception):
-        assert one([1, 2])
