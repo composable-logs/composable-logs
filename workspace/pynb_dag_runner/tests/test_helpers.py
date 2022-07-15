@@ -62,10 +62,23 @@ def test_flatten():
         return flatten(xss)
 
     assert flatten2([]) == flatten2([[]]) == flatten2([[], [], [[]]]) == []
+
+    assert flatten2([None, (None, None, [None])]) == [None, None, None, None]
     assert flatten2([1, [2]]) == [1, 2]
     assert flatten2([1, [2], [[[3]]]]) == [1, 2, 3]
     assert flatten2([[1, 2, 3, [4]]]) == [1, 2, 3, 4]
-    assert flatten2(list(range(10))) == list(range(10))
+
+    # should accept list, tuples, and sets
+    for t in [list, tuple, set]:
+        assert flatten2(t(range(10))) == list(range(10))
+        assert flatten2(t([])) == []
+
+    # mixed types
+    r1 = flatten2([(99, 22), {(1, 2), (3, 4), (4, 5)}])
+    assert list(sorted(r1)) == [1, 2, 3, 4, 4, 5, 22, 99]
+
+    # strings should not be expanded
+    assert flatten2(["abc", ("bar", "zoo")]) == ["abc", "bar", "zoo"]
 
 
 def test_compose():

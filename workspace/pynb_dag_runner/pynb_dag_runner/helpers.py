@@ -4,6 +4,8 @@ from typing import Any, Generic, TypeVar, List, Iterable, Sequence, Tuple, Optio
 
 A = TypeVar("A")
 
+# --- range related helper functions ---
+
 
 def range_is_empty(range):
     assert range.step == 1
@@ -33,15 +35,23 @@ def range_intersect(range1, range2) -> bool:
     return not range_is_empty(range_intersection(range1, range2))
 
 
+# --- sequence and function helper functions ---
+
+
+def _is_iterable(maybe_iterable):
+    # see: https://stackoverflow.com/questions/1952464
+    # In particular, this should return False for strings
+    return isinstance(maybe_iterable, (set, tuple, list))
+
+
 def flatten(xss):
-    assert isinstance(xss, list)
     result = []
 
     for xs in xss:
-        if isinstance(xs, list):
+        if _is_iterable(xs):
             result += flatten(xs)
         else:
-            result += [xs]
+            result.append(xs)
 
     return result
 
@@ -78,6 +88,9 @@ def pairs(xs: Sequence[A]) -> Sequence[Tuple[A, A]]:
     if len(xs) <= 1:
         return []
     return list(zip(xs[:-1], xs[1:]))
+
+
+# --- file I/O helper functions ---
 
 
 def read_json(filepath: Path) -> Any:
