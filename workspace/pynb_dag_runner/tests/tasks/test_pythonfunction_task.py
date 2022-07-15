@@ -260,7 +260,7 @@ def _get_time_range(spans: Spans, function_id: str, inner: bool):
     return get_duration_range_us(inner_flag_to_span_dict[inner])
 
 
-def test_tasks_run_in_parallel():
+def test__python_function_task__run_in_parallel():
     def get_test_spans():
         with SpanRecorder() as rec:
             tasks = [
@@ -291,7 +291,7 @@ def test_tasks_run_in_parallel():
     validate_spans(get_test_spans())
 
 
-def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
+def test__python_function_task__parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
     def get_test_spans():
         with SpanRecorder() as rec:
             tasks = [
@@ -331,7 +331,7 @@ def test_parallel_tasks_are_queued_based_on_available_ray_worker_cpus():
     validate_spans(get_test_spans())
 
 
-def test_always_failing_task():
+def test__python_function_task__always_failing_task():
     def get_test_spans():
         with SpanRecorder() as rec:
 
@@ -404,7 +404,7 @@ def test_always_failing_task():
     validate_spans(get_test_spans())
 
 
-def test__task_retries__task_is_retried_until_success():
+def test__python_function_task__task_is_retried_until_success():
     def get_test_spans():
         with SpanRecorder() as rec:
 
@@ -606,7 +606,7 @@ def test__task_retries__task_is_retried_until_success():
         },
     ],
 )
-async def test_random_sleep_tasks_with_order_dependencies(
+async def test__python_function_task__random_sleep_tasks_with_order_dependencies(
     dummy_loop_parameter, arg, ray_reinit
 ):
     """
