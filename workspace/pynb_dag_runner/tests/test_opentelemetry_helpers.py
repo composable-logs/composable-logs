@@ -169,3 +169,42 @@ def test__tree__built_in_methods(test_tree):
         assert node_id in test_tree
 
     assert not -1 in test_tree
+
+
+def test__tree__bound_inclusive(test_tree: Tree[int]):
+    # Bounding test-tree by node_id=0 (inclusive) should return the same tree
+    tree_bound_0 = test_tree.bound_inclusive(0)
+    assert tree_bound_0 == test_tree
+    assert len(tree_bound_0) == len(test_tree)
+
+    # Bounding by other node_id:s should not return same tree
+    assert not test_tree == test_tree.bound_inclusive(2)
+
+    #
+    # Bounding test-tree by node_id=5 (inclusive) should give tree
+    #
+    #      5
+    #      |
+    #      8
+    #    / | \
+    #  10 11  12
+    #
+    assert test_tree.bound_inclusive(5).all_node_ids == {5, 8, 10, 11, 12}
+    assert test_tree.bound_inclusive(5) == Tree[int].from_edges(
+        {
+            (5, 8),
+            #
+            (8, 10),
+            (8, 11),
+            (8, 12),
+        }
+    )
+
+    # Bounding test-tree by node_id=11 (inclusive) should give tree with only one
+    # element.
+    #
+    # Note that this tree can not be generated from list of edges.
+    tree_bound_11 = test_tree.bound_inclusive(11)
+    assert tree_bound_11.all_node_ids == {11}
+    assert set(tree_bound_11.edges()) == set([])
+    assert len(tree_bound_11) == 1

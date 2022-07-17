@@ -178,6 +178,9 @@ class Tree(Generic[NodeId]):
 
     @classmethod
     def from_edges(cls, edges: Set[Edge[NodeId]]):
+        if len(edges) == 0:
+            raise ValueError("Tree should have at least a root node.")
+
         all_node_ids: Set[NodeId] = set(flatten(edges))
 
         # Create TreeNode:s and connect them according to the edge data
@@ -201,6 +204,18 @@ class Tree(Generic[NodeId]):
 
     def __contains__(self, node_id: NodeId) -> bool:
         return node_id in self.all_node_ids
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, Tree):
+            return (
+                # -
+                self.edges() == other.edges()
+                and
+                # -
+                self.all_node_ids == other.all_node_ids
+            )
+        else:
+            return False
 
     def _edges_from(self, node_id: NodeId):
         """
@@ -237,7 +252,7 @@ class Tree(Generic[NodeId]):
         bounded_node_ids = set(self._traverse_from(node_id, inclusive=True))
 
         return Tree(
-            root_id={node_id},
+            root_id=node_id,
             all_node_ids=bounded_node_ids,
             node_id_to_treenode={
                 k: self.node_id_to_treenode[k] for k in bounded_node_ids
