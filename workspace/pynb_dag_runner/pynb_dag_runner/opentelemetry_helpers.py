@@ -157,18 +157,22 @@ class TreeNode(Generic[NodeId]):
 Edge = Tuple[NodeId, NodeId]
 
 
-class TreeSet(Generic[NodeId]):
+class Tree(Generic[NodeId]):
     """
-    Represet a Tree (with one root node) or a set of Tree:s (multiple root nodes)
+    Represent a directed Tree with one root node
     """
 
     def __init__(
         self,
-        root_ids: Set[NodeId],
+        root_id: NodeId,
         all_node_ids: Set[NodeId],
         node_id_to_treenode: Dict[NodeId, TreeNode[NodeId]],
     ):
-        self.root_ids: Set[NodeId] = root_ids
+        # do consistency checks
+        assert root_id in all_node_ids
+        assert set(node_id_to_treenode.keys()) == all_node_ids
+
+        self.root_id: NodeId = root_id
         self.all_node_ids: Set[NodeId] = all_node_ids
         self.node_id_to_treenode: Dict[NodeId, TreeNode[NodeId]] = node_id_to_treenode
 
@@ -184,10 +188,56 @@ class TreeSet(Generic[NodeId]):
         for parent_id, child_id in edges:
             tree_nodes[parent_id].add_child_id(child_id)
 
-        # Find the tree root(s) by finding node_id(s) that have no parent.
-        root_ids: Set[NodeId] = all_node_ids - set(child_id for (_, child_id) in edges)
+        # Find the tree root by finding node_id(s) that have no parent.
+        root_id: NodeId = one(all_node_ids - set(child_id for (_, child_id) in edges))
 
-        return cls(root_ids, all_node_ids, tree_nodes)
+        return cls(root_id, all_node_ids, tree_nodes)
+
+    def __iter__(self):
+        return iter(self.all_node_ids)
+
+    def __len__(self) -> int:
+        return len(self.all_node_ids)
+
+    def __contains__(self, node_id: NodeId) -> bool:
+        return node_id in self.all_node_ids
+
+    def traverse_from(self, root_node_id: NodeId, inclusive: bool):
+        """
+        Returns iterator over node_id:s in this tree under root_node_id.
+
+        root_node_id is included/not included depending on inclusive=True/False.
+        """
+        if inclusive:
+            yield root_node_id
+
+        for node_id in self.node_id_to_treenode[root_node_id].child_ids:
+            for n in self.traverse_from(node_id, inclusive=True):
+                yield n
+
+    def bound_inclusive(self, node_id: NodeId) -> "Tree":
+        assert node_id in self
+        bounded_node_ids = set(self.traverse_from(node_id, inclusive=True))
+
+        return Tree(
+            root_id={node_id},
+            all_node_ids=bounded_node_ids,
+            node_id_to_treenode={
+                k: self.node_id_to_treenode[k] for k in bounded_node_ids
+            },
+        )
+
+
+class TreeUnion(Generic[NodeId]):
+    """
+    Represent a union of tree:s (w. multiple root nodes)
+    """
+
+    def __init__(
+        self,
+        trees: List[Tree[NodeId]],
+    ):
+        self.trees: List[Tree[NodeId]] = trees
 
 
 class Spans:
@@ -229,6 +279,7 @@ class Spans:
         return iter(self.spans)
 
     def __getitem__(self, idx):
+        # TODO: deprecate, we should not need to access span:s by their index
         return self.spans[idx]
 
     def contains_span_id(self, span_id: SpanId) -> bool:

@@ -19,7 +19,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     get_span_exceptions,
     Spans,
     SpanRecorder,
-    TreeSet,
+    Tree,
 )
 from pynb_dag_runner.helpers import one
 
@@ -93,7 +93,7 @@ def test_tracing_get_span_id_and_duration():
 
 
 @pytest.fixture
-def treeset_edges() -> Set[Tuple[int, int]]:
+def tree_edges() -> Set[Tuple[int, int]]:
     """
     Test tree:
 
@@ -132,18 +132,18 @@ def treeset_edges() -> Set[Tuple[int, int]]:
     }
 
 
-def test__treeset__from_edges(treeset_edges):
-    ts = TreeSet[int].from_edges(treeset_edges)
+def test__tree__from_edges(tree_edges):
+    ts = Tree[int].from_edges(tree_edges)
 
     assert ts.all_node_ids == set(range(13))
-    assert ts.root_ids == {0}
+    assert ts.root_id == 0
 
     def get_child_ids(node_id: int) -> Set[int]:
         return set(ts.node_id_to_treenode[node_id].child_ids)
 
     def get_child_ids_from_edges(node_id: int) -> Set[int]:
         return set(
-            child_id for (parent_id, child_id) in treeset_edges if parent_id == node_id
+            child_id for (parent_id, child_id) in tree_edges if parent_id == node_id
         )
 
     assert get_child_ids(node_id=0) == {1}
@@ -152,3 +152,17 @@ def test__treeset__from_edges(treeset_edges):
 
     for node_id in ts.all_node_ids:
         assert get_child_ids(node_id) == get_child_ids_from_edges(node_id)
+
+
+def test__tree__built_in_methods(tree_edges):
+    ts = Tree[int].from_edges(tree_edges)
+
+    # test iteration over elements in tree
+    ts_list = list(iter(ts))
+    assert set(ts_list) == set(range(13))
+
+    # test element in tree
+    for node_id in range(13):
+        assert node_id in ts
+
+    assert not -1 in ts
