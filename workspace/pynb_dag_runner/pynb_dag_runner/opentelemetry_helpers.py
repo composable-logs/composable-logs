@@ -80,6 +80,9 @@ def get_span_exceptions(span: SpanDict):
     return [event for event in span["events"] if event.get("name", "") == "exception"]
 
 
+# --- span id/parent id helpers ---
+
+
 def get_span_id(span: SpanDict) -> SpanId:
     try:
         result = read_key(span, ["context", "span_id"])
@@ -87,6 +90,28 @@ def get_span_id(span: SpanDict) -> SpanId:
         return result
     except:
         raise Exception(f"Unable to read span_id from {str(span)}.")
+
+
+def get_parent_span_id(span: SpanDict) -> Optional[SpanId]:
+    """
+    Return:
+    - span_id of parent if Span has a parent
+    - otherwise (if Span has no parent) return None
+    """
+    try:
+        return read_key(span, ["parent_id"])
+    except:
+        raise Exception(f"Unable to read parent_id from {str(span)}.")
+
+
+def is_parent_child(span_parent: SpanDict, span_child: SpanDict) -> bool:
+    """
+    Return True/False if span_parent is direct parent of span_child.
+    """
+    return get_span_id(span_parent) == get_parent_span_id(span_child)
+
+
+# --- span timestamp helpers ---
 
 
 def iso8601_to_epoch_s(iso8601_datetime: str) -> float:
@@ -108,16 +133,6 @@ def get_duration_s(span: SpanDict) -> float:
     start_epoch_s: float = iso8601_to_epoch_s(span["start_time"])
     end_epoch_s: float = iso8601_to_epoch_s(span["end_time"])
     return end_epoch_s - start_epoch_s
-
-
-def is_parent_child(span_parent: SpanDict, span_child: SpanDict) -> bool:
-    """
-    Return True/False if span_parent is direct parent of span_child.
-    """
-    child_parent_id = read_key(span_child, ["parent_id"])
-    return (child_parent_id is not None) and (
-        child_parent_id == get_span_id(span_parent)
-    )
 
 
 ### --- Tree data structure helper ---
@@ -234,7 +249,7 @@ class Tree(Generic[NodeId]):
         """
         return set(self._edges_from(self.root_id))
 
-    def _traverse_from(self, root_node_id: NodeId, inclusive: bool):
+    def traverse_from(self, root_node_id: NodeId, inclusive: bool):
         """
         Returns iterator over node_id:s in this tree under root_node_id.
 
@@ -244,12 +259,12 @@ class Tree(Generic[NodeId]):
             yield root_node_id
 
         for node_id in self.node_id_to_treenode[root_node_id].child_ids:
-            for n in self._traverse_from(node_id, inclusive=True):
+            for n in self.traverse_from(node_id, inclusive=True):
                 yield n
 
     def bound_inclusive(self, node_id: NodeId) -> "Tree":
         assert node_id in self
-        bounded_node_ids = set(self._traverse_from(node_id, inclusive=True))
+        bounded_node_ids = set(self.traverse_from(node_id, inclusive=True))
 
         return Tree(
             root_id=node_id,
@@ -259,17 +274,45 @@ class Tree(Generic[NodeId]):
             },
         )
 
+    def contains_path(self, *node_id_path: NodeId) -> bool:
+        """
+        For a sequence node_id_path = (n1, n2, n3, .., nx) of NodeId:s in the
+        tree.
 
-class TreeUnion(Generic[NodeId]):
-    """
-    Represent a union of tree:s (w. multiple root nodes)
-    """
+        Return:
+          True if the nodeId:s in the path can be connected in the Tree, otherwise
+          False
 
-    def __init__(
-        self,
-        trees: List[Tree[NodeId]],
-    ):
-        self.trees: List[Tree[NodeId]] = trees
+        Eg. in the tree
+              1
+              |
+              v
+              2
+            / | \
+           v  v  v
+           3  4  5
+
+          True == contains_path(1, 2)      [1 is parent of 2 and there is path 1 -> 2]
+               == contains_path(1, 3)      [there is path 1 -> 2 -> 3]
+               == contains_path(1, 2, 3)
+
+          False == contains_path(3, 4)
+                == contains_path(5, 1)     [there is path 1 -> 5, but graph is directed]
+        """
+        assert set(node_id_path) <= self.all_node_ids
+        assert len(node_id_path) >= 1
+
+        # Note: each node can have at most one parent we could first compute
+        # maximum path from last element provided, and see if the provided path
+        # is subset of this. However, currently we do not have child -> parent
+        # easily accessible.
+
+        for node_1, node_2 in pairs(node_id_path):
+            assert node_1 != node_2
+            if node_2 not in self.traverse_from(node_1, inclusive=False):
+                return False
+
+        return True
 
 
 class Spans:
@@ -410,6 +453,11 @@ class Spans:
                 else:
                     result[k] = v
         return result
+
+
+# --- helper functions to record Span:s ---
+#
+# The below currently uses Ray's default OpenTelemetry (log to local /tmp/) logger
 
 
 def _get_all_spans():

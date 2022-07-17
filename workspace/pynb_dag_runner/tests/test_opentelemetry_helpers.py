@@ -206,5 +206,17 @@ def test__tree__bound_inclusive(test_tree: Tree[int]):
     # Note that this tree can not be generated from list of edges.
     tree_bound_11 = test_tree.bound_inclusive(11)
     assert tree_bound_11.all_node_ids == {11}
-    assert set(tree_bound_11.edges()) == set([])
+    assert tree_bound_11.edges() == set([])
     assert len(tree_bound_11) == 1
+
+
+def test__tree__contains_path(test_tree: Tree[int]):
+    assert test_tree.contains_path(0, 1, 2, 4)
+    assert test_tree.contains_path(0, 4)
+    assert test_tree.contains_path(5, 8, 12)
+    assert test_tree.contains_path(5, 12)
+
+    assert not test_tree.contains_path(3, 7)
+    assert not test_tree.contains_path(2, 3)
+    assert not test_tree.contains_path(8, 9)
+    assert not test_tree.contains_path(3, 0)
