@@ -135,28 +135,9 @@ def get_duration_s(span: SpanDict) -> float:
     return end_epoch_s - start_epoch_s
 
 
-### --- Tree data structure helper ---
+### --- DirectedGraph data structure helper ---
 
 NodeId = TypeVar("NodeId")
-
-
-class TreeNode(Generic[NodeId]):
-    """
-    Tree node with an (immutable) id and a mutable list of child id:s.
-    """
-
-    def __init__(self, node_id: NodeId):
-        self.node_id: NodeId = node_id
-        self.child_ids: List[NodeId] = []
-
-    def add_child_id(self, child_id: NodeId):
-        if child_id in self.child_ids:
-            raise ValueError(
-                f"TreeNode {self.node_id}: "
-                f"The id={child_id} is already a child id for this node. "
-                f"Current child_id:s = {self.child_ids}."
-            )
-        self.child_ids.append(child_id)
 
 
 # Represent graph edge (n1 -> n2) as tuple (n1, n2).
@@ -172,44 +153,60 @@ class TreeNode(Generic[NodeId]):
 Edge = Tuple[NodeId, NodeId]
 
 
-class Tree(Generic[NodeId]):
+class _DG_Node(Generic[NodeId]):
     """
-    Represent a directed Tree with one root node
+    Internal representation of a node in a DirectedGraph.
+
+    The id is immutable, and list of child id:s is mutable.
+    """
+
+    def __init__(self, node_id: NodeId):
+        self.node_id: NodeId = node_id
+        self.child_ids: List[NodeId] = []
+
+    def add_child_id(self, child_id: NodeId):
+        if child_id in self.child_ids:
+            raise ValueError(
+                f"DirectedGraphNode {self.node_id}: "
+                f"The id={child_id} is already a child id for this node. "
+                f"Current child_id:s = {self.child_ids}."
+            )
+        self.child_ids.append(child_id)
+
+
+class DirectedGraph(Generic[NodeId]):
+    """
+    Represent a directed graph where every node in the graph has at most one parent.
+
+    - Typically we will use this for OpenTelemetry spans (that have at most one parent).
+
+    - The entire run log will have one top (parent) span, and we have a directed tree.
+      However, when bounding this we may get a union of directed trees.
     """
 
     def __init__(
         self,
-        root_id: NodeId,
         all_node_ids: Set[NodeId],
-        node_id_to_treenode: Dict[NodeId, TreeNode[NodeId]],
+        _node_id_dict: Dict[NodeId, _DG_Node],  # see above
     ):
-        # do consistency checks
-        assert root_id in all_node_ids
-        assert set(node_id_to_treenode.keys()) == all_node_ids
+        assert set(_node_id_dict.keys()) == all_node_ids
 
-        self.root_id: NodeId = root_id
         self.all_node_ids: Set[NodeId] = all_node_ids
-        self.node_id_to_treenode: Dict[NodeId, TreeNode[NodeId]] = node_id_to_treenode
+        self._node_id_dict: Dict[NodeId, _DG_Node[NodeId]] = _node_id_dict
 
     @classmethod
     def from_edges(cls, edges: Set[Edge[NodeId]]):
-        if len(edges) == 0:
-            raise ValueError("Tree should have at least a root node.")
-
         all_node_ids: Set[NodeId] = set(flatten(edges))
 
-        # Create TreeNode:s and connect them according to the edge data
-        tree_nodes: Dict[NodeId, TreeNode[NodeId]] = {
-            node_id: TreeNode(node_id) for node_id in all_node_ids
+        # Create _DG_Node:s and connect them according to the edge data
+        _node_id_dict: Dict[NodeId, _DG_Node] = {
+            node_id: _DG_Node(node_id) for node_id in all_node_ids
         }
 
         for parent_id, child_id in edges:
-            tree_nodes[parent_id].add_child_id(child_id)
+            _node_id_dict[parent_id].add_child_id(child_id)
 
-        # Find the tree root by finding node_id(s) that have no parent.
-        root_id: NodeId = one(all_node_ids - set(child_id for (_, child_id) in edges))
-
-        return cls(root_id, all_node_ids, tree_nodes)
+        return cls(all_node_ids, _node_id_dict)
 
     def __iter__(self):
         return iter(self.all_node_ids)
@@ -221,7 +218,7 @@ class Tree(Generic[NodeId]):
         return node_id in self.all_node_ids
 
     def __eq__(self, other: Any) -> bool:
-        if isinstance(other, Tree):
+        if isinstance(other, DirectedGraph):
             return (
                 # -
                 self.edges() == other.edges()
@@ -232,58 +229,56 @@ class Tree(Generic[NodeId]):
         else:
             return False
 
-    def _edges_from(self, node_id: NodeId):
-        """
-        Return iterator over edges from and below given node_id
-        """
-        assert node_id in self
-
-        for child_node_id in self.node_id_to_treenode[node_id].child_ids:
-            yield (node_id, child_node_id)
-            for edge in self._edges_from(child_node_id):
-                yield edge
+    def _edges(self):
+        for parent_node_id, node in self._node_id_dict.items():
+            for child_node_id in node.child_ids:
+                yield parent_node_id, child_node_id
 
     def edges(self) -> Set[Edge[NodeId]]:
         """
-        Return set of edges for this tree
+        Return set of edges for this directed graph
         """
-        return set(self._edges_from(self.root_id))
+        return set(self._edges())
+
+    def root_nodes(self) -> Set[NodeId]:
+        """
+        Return root nodes (node(s) that have no parent).
+        """
+        return self.all_node_ids - set(child_id for (_, child_id) in self.edges())
 
     def traverse_from(self, root_node_id: NodeId, inclusive: bool):
         """
-        Returns iterator over node_id:s in this tree under root_node_id.
+        Returns iterator over node_id:s in this DirectedGraph under root_node_id.
 
         root_node_id is included/not included depending on inclusive=True/False.
         """
         if inclusive:
             yield root_node_id
 
-        for node_id in self.node_id_to_treenode[root_node_id].child_ids:
+        for node_id in self._node_id_dict[root_node_id].child_ids:
             for n in self.traverse_from(node_id, inclusive=True):
                 yield n
 
-    def bound_inclusive(self, node_id: NodeId) -> "Tree":
+    def bound_inclusive(self, node_id: NodeId) -> "DirectedGraph":
+        # assumes no cycles
         assert node_id in self
         bounded_node_ids = set(self.traverse_from(node_id, inclusive=True))
 
-        return Tree(
-            root_id=node_id,
+        return DirectedGraph(
             all_node_ids=bounded_node_ids,
-            node_id_to_treenode={
-                k: self.node_id_to_treenode[k] for k in bounded_node_ids
-            },
+            _node_id_dict={k: self._node_id_dict[k] for k in bounded_node_ids},
         )
 
     def contains_path(self, *node_id_path: NodeId) -> bool:
         """
         For a sequence node_id_path = (n1, n2, n3, .., nx) of NodeId:s in the
-        tree.
+        DirectedGraph.
 
         Return:
-          True if the nodeId:s in the path can be connected in the Tree, otherwise
+          True if the nodeId:s in the path can be connected in the DirectedGraph, otherwise
           False
 
-        Eg. in the tree
+        Eg. in the DirectedGraph
               1
               |
               v
@@ -298,6 +293,8 @@ class Tree(Generic[NodeId]):
 
           False == contains_path(3, 4)
                 == contains_path(5, 1)     [there is path 1 -> 5, but graph is directed]
+
+        Note: assumes no cycles
         """
         assert set(node_id_path) <= self.all_node_ids
         assert len(node_id_path) >= 1
@@ -408,7 +405,21 @@ class Spans:
             + [s for s in self if self.contains_path(top, s, recursive=True)]
         )
 
+    def _get_edges(self):
+        result = []
+
+        for span in self:
+            if get_parent_span_id(span) is not None:
+                result.append((get_parent_span_id(span), get_span_id(span)))
+
+        return set(result)
+
     def bound_under(self, top) -> "Spans":
+
+        # DirectedGraph = DirectedGraph[str].from_edges(self._get_edges())
+        # bounded_ids = set(DirectedGraph.traverse_from(root_node_id=top, inclusive=False))
+        # return Spans([span for span in self if get_span_id(span) in bounded_ids])
+
         return self._bound_by(top, inclusive=False)
 
     def bound_inclusive(self, top) -> "Spans":

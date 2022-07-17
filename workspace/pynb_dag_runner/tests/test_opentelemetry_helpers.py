@@ -1,5 +1,5 @@
 import time
-from typing import Set, Tuple
+from typing import Set, Tuple, Dict, List
 
 #
 import pytest
@@ -19,7 +19,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     get_span_exceptions,
     Spans,
     SpanRecorder,
-    Tree,
+    DirectedGraph,
 )
 from pynb_dag_runner.helpers import one
 
@@ -87,15 +87,13 @@ def test_tracing_get_span_id_and_duration():
     assert get_span_exceptions(test_span) == []
 
 
-# --- test Spans ---
-
-# --- test Spans: TreeSet ---
+# --- test Directed Graph functions ---
 
 
 @pytest.fixture
-def test_tree() -> Tree[int]:
+def directed_tree_fixture() -> DirectedGraph[int]:
     """
-    Test tree:
+    Test tree (a directed graph):
 
               0
               |
@@ -131,54 +129,68 @@ def test_tree() -> Tree[int]:
         (8, 12),
     }
 
-    ts = Tree[int].from_edges(edges)
+    ts = DirectedGraph[int].from_edges(edges)
     assert set(ts.edges()) == edges
     return ts
 
 
-def test__tree__from_edges(test_tree):
-    assert test_tree.all_node_ids == set(range(13))
-    assert test_tree.root_id == 0
+def test__graph__from_edges(directed_tree_fixture: DirectedGraph[int]):
+    assert directed_tree_fixture.all_node_ids == set(range(13))
 
     def get_child_ids(node_id: int) -> Set[int]:
-        return set(test_tree.node_id_to_treenode[node_id].child_ids)
-
-    def get_child_ids_from_edges(node_id: int) -> Set[int]:
         return set(
             child_id
-            for (parent_id, child_id) in test_tree.edges()
+            for (parent_id, child_id) in directed_tree_fixture.edges()
             if parent_id == node_id
         )
 
-    assert get_child_ids(node_id=0) == {1}
-    assert get_child_ids(node_id=1) == {2, 3}
-    assert get_child_ids(node_id=2) == {4, 5, 6, 7}
+    expected_child_ids: Dict[int, List[int]] = {
+        0: [1],
+        1: [2, 3],
+        2: [4, 5, 6, 7],
+        3: [],
+        4: [],
+        5: [8],
+        6: [],
+        7: [9],
+        8: [10, 11, 12],
+        9: [],
+        10: [],
+        11: [],
+        12: [],
+    }
 
-    for node_id in test_tree.all_node_ids:
-        assert get_child_ids(node_id) == get_child_ids_from_edges(node_id)
+    for parent_id, child_ids in expected_child_ids.items():
+        assert get_child_ids(node_id=parent_id) == set(child_ids)
 
 
-def test__tree__built_in_methods(test_tree):
+def test__graph__can_create_empty_graph():
+    assert len(DirectedGraph[int].from_edges(set([]))) == 0
 
-    # test iteration over elements in tree
-    ts_list = list(iter(test_tree))
+
+def test__graph__built_in_methods(directed_tree_fixture: DirectedGraph[int]):
+    assert len(directed_tree_fixture) == 13
+
+    # iteration over nodes
+    ts_list = list(iter(directed_tree_fixture))
     assert set(ts_list) == set(range(13))
 
-    # test element in tree
+    # test element membership in graph
     for node_id in range(13):
-        assert node_id in test_tree
+        assert node_id in directed_tree_fixture
 
-    assert not -1 in test_tree
+    for no_node_id in [-1, "foo"]:
+        assert not no_node_id in directed_tree_fixture
 
 
-def test__tree__bound_inclusive(test_tree: Tree[int]):
+def test__graph__bound_inclusive(directed_tree_fixture: DirectedGraph[int]):
     # Bounding test-tree by node_id=0 (inclusive) should return the same tree
-    tree_bound_0 = test_tree.bound_inclusive(0)
-    assert tree_bound_0 == test_tree
-    assert len(tree_bound_0) == len(test_tree)
+    tree_bound_0 = directed_tree_fixture.bound_inclusive(0)
+    assert tree_bound_0 == directed_tree_fixture
+    assert len(tree_bound_0) == len(directed_tree_fixture)
 
     # Bounding by other node_id:s should not return same tree
-    assert not test_tree == test_tree.bound_inclusive(2)
+    assert not directed_tree_fixture == directed_tree_fixture.bound_inclusive(2)
 
     #
     # Bounding test-tree by node_id=5 (inclusive) should give tree
@@ -189,8 +201,8 @@ def test__tree__bound_inclusive(test_tree: Tree[int]):
     #    / | \
     #  10 11  12
     #
-    assert test_tree.bound_inclusive(5).all_node_ids == {5, 8, 10, 11, 12}
-    assert test_tree.bound_inclusive(5) == Tree[int].from_edges(
+    assert directed_tree_fixture.bound_inclusive(5).all_node_ids == {5, 8, 10, 11, 12}
+    assert directed_tree_fixture.bound_inclusive(5) == DirectedGraph[int].from_edges(
         {
             (5, 8),
             #
@@ -203,20 +215,23 @@ def test__tree__bound_inclusive(test_tree: Tree[int]):
     # Bounding test-tree by node_id=11 (inclusive) should give tree with only one
     # element.
     #
-    # Note that this tree can not be generated from list of edges.
-    tree_bound_11 = test_tree.bound_inclusive(11)
+    # Note: this graph can not be generated from list of edges since there is only
+    # one node.
+    tree_bound_11 = directed_tree_fixture.bound_inclusive(11)
     assert tree_bound_11.all_node_ids == {11}
     assert tree_bound_11.edges() == set([])
     assert len(tree_bound_11) == 1
 
 
-def test__tree__contains_path(test_tree: Tree[int]):
-    assert test_tree.contains_path(0, 1, 2, 4)
-    assert test_tree.contains_path(0, 4)
-    assert test_tree.contains_path(5, 8, 12)
-    assert test_tree.contains_path(5, 12)
+def test__graph__contains_path(directed_tree_fixture: DirectedGraph[int]):
+    assert directed_tree_fixture.root_nodes() == set([0])
 
-    assert not test_tree.contains_path(3, 7)
-    assert not test_tree.contains_path(2, 3)
-    assert not test_tree.contains_path(8, 9)
-    assert not test_tree.contains_path(3, 0)
+    assert directed_tree_fixture.contains_path(0, 1, 2, 4)
+    assert directed_tree_fixture.contains_path(0, 4)
+    assert directed_tree_fixture.contains_path(5, 8, 12)
+    assert directed_tree_fixture.contains_path(5, 12)
+
+    assert not directed_tree_fixture.contains_path(3, 7)
+    assert not directed_tree_fixture.contains_path(2, 3)
+    assert not directed_tree_fixture.contains_path(8, 9)
+    assert not directed_tree_fixture.contains_path(3, 0)
