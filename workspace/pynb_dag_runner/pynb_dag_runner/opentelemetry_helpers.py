@@ -401,7 +401,7 @@ class Spans:
                 self.contains_path(*ps, recursive=recursive) for ps in pairs(span_chain)
             )
 
-    def _bound_by(self, top: SpanDict, inclusive: bool = False) -> "Spans":
+    def _bound_by(self, top: SpanDict, inclusive: bool) -> "Spans":
         """
         Bound this span collection to spans that can be connected to
         the top-span using one or many parent-child relationships.
