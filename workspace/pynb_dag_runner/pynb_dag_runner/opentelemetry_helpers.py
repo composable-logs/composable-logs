@@ -145,7 +145,15 @@ class TreeNode(Generic[NodeId]):
 
 
 # Represent graph edge (n1 -> n2) as tuple (n1, n2).
-# In this case, n1 is "parent node", and n2 is "child node".
+#
+#     n1
+#      |
+#      v
+#     n2
+#
+# Terminology:
+#    n1 is the "parent node";
+#    n2 is the "child node".
 Edge = Tuple[NodeId, NodeId]
 
 
@@ -173,11 +181,11 @@ class TreeSet(Generic[NodeId]):
             node_id: TreeNode(node_id) for node_id in all_node_ids
         }
 
-        for child_id, parent_id in edges:
+        for parent_id, child_id in edges:
             tree_nodes[parent_id].add_child_id(child_id)
 
         # Find the tree root(s) by finding node_id(s) that have no parent.
-        root_ids: Set[NodeId] = all_node_ids - set(child_id for (child_id, _) in edges)
+        root_ids: Set[NodeId] = all_node_ids - set(child_id for (_, child_id) in edges)
 
         return cls(root_ids, all_node_ids, tree_nodes)
 
