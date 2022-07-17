@@ -330,9 +330,6 @@ class Spans:
 
         return Spans([span for span in self.spans if match(span, keys, value)])
 
-    # def get_by_span_id(self, span_id) -> SpanDict:
-    #    return one([span for span in self if get_span_id(span) == span_id])
-
     def sort_by_start_time(self, reverse=False):
         return Spans(
             list(
@@ -359,6 +356,19 @@ class Spans:
 
     def contains(self, span: SpanDict) -> bool:
         return self.contains_span_id(get_span_id(span))
+
+    def _get_graph(self):
+        # Check if with later Python versions this could be done with lru_cache
+        if not hasattr(self, "_cached_graph"):
+            edges: List[Edge[SpanId]] = []
+
+            for span in self:
+                if get_parent_span_id(span) is not None:
+                    edges.append((get_parent_span_id(span), get_span_id(span)))
+
+            self._cached_graph = DirectedGraph[SpanId].from_edges(set(edges))
+
+        return self._cached_graph
 
     def contains_path(self, *span_chain: Span, recursive: bool = True) -> bool:
         """
@@ -398,28 +408,14 @@ class Spans:
 
         Note: the provided span `top` is only included if inclusive=True.
         """
-        top_optional: List[SpanDict] = [top] if inclusive else []
-
-        return Spans(
-            top_optional
-            + [s for s in self if self.contains_path(top, s, recursive=True)]
+        bounded_ids: Set[SpanId] = set(
+            self._get_graph()
+            # -
+            .traverse_from(root_node_id=get_span_id(top), inclusive=inclusive)
         )
-
-    def _get_edges(self):
-        result = []
-
-        for span in self:
-            if get_parent_span_id(span) is not None:
-                result.append((get_parent_span_id(span), get_span_id(span)))
-
-        return set(result)
+        return Spans([span for span in self if get_span_id(span) in bounded_ids])
 
     def bound_under(self, top) -> "Spans":
-
-        # DirectedGraph = DirectedGraph[str].from_edges(self._get_edges())
-        # bounded_ids = set(DirectedGraph.traverse_from(root_node_id=top, inclusive=False))
-        # return Spans([span for span in self if get_span_id(span) in bounded_ids])
-
         return self._bound_by(top, inclusive=False)
 
     def bound_inclusive(self, top) -> "Spans":
