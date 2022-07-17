@@ -370,7 +370,7 @@ class Spans:
 
         return self._cached_graph
 
-    def contains_path(self, *span_chain: Span, recursive: bool = True) -> bool:
+    def contains_path(self, *span_chain: Span) -> bool:
         """
         Return true/false depending on whether there is a parent-child relationship
         link between the spans in span_chain.
@@ -381,6 +381,8 @@ class Spans:
         Cycles in self are not detected.
         """
         assert len(span_chain) >= 2
+
+        recursive = True
 
         if len(span_chain) == 2:
             parent, child = span_chain
