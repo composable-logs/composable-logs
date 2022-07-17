@@ -93,7 +93,7 @@ def test_tracing_get_span_id_and_duration():
 
 
 @pytest.fixture
-def tree_edges() -> Set[Tuple[int, int]]:
+def test_tree() -> Tree[int]:
     """
     Test tree:
 
@@ -111,7 +111,7 @@ def tree_edges() -> Set[Tuple[int, int]]:
       10 11  12
     """
 
-    return {
+    edges: Set[Tuple[int, int]] = {
         # (parent_id, child_id)
         (0, 1),
         #
@@ -131,38 +131,41 @@ def tree_edges() -> Set[Tuple[int, int]]:
         (8, 12),
     }
 
+    ts = Tree[int].from_edges(edges)
+    assert set(ts.edges()) == edges
+    return ts
 
-def test__tree__from_edges(tree_edges):
-    ts = Tree[int].from_edges(tree_edges)
 
-    assert ts.all_node_ids == set(range(13))
-    assert ts.root_id == 0
+def test__tree__from_edges(test_tree):
+    assert test_tree.all_node_ids == set(range(13))
+    assert test_tree.root_id == 0
 
     def get_child_ids(node_id: int) -> Set[int]:
-        return set(ts.node_id_to_treenode[node_id].child_ids)
+        return set(test_tree.node_id_to_treenode[node_id].child_ids)
 
     def get_child_ids_from_edges(node_id: int) -> Set[int]:
         return set(
-            child_id for (parent_id, child_id) in tree_edges if parent_id == node_id
+            child_id
+            for (parent_id, child_id) in test_tree.edges()
+            if parent_id == node_id
         )
 
     assert get_child_ids(node_id=0) == {1}
     assert get_child_ids(node_id=1) == {2, 3}
     assert get_child_ids(node_id=2) == {4, 5, 6, 7}
 
-    for node_id in ts.all_node_ids:
+    for node_id in test_tree.all_node_ids:
         assert get_child_ids(node_id) == get_child_ids_from_edges(node_id)
 
 
-def test__tree__built_in_methods(tree_edges):
-    ts = Tree[int].from_edges(tree_edges)
+def test__tree__built_in_methods(test_tree):
 
     # test iteration over elements in tree
-    ts_list = list(iter(ts))
+    ts_list = list(iter(test_tree))
     assert set(ts_list) == set(range(13))
 
     # test element in tree
     for node_id in range(13):
-        assert node_id in ts
+        assert node_id in test_tree
 
-    assert not -1 in ts
+    assert not -1 in test_tree

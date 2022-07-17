@@ -202,7 +202,24 @@ class Tree(Generic[NodeId]):
     def __contains__(self, node_id: NodeId) -> bool:
         return node_id in self.all_node_ids
 
-    def traverse_from(self, root_node_id: NodeId, inclusive: bool):
+    def _edges_from(self, node_id: NodeId):
+        """
+        Return iterator over edges from and below given node_id
+        """
+        assert node_id in self
+
+        for child_node_id in self.node_id_to_treenode[node_id].child_ids:
+            yield (node_id, child_node_id)
+            for edge in self._edges_from(child_node_id):
+                yield edge
+
+    def edges(self) -> Set[Edge[NodeId]]:
+        """
+        Return set of edges for this tree
+        """
+        return set(self._edges_from(self.root_id))
+
+    def _traverse_from(self, root_node_id: NodeId, inclusive: bool):
         """
         Returns iterator over node_id:s in this tree under root_node_id.
 
@@ -212,12 +229,12 @@ class Tree(Generic[NodeId]):
             yield root_node_id
 
         for node_id in self.node_id_to_treenode[root_node_id].child_ids:
-            for n in self.traverse_from(node_id, inclusive=True):
+            for n in self._traverse_from(node_id, inclusive=True):
                 yield n
 
     def bound_inclusive(self, node_id: NodeId) -> "Tree":
         assert node_id in self
-        bounded_node_ids = set(self.traverse_from(node_id, inclusive=True))
+        bounded_node_ids = set(self._traverse_from(node_id, inclusive=True))
 
         return Tree(
             root_id={node_id},
