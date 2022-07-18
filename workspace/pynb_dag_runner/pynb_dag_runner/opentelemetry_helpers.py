@@ -20,7 +20,7 @@ import dateutil.parser as dp  # type: ignore
 from opentelemetry import context, baggage  # type: ignore
 
 #
-from pynb_dag_runner.helpers import pairs, flatten, read_jsonl, one
+from pynb_dag_runner.helpers import pairs, flatten, read_jsonl
 
 AttributesDict = Mapping[str, Any]
 
@@ -96,7 +96,7 @@ def get_parent_span_id(span: SpanDict) -> Optional[SpanId]:
     """
     Return:
     - span_id of parent if Span has a parent
-    - otherwise (if Span has no parent) return None
+    - return None otherwise (ie., if span has no parent)
     """
     try:
         return read_key(span, ["parent_id"])
@@ -272,11 +272,9 @@ class DirectedGraph(Generic[NodeId]):
     def contains_path(self, *node_id_path: NodeId) -> bool:
         """
         For a sequence node_id_path = (n1, n2, n3, .., nx) of NodeId:s in the
-        DirectedGraph.
-
-        Return:
-          True if the nodeId:s in the path can be connected in the DirectedGraph, otherwise
-          False
+        DirectedGraph, return:
+          True if the nodeId:s in the path can be connected in the DirectedGraph,
+          otherwise False
 
         Eg. in the DirectedGraph
               1
@@ -297,7 +295,7 @@ class DirectedGraph(Generic[NodeId]):
         Note: assumes no cycles
         """
         assert set(node_id_path) <= self.all_node_ids
-        assert len(node_id_path) >= 1
+        assert len(node_id_path) >= 2
 
         # Note: each node can have at most one parent we could first compute
         # maximum path from last element provided, and see if the provided path
@@ -354,9 +352,6 @@ class Spans:
     def contains_span_id(self, span_id: SpanId) -> bool:
         return span_id in map(get_span_id, self)
 
-    def contains(self, span: SpanDict) -> bool:
-        return self.contains_span_id(get_span_id(span))
-
     def _get_graph(self):
         # Check if with later Python versions this could be done with lru_cache
         if not hasattr(self, "_cached_graph"):
@@ -375,36 +370,17 @@ class Spans:
         Return true/false depending on whether there is a parent-child relationship
         link between the spans in span_chain.
 
-        If recursive=False, the relation should be direct. Otherwise multiple
-        parent-child relationships/links are allowed.
-
         Cycles in self are not detected.
         """
-        assert len(span_chain) >= 2
-
-        recursive = True
-
-        if len(span_chain) == 2:
-            parent, child = span_chain
-            assert self.contains(parent) and self.contains(child)
-
-            if is_parent_child(parent, child):
-                return True
-
-            if recursive:
-                child_subspans = [s for s in self if is_parent_child(parent, s)]
-                return any(self.contains_path(s, child) for s in child_subspans)
-            else:
-                return False
-        else:
-            return all(self.contains_path(*ps) for ps in pairs(span_chain))
+        span_id_chain: List[SpanId] = [get_span_id(span) for span in span_chain]
+        return self._get_graph().contains_path(*span_id_chain)
 
     def _bound_by(self, top: SpanDict, inclusive: bool) -> "Spans":
         """
         Bound this span collection to spans that can be connected to
         the top-span using one or many parent-child relationships.
 
-        Note: the provided span `top` is only included if inclusive=True.
+        The provided span `top` is only included if inclusive=True.
         """
         bounded_ids: Set[SpanId] = set(
             self._get_graph()
