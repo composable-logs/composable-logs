@@ -195,8 +195,8 @@ class UDT(Generic[NodeId]):
            v  v  v
            3  4  5
 
-    We will frequently omit the arrows and draw the tree with understanding that if
-    A and B are connected and A is above B then A is parent, and B is child node.
+    We can omit the arrows and draw the tree with understanding that if
+    (A and B are connected) and (A is above B), then A is parent, and B is child node.
     Then the above graph can be drawn as:
 
               1
@@ -306,10 +306,8 @@ class UDT(Generic[NodeId]):
         Eg. in the UDT
               1
               |
-              v
               2
             / | \
-           v  v  v
            3  4  5
 
           True == contains_path(1, 2)      [1 is parent of 2 and there is path 1 -> 2]
