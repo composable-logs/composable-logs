@@ -393,15 +393,11 @@ class Spans:
 
             if recursive:
                 child_subspans = [s for s in self if is_parent_child(parent, s)]
-                return any(
-                    self.contains_path(s, child, recursive=True) for s in child_subspans
-                )
+                return any(self.contains_path(s, child) for s in child_subspans)
             else:
                 return False
         else:
-            return all(
-                self.contains_path(*ps, recursive=recursive) for ps in pairs(span_chain)
-            )
+            return all(self.contains_path(*ps) for ps in pairs(span_chain))
 
     def _bound_by(self, top: SpanDict, inclusive: bool) -> "Spans":
         """
