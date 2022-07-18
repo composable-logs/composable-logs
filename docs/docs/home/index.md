@@ -23,7 +23,7 @@ The [Demo pipeline](../live-demos/mnist-digits-demo-pipeline/)-section in this d
 how one eg. deploy and run a pipeline using only services provided with a (free, personal) Github account.
 
 <figure markdown>
-  [![screenshot-task-list.png](../live-demos/screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+  [![screenshot-task-list.png](../live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
   <figcaption>
   <b><a href="https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/">
   https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/

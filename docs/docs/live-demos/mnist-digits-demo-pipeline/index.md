@@ -13,7 +13,7 @@ Currently there is one live demo pipeline `mnist-digits-demo-pipeline` illustrat
 **Public experiment tracker (hosted on Github Pages):** [https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline<sup><sup><sub>:material-launch:</sub></sup></sup>](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
 
 <figure markdown>
-  [![screenshot-task-list.png](../live-demos/screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+  [![screenshot-task-list.png](screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
 </figure>
 
 **Code repo:** [https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline)
