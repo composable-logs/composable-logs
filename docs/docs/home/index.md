@@ -19,11 +19,11 @@ Currently, `pynb-dag-runner` can convert logs into a static website that can be 
 ## Demo ML training pipeline
 
 A main motivation for developing `pynb-dag-runner` is to have a framework to run pipelines on limited or no cloud infrastructure.
-The [Demo pipeline](../live-demos/)-section in this documentation describe in more detail
+The [Demo pipeline](../live-demos/mnist-digits-demo-pipeline/)-section in this documentation describe in more detail
 how one eg. deploy and run a pipeline using only services provided with a (free, personal) Github account.
 
 <figure markdown>
-  [![screenshot-task-list.png](../live-demos/screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+  [![screenshot-task-list.png](../live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
   <figcaption>
   <b><a href="https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/">
   https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/
@@ -45,7 +45,7 @@ Git[Git repository]
 Developer[Developer, <br />local development]
 
 Developer --> Git
-  subgraph "Stateless execution"
+  subgraph "<b>Stateless execution</b>"
     subgraph "<b>Execution driver</b> (pynb-dag-runner)"
         Code[Codes]
     end
@@ -61,10 +61,12 @@ Developer --> Git
     Code --> run_3
   end
 
-  subgraph "<b>Storage for persisted logs</b> <br/> (eg. data lake, OpenTelemetry DB, Github build artifact)"
-    logs_1[Logs for run 1]
-    logs_2[Logs for run 2]
-    logs_3[Logs for run 3]
+  subgraph "<b>Storage</b>"
+    subgraph "<b>Persisted logs</b> <br/> (eg. data lake, OpenTelemetry DB, Github build artifact)"
+      logs_1[Logs for run 1]
+      logs_2[Logs for run 2]
+      logs_3[Logs for run 3]
+    end
   end
 
   subgraph "<b>Reporting and UI</b>"
@@ -75,7 +77,7 @@ Developer --> Git
   end
 
   run_1 --> logs_1
-  run_2 -->|After a run has<br/>completed, persist <br/>OpenTelemetry<br/>logs.| logs_2
+  run_2 -->|Persist <br/>OpenTelemetry<br/>logs.| logs_2
   run_3 --> logs_3
 
   logs_1 --> ui_data
