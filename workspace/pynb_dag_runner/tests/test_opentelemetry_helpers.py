@@ -133,14 +133,14 @@ def test_udt_fixture() -> UDT[int]:
         (8, 12),
     }
 
-    ts = UDT[int].from_edges(edges)
-    assert set(ts.edges()) == edges
-    return ts
+    udt: UDT[int] = UDT.from_edges(edges)
+    assert udt.all_node_ids == set(range(13))
+    assert udt.root_nodes() == {0}
+    assert set(udt.edges()) == edges
+    return udt
 
 
 def test__graph__from_edges(test_udt_fixture: UDT[int]):
-    assert test_udt_fixture.all_node_ids == set(range(13))
-
     def get_child_ids(node_id: int) -> Set[int]:
         return set(
             child_id
@@ -184,63 +184,76 @@ def test__graph__built_in_methods(test_udt_fixture: UDT[int]):
 
 
 def test__graph__bound_by(test_udt_fixture: UDT[int]):
-    # Bounding test-tree by node_id=0 (inclusive) should return the same tree
-    tree_bound_0 = test_udt_fixture.bound_by(0, inclusive=True)
-    assert tree_bound_0 == test_udt_fixture
-    assert len(tree_bound_0) == len(test_udt_fixture)
+    def validate_root_bound_by_0(udt: UDT[int]):
+        # Bounding test-tree by node_id=0 (inclusive) should return the same tree
+        assert udt.root_nodes() == {0}
+        assert udt == test_udt_fixture
+        assert len(udt) == len(test_udt_fixture)
+
+    validate_root_bound_by_0(test_udt_fixture.bound_by(0, inclusive=True))
 
     # Bounding by other node_id:s should not return same tree
-    assert not test_udt_fixture == test_udt_fixture.bound_by(2, inclusive=True)
+    assert test_udt_fixture != test_udt_fixture.bound_by(0, inclusive=False)
 
-    #
-    # Bounding test-tree by node_id=5 (inclusive) should give tree
-    #
-    #      5
-    #      |
-    #      8
-    #    / | \
-    #  10 11  12
-    #
-    assert test_udt_fixture.bound_by(5, inclusive=True).all_node_ids == {
-        5,
-        8,
-        10,
-        11,
-        12,
-    }
-    assert test_udt_fixture.bound_by(5, inclusive=True) == UDT[int].from_edges(
-        {
-            (5, 8),
-            #
-            (8, 10),
-            (8, 11),
-            (8, 12),
+    def validate_root_bound_by_2(udt: UDT[int]):
+        # Bounding test-tree by node_id=2 (non-inclusive) should give union of four
+        # disconnected directed trees:
+        #
+        #     4     5     6     7
+        #           |           |
+        #           8           9
+        #         / | \
+        #       10 11  12
+        #
+        assert udt.root_nodes() == {4, 5, 6, 7}
+        assert udt.all_node_ids == {4, 5, 6, 7, 8, 9, 10, 11, 12}
+        assert udt.edges() == set([(5, 8), (8, 10), (8, 11), (8, 12), (7, 9)])
+        assert len(udt) == 9
+
+    validate_root_bound_by_2(test_udt_fixture.bound_by(2, inclusive=False))
+
+    def validate_root_bound_by_5(udt: UDT[int]):
+        #
+        # Bounding test-tree by node_id=5 (inclusive) should give tree
+        #
+        #        5
+        #        |
+        #        8
+        #      / | \
+        #    10 11  12
+        #
+        assert udt.root_nodes() == {5}
+        assert udt.all_node_ids == {
+            5,
+            8,
+            10,
+            11,
+            12,
         }
-    )
+        assert udt == UDT[int].from_edges(
+            {
+                (5, 8),
+                #
+                (8, 10),
+                (8, 11),
+                (8, 12),
+            }
+        )
 
-    # Bounding test-tree by node_id=11 (inclusive) should give tree with only one
-    # element.
-    #
-    # Note: this graph can not be generated from list of edges since there is only
-    # one node.
-    tree_bound_11 = test_udt_fixture.bound_by(11, inclusive=True)
-    assert tree_bound_11.all_node_ids == {11}
-    assert tree_bound_11.edges() == set([])
-    assert len(tree_bound_11) == 1
+    validate_root_bound_by_5(test_udt_fixture.bound_by(5, inclusive=True))
 
-    # Bounding test-tree by node_id=2 (non-inclusive) should give union of four
-    # disconnected directed trees:
-    #
-    #     4     5     6     7
-    #           |           |
-    #           8           9
-    #         / | \
-    #       10 11  12
-    #
-    tree_bound_2 = test_udt_fixture.bound_by(2, inclusive=False)
-    assert tree_bound_2.all_node_ids == {4, 5, 6, 7, 8, 9, 10, 11, 12}
-    assert tree_bound_2.edges() == set([(5, 8), (8, 10), (8, 11), (8, 12), (7, 9)])
-    assert len(tree_bound_2) == 9
+    def validate_root_bound_by_11(udt: UDT[int]):
+        # Bounding test-tree by node_id=11 (inclusive) should give tree with only one
+        # element.
+        #
+        # Note: this graph can not be generated from list of edges since there is only
+        # one node.
+        assert udt.all_node_ids == {11}
+        assert udt.root_nodes() == {11}
+        assert udt.edges() == set([])
+        assert len(udt) == 1
+
+    validate_root_bound_by_11(test_udt_fixture.bound_by(11, inclusive=True))
 
 
 def test__graph__contains_path(test_udt_fixture: UDT[int]):
