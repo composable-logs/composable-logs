@@ -228,7 +228,7 @@ class UDT(Generic[NodeId]):
     def from_edges(cls, edges: Set[Edge[NodeId]]):
         all_node_ids: Set[NodeId] = set(flatten(edges))
 
-        # Create _UDT_Node:s and connect them according to the edge data
+        # Create _UDT_Node:s and add child nodes according to the edge data
         _node_id_dict: Dict[NodeId, _UDT_Node[NodeId]] = {
             node_id: _UDT_Node(node_id) for node_id in all_node_ids
         }
