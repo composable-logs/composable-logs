@@ -179,8 +179,8 @@ def test__graph__built_in_methods(test_udt_fixture: UDT[int]):
     for node_id in range(13):
         assert node_id in test_udt_fixture
 
-    for no_node_id in [-1, "foo"]:
-        assert not no_node_id in test_udt_fixture
+    assert -1 not in test_udt_fixture
+    assert "foo" not in test_udt_fixture  # type: ignore
 
 
 def test__graph__bound_by(test_udt_fixture: UDT[int]):
@@ -228,8 +228,8 @@ def test__graph__bound_by(test_udt_fixture: UDT[int]):
     assert tree_bound_11.edges() == set([])
     assert len(tree_bound_11) == 1
 
-    # Bounding test-tree by node_id=2 (non-inclusive) should give tree with four
-    # dis-connected components:
+    # Bounding test-tree by node_id=2 (non-inclusive) should give union of four
+    # disconnected directed trees:
     #
     #     4     5     6     7
     #           |           |

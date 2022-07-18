@@ -5,6 +5,8 @@ from typing import (
     Dict,
     Generic,
     List,
+    Iterator,
+    Iterable,
     Mapping,
     MutableMapping,
     Optional,
@@ -164,7 +166,7 @@ class _UDT_Node(Generic[NodeId]):
         self.node_id: NodeId = node_id
         self.child_ids: List[NodeId] = []
 
-    def add_child_id(self, child_id: NodeId):
+    def add_child_id(self, child_id: NodeId) -> None:
         if child_id in self.child_ids:
             raise ValueError(
                 f"_UDT_Node {self.node_id}: "
@@ -225,7 +227,7 @@ class UDT(Generic[NodeId]):
         self._node_id_dict: Dict[NodeId, _UDT_Node[NodeId]] = _node_id_dict
 
     @classmethod
-    def from_edges(cls, edges: Set[Edge[NodeId]]):
+    def from_edges(cls, edges: Set[Edge[NodeId]]) -> "UDT[NodeId]":
         all_node_ids: Set[NodeId] = set(flatten(edges))
 
         # Create _UDT_Node:s and add child nodes according to the edge data
@@ -238,7 +240,7 @@ class UDT(Generic[NodeId]):
 
         return cls(all_node_ids, _node_id_dict)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[NodeId]:
         return iter(self.all_node_ids)
 
     def __len__(self) -> int:
@@ -258,7 +260,7 @@ class UDT(Generic[NodeId]):
         else:
             return False
 
-    def _edges(self):
+    def _edges(self) -> Iterator[Edge[NodeId]]:
         for parent_node_id, node in self._node_id_dict.items():
             for child_node_id in node.child_ids:
                 yield parent_node_id, child_node_id
@@ -275,7 +277,7 @@ class UDT(Generic[NodeId]):
         """
         return self.all_node_ids - set(child_id for (_, child_id) in self.edges())
 
-    def traverse_from(self, root_node_id: NodeId, inclusive: bool):
+    def traverse_from(self, root_node_id: NodeId, inclusive: bool) -> Iterable[NodeId]:
         """
         Returns iterator over node_id:s in this UDT under root_node_id.
 
@@ -290,7 +292,7 @@ class UDT(Generic[NodeId]):
             for child_node_id in self.traverse_from(node_id, inclusive=True):
                 yield child_node_id
 
-    def bound_by(self, node_id: NodeId, inclusive: bool) -> "UDT":
+    def bound_by(self, node_id: NodeId, inclusive: bool) -> "UDT[NodeId]":
         """
         Notes:
         - assumes no cycles
@@ -298,17 +300,20 @@ class UDT(Generic[NodeId]):
         """
         bounded_node_ids = set(self.traverse_from(node_id, inclusive=inclusive))
 
-        return UDT(
+        return UDT[NodeId](
             all_node_ids=bounded_node_ids,
             _node_id_dict={k: self._node_id_dict[k] for k in bounded_node_ids},
         )
 
     def contains_path(self, *node_id_path: NodeId) -> bool:
         """
-        For a sequence node_id_path = (n1, n2, n3, .., nx) of NodeId:s in the
+        For a sequence node_id_path = (n_1, n_2, ..., n_k) of NodeId:s in the
         UDT, return:
           True if the nodeId:s in the path can be connected in the UDT,
           otherwise False
+
+        As shown below, the path (may, but) does not need to be a direct sequence in
+        the graph. There can be intermediate nodes.
 
         Eg. in the UDT
               1
@@ -350,7 +355,7 @@ class Spans:
     def __init__(self, spans: List[SpanDict]):
         self.spans = spans
 
-    def filter(self, keys: List[str], value: Any):
+    def filter(self, keys: List[str], value: Any) -> "Spans":
         def match(span, keys, value):
             try:
                 return read_key(span, keys) == value
@@ -360,7 +365,7 @@ class Spans:
 
         return Spans([span for span in self.spans if match(span, keys, value)])
 
-    def sort_by_start_time(self, reverse=False):
+    def sort_by_start_time(self, reverse=False) -> "Spans":
         return Spans(
             list(
                 sorted(
@@ -371,27 +376,28 @@ class Spans:
             )
         )
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.spans)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[SpanDict]:
         return iter(self.spans)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> SpanDict:
         # TODO: deprecate, we should not need to access span:s by their index
         return self.spans[idx]
 
     def contains_span_id(self, span_id: SpanId) -> bool:
         return span_id in map(get_span_id, self)
 
-    def _get_graph(self):
+    def _get_graph(self) -> UDT[SpanId]:
         # (TODO: Check if with later Python versions this could be done with lru_cache)
         if not hasattr(self, "_cached_graph"):
             edges: List[Edge[SpanId]] = []
 
             for span in self:
-                if get_parent_span_id(span) is not None:
-                    edges.append((get_parent_span_id(span), get_span_id(span)))
+                parent_span_id_o: Optional[SpanId] = get_parent_span_id(span)
+                if parent_span_id_o is not None:
+                    edges.append((parent_span_id_o, get_span_id(span)))
 
             self._cached_graph = UDT[SpanId].from_edges(set(edges))
 
