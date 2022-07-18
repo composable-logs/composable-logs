@@ -19,7 +19,7 @@ Currently, `pynb-dag-runner` can convert logs into a static website that can be 
 ## Demo ML training pipeline
 
 A main motivation for developing `pynb-dag-runner` is to have a framework to run pipelines on limited or no cloud infrastructure.
-The [Demo pipeline](../live-demos/)-section in this documentation describe in more detail
+The [Demo pipeline](../live-demos/mnist-digits-demo-pipeline/)-section in this documentation describe in more detail
 how one eg. deploy and run a pipeline using only services provided with a (free, personal) Github account.
 
 <figure markdown>
