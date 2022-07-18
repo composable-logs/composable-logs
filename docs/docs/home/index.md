@@ -45,7 +45,7 @@ Git[Git repository]
 Developer[Developer, <br />local development]
 
 Developer --> Git
-  subgraph "Stateless execution"
+  subgraph "<b>Stateless execution</b>"
     subgraph "<b>Execution driver</b> (pynb-dag-runner)"
         Code[Codes]
     end
@@ -61,10 +61,12 @@ Developer --> Git
     Code --> run_3
   end
 
-  subgraph "<b>Storage for persisted logs</b> <br/> (eg. data lake, OpenTelemetry DB, Github build artifact)"
-    logs_1[Logs for run 1]
-    logs_2[Logs for run 2]
-    logs_3[Logs for run 3]
+  subgraph "<b>Storage</b>"
+    subgraph "<b>Persisted logs</b> <br/> (eg. data lake, OpenTelemetry DB, Github build artifact)"
+      logs_1[Logs for run 1]
+      logs_2[Logs for run 2]
+      logs_3[Logs for run 3]
+    end
   end
 
   subgraph "<b>Reporting and UI</b>"
@@ -75,7 +77,7 @@ Developer --> Git
   end
 
   run_1 --> logs_1
-  run_2 -->|After a run has<br/>completed, persist <br/>OpenTelemetry<br/>logs.| logs_2
+  run_2 -->|Persist <br/>OpenTelemetry<br/>logs.| logs_2
   run_3 --> logs_3
 
   logs_1 --> ui_data
