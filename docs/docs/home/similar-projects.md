@@ -2,7 +2,7 @@
 
 ML pipeline deployment tools (part of MLOps) are now actively developed.
 
-Additions and corrections are welcome.
+This list is not complete. Additions and corrections are welcome ([eg here](https://github.com/pynb-dag-runner/pynb-dag-runner/issues/122)).
 
 ## Open source projects
 
