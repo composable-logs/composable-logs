@@ -86,7 +86,7 @@ def test__pydar_logger__logged_spans_are_nested():
         sub_span = one(spans.filter(["name"], "sub-span"))
         log_span = one(spans.filter(["name"], "named-value"))
 
-        assert spans.contains_path(top_span, sub_span, log_span, recursive=False)
+        assert spans.contains_path(top_span, sub_span, log_span)
 
     validate_spans(get_test_spans())
 

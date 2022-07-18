@@ -88,8 +88,7 @@ def test__otel__spans__tracing_nested_native_python(dummy_loop_parameter):
     sub2 = one(spans.filter(["name"], "sub2"))
 
     def check_parent_child(parent, child):
-        assert spans.contains_path(parent, child, recursive=True)
-        assert spans.contains_path(parent, child, recursive=False)
+        assert spans.contains_path(parent, child)
         assert is_parent_child(parent, child)
 
     check_parent_child(top, sub1)
@@ -100,8 +99,7 @@ def test__otel__spans__tracing_nested_native_python(dummy_loop_parameter):
     assert not is_parent_child(sub1, top)
 
     # Check that we can find "top -> sub11" relationship in "top -> sub1 -> sub11"
-    assert spans.contains_path(top, sub11, recursive=True)
-    assert not spans.contains_path(top, sub11, recursive=False)
+    assert spans.contains_path(top, sub11)
 
     def check_duration(span, expected_duration_s: float) -> bool:
         return abs(get_duration_s(span) - expected_duration_s) < 0.05
@@ -214,6 +212,6 @@ def test__otel__demo_context_propagation_mechanism():
         assert top_span["attributes"]["parent-attr"] == "foo"
         assert child_span["attributes"]["child-attr"] == "foo-bar"
 
-        assert spans.contains_path(top_span, child_span, recursive=False)
+        assert spans.contains_path(top_span, child_span)
 
     validate_spans(get_test_spans())
