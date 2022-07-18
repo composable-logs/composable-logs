@@ -210,9 +210,8 @@ class UDT(Generic[NodeId]):
             / | \  10
            3  4  5
 
-    For example, if we bound the above graph to nodes below 2, we get a graph with
-    nodes 3, 4, 5 and no edges (and 3 root nodes).
-
+    For example, if we bound the above graph to child nodes from 2, we get a graph with
+    nodes 3, 4, 5 and no edges (and three root nodes).
     """
 
     def __init__(
