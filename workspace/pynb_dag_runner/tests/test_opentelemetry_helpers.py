@@ -183,14 +183,14 @@ def test__graph__built_in_methods(test_udt_fixture: UDT[int]):
         assert not no_node_id in test_udt_fixture
 
 
-def test__graph__bound_inclusive(test_udt_fixture: UDT[int]):
+def test__graph__bound_by(test_udt_fixture: UDT[int]):
     # Bounding test-tree by node_id=0 (inclusive) should return the same tree
-    tree_bound_0 = test_udt_fixture.bound_inclusive(0)
+    tree_bound_0 = test_udt_fixture.bound_by(0, inclusive=True)
     assert tree_bound_0 == test_udt_fixture
     assert len(tree_bound_0) == len(test_udt_fixture)
 
     # Bounding by other node_id:s should not return same tree
-    assert not test_udt_fixture == test_udt_fixture.bound_inclusive(2)
+    assert not test_udt_fixture == test_udt_fixture.bound_by(2, inclusive=True)
 
     #
     # Bounding test-tree by node_id=5 (inclusive) should give tree
@@ -201,8 +201,14 @@ def test__graph__bound_inclusive(test_udt_fixture: UDT[int]):
     #    / | \
     #  10 11  12
     #
-    assert test_udt_fixture.bound_inclusive(5).all_node_ids == {5, 8, 10, 11, 12}
-    assert test_udt_fixture.bound_inclusive(5) == UDT[int].from_edges(
+    assert test_udt_fixture.bound_by(5, inclusive=True).all_node_ids == {
+        5,
+        8,
+        10,
+        11,
+        12,
+    }
+    assert test_udt_fixture.bound_by(5, inclusive=True) == UDT[int].from_edges(
         {
             (5, 8),
             #
@@ -217,10 +223,24 @@ def test__graph__bound_inclusive(test_udt_fixture: UDT[int]):
     #
     # Note: this graph can not be generated from list of edges since there is only
     # one node.
-    tree_bound_11 = test_udt_fixture.bound_inclusive(11)
+    tree_bound_11 = test_udt_fixture.bound_by(11, inclusive=True)
     assert tree_bound_11.all_node_ids == {11}
     assert tree_bound_11.edges() == set([])
     assert len(tree_bound_11) == 1
+
+    # Bounding test-tree by node_id=2 (non-inclusive) should give tree with four
+    # dis-connected components:
+    #
+    #     4     5     6     7
+    #           |           |
+    #           8           9
+    #         / | \
+    #       10 11  12
+    #
+    tree_bound_2 = test_udt_fixture.bound_by(2, inclusive=False)
+    assert tree_bound_2.all_node_ids == {4, 5, 6, 7, 8, 9, 10, 11, 12}
+    assert tree_bound_2.edges() == set([(5, 8), (8, 10), (8, 11), (8, 12), (7, 9)])
+    assert len(tree_bound_2) == 9
 
 
 def test__graph__contains_path(test_udt_fixture: UDT[int]):

@@ -176,13 +176,18 @@ class _UDT_Node(Generic[NodeId]):
 
 class UDT(Generic[NodeId]):
     """
-    Represent a Union of Directed Trees (UDT), ie., a directed graphs where every node
-    has at most one parent.
+    Represent a "Union of Directed Trees" (UDT) and we use these as directed graphs
+    such that:
 
-    - We will use this for OpenTelemetry spans (where each span has at most one
+     - every node has at most one parent;
+     - there are no cycles.
+
+    Notes:
+    - We will use this to represent OpenTelemetry spans (where each span has at most one
       parent span).
-    - The entire collection of spans logged from a process will have one top span.
-      However, if one bound the log there might be multiple roots.
+    - The entire collection of spans logged from a process will have one top span (
+      so the graph will have one root node). However, if one bound the log there
+      might be multiple root nodes.
 
     Below is example of a UDT with one root (and A -> B indicate that A is parent and
     B is child node)
@@ -286,10 +291,13 @@ class UDT(Generic[NodeId]):
             for child_node_id in self.traverse_from(node_id, inclusive=True):
                 yield child_node_id
 
-    def bound_inclusive(self, node_id: NodeId) -> "UDT":
-        # assumes no cycles
-        assert node_id in self
-        bounded_node_ids = set(self.traverse_from(node_id, inclusive=True))
+    def bound_by(self, node_id: NodeId, inclusive: bool) -> "UDT":
+        """
+        Notes:
+        - assumes no cycles
+        - not currently used
+        """
+        bounded_node_ids = set(self.traverse_from(node_id, inclusive=inclusive))
 
         return UDT(
             all_node_ids=bounded_node_ids,
