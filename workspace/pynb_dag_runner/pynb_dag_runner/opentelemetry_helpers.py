@@ -135,7 +135,7 @@ def get_duration_s(span: SpanDict) -> float:
     return end_epoch_s - start_epoch_s
 
 
-### --- DirectedGraph data structure helper ---
+### --- UDT data structure helper ---
 
 NodeId = TypeVar("NodeId")
 
@@ -153,9 +153,9 @@ NodeId = TypeVar("NodeId")
 Edge = Tuple[NodeId, NodeId]
 
 
-class _DG_Node(Generic[NodeId]):
+class _UDT_Node(Generic[NodeId]):
     """
-    Internal representation of a node in a DirectedGraph.
+    Internal representation of a node in a UDT (see below).
 
     The id is immutable, and list of child id:s is mutable.
     """
@@ -167,40 +167,66 @@ class _DG_Node(Generic[NodeId]):
     def add_child_id(self, child_id: NodeId):
         if child_id in self.child_ids:
             raise ValueError(
-                f"DirectedGraphNode {self.node_id}: "
+                f"_UDT_Node {self.node_id}: "
                 f"The id={child_id} is already a child id for this node. "
                 f"Current child_id:s = {self.child_ids}."
             )
         self.child_ids.append(child_id)
 
 
-class DirectedGraph(Generic[NodeId]):
+class UDT(Generic[NodeId]):
     """
-    Represent a directed graph where every node in the graph has at most one parent.
+    Represent a Union of Directed Trees (UDT), ie., a directed graphs where every node
+    has at most one parent.
 
-    - Typically we will use this for OpenTelemetry spans (that have at most one parent).
+    - We will use this for OpenTelemetry spans (where each span has at most one
+      parent span).
+    - The entire collection of spans logged from a process will have one top span.
+      However, if one bound the log there might be multiple roots.
 
-    - The entire run log will have one top (parent) span, and we have a directed tree.
-      However, when bounding this we may get a union of directed trees.
+    Below is example of a UDT with one root (and A -> B indicate that A is parent and
+    B is child node)
+
+              1
+              | \
+              v   \
+              2     v
+            / | \    10
+           v  v  v
+           3  4  5
+
+    We will frequently omit the arrows and draw the tree with understanding that if
+    A and B are connected and A is above B then A is parent, and B is child node.
+    Then the above graph can be drawn as:
+
+              1
+              | \
+              2   \
+            / | \  10
+           3  4  5
+
+    For example, if we bound the above graph to nodes below 2, we get a graph with
+    nodes 3, 4, 5 and no edges (and 3 root nodes).
+
     """
 
     def __init__(
         self,
         all_node_ids: Set[NodeId],
-        _node_id_dict: Dict[NodeId, _DG_Node],  # see above
+        _node_id_dict: Dict[NodeId, _UDT_Node[NodeId]],  # see above
     ):
         assert set(_node_id_dict.keys()) == all_node_ids
 
         self.all_node_ids: Set[NodeId] = all_node_ids
-        self._node_id_dict: Dict[NodeId, _DG_Node[NodeId]] = _node_id_dict
+        self._node_id_dict: Dict[NodeId, _UDT_Node[NodeId]] = _node_id_dict
 
     @classmethod
     def from_edges(cls, edges: Set[Edge[NodeId]]):
         all_node_ids: Set[NodeId] = set(flatten(edges))
 
-        # Create _DG_Node:s and connect them according to the edge data
-        _node_id_dict: Dict[NodeId, _DG_Node] = {
-            node_id: _DG_Node(node_id) for node_id in all_node_ids
+        # Create _UDT_Node:s and connect them according to the edge data
+        _node_id_dict: Dict[NodeId, _UDT_Node[NodeId]] = {
+            node_id: _UDT_Node(node_id) for node_id in all_node_ids
         }
 
         for parent_id, child_id in edges:
@@ -218,9 +244,8 @@ class DirectedGraph(Generic[NodeId]):
         return node_id in self.all_node_ids
 
     def __eq__(self, other: Any) -> bool:
-        if isinstance(other, DirectedGraph):
+        if isinstance(other, UDT):
             return (
-                # -
                 self.edges() == other.edges()
                 and
                 # -
@@ -248,23 +273,25 @@ class DirectedGraph(Generic[NodeId]):
 
     def traverse_from(self, root_node_id: NodeId, inclusive: bool):
         """
-        Returns iterator over node_id:s in this DirectedGraph under root_node_id.
+        Returns iterator over node_id:s in this UDT under root_node_id.
 
         root_node_id is included/not included depending on inclusive=True/False.
         """
+        assert root_node_id in self
+
         if inclusive:
             yield root_node_id
 
         for node_id in self._node_id_dict[root_node_id].child_ids:
-            for n in self.traverse_from(node_id, inclusive=True):
-                yield n
+            for child_node_id in self.traverse_from(node_id, inclusive=True):
+                yield child_node_id
 
-    def bound_inclusive(self, node_id: NodeId) -> "DirectedGraph":
+    def bound_inclusive(self, node_id: NodeId) -> "UDT":
         # assumes no cycles
         assert node_id in self
         bounded_node_ids = set(self.traverse_from(node_id, inclusive=True))
 
-        return DirectedGraph(
+        return UDT(
             all_node_ids=bounded_node_ids,
             _node_id_dict={k: self._node_id_dict[k] for k in bounded_node_ids},
         )
@@ -272,11 +299,11 @@ class DirectedGraph(Generic[NodeId]):
     def contains_path(self, *node_id_path: NodeId) -> bool:
         """
         For a sequence node_id_path = (n1, n2, n3, .., nx) of NodeId:s in the
-        DirectedGraph, return:
-          True if the nodeId:s in the path can be connected in the DirectedGraph,
+        UDT, return:
+          True if the nodeId:s in the path can be connected in the UDT,
           otherwise False
 
-        Eg. in the DirectedGraph
+        Eg. in the UDT
               1
               |
               v
@@ -353,7 +380,7 @@ class Spans:
         return span_id in map(get_span_id, self)
 
     def _get_graph(self):
-        # Check if with later Python versions this could be done with lru_cache
+        # (TODO: Check if with later Python versions this could be done with lru_cache)
         if not hasattr(self, "_cached_graph"):
             edges: List[Edge[SpanId]] = []
 
@@ -361,7 +388,7 @@ class Spans:
                 if get_parent_span_id(span) is not None:
                     edges.append((get_parent_span_id(span), get_span_id(span)))
 
-            self._cached_graph = DirectedGraph[SpanId].from_edges(set(edges))
+            self._cached_graph = UDT[SpanId].from_edges(set(edges))
 
         return self._cached_graph
 
