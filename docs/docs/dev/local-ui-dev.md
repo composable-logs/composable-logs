@@ -56,8 +56,11 @@ rm -rf static_output    # <-- !!
 
 static_builder \
    --zip_cache_dir ./cache \
-   --output_static_mlflow_data ./static_output/js/StaticData.js \
+   --output_static_data_json ./static_output/static-data.json \
    --output_dir ./static_output/pipeline-artifacts
+
+# TODO: Create StaticData.js from static-data.json, see demo pipeline GHA pipeline
+# (no longer needed after UI loads data from static-data.json)
 ```
 
 ### 3. Copy data into mlflow repo
@@ -71,11 +74,19 @@ cd /some-work-dir/
 rm -rf mlflow/mlflow/server/js/public/pipeline-artifacts    # <-- !!
 
 cp -r \
-   pynb-dag-runner/otel_output_parser/workspace/static_output/pipeline-artifacts \
+   pynb-dag-runner/otel_output_parser/workspace/static_output/static-data.json \
    mlflow/mlflow/server/js/public/
+
+# -- (this step no longer needed after UI loads data from static-data.json)
 cp \
    pynb-dag-runner/otel_output_parser/workspace/static_output/js/StaticData.js \
    mlflow/mlflow/server/js/src/experiment-tracking/static-data/
+# --
+
+cp -r \
+   pynb-dag-runner/otel_output_parser/workspace/static_output/pipeline-artifacts \
+   mlflow/mlflow/server/js/public/
+
 ```
 
 ### 4. Build static mlflow/run in watch mode
