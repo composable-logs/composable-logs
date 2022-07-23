@@ -45,10 +45,10 @@ def args():
         help="Output directory for parsed content (json:s and logged artifacts)",
     )
     parser.add_argument(
-        "--output_static_mlflow_data",
+        "--output_static_data_json",
         required=False,
         type=Path,
-        help="Output file path for static mlflow js-file",
+        help="Output JSON file path with static metadata for use in static UI site",
     )
     return parser.parse_args()
 
@@ -120,12 +120,12 @@ class StaticMLFlowDataSink:
     Stateful sink for outputting ML Flow static data
     """
 
-    def __init__(self, output_static_mlflow_data: Optional[Path]):
-        self.output_static_mlflow_data: Optional[Path] = output_static_mlflow_data
+    def __init__(self, output_static_data_json: Optional[Path]):
+        self.output_static_data_json: Optional[Path] = output_static_data_json
         self.summaries: List[Any] = []
 
     def push(self, summary):
-        if self.output_static_mlflow_data is None:
+        if self.output_static_data_json is None:
             return
 
         self.summaries.append(
@@ -140,7 +140,7 @@ class StaticMLFlowDataSink:
         )
 
     def close(self):
-        if self.output_static_mlflow_data is None:
+        if self.output_static_data_json is None:
             return
 
         # Construct graph of parent-child relationships between logged events:
@@ -202,8 +202,8 @@ class StaticMLFlowDataSink:
                 )
         # -----
 
-        ensure_dir_exist(self.output_static_mlflow_data).write_text(
-            f"export const STATIC_DATA = {json.dumps(aug_summaries, indent=2)};"
+        ensure_dir_exist(self.output_static_data_json).write_text(
+            json.dumps(aug_summaries, indent=2)
         )
 
 
@@ -228,10 +228,10 @@ def entry_point():
     print("output_dir                 :", args().output_dir)
     print("github_repository          :", args().github_repository)
     print("zip_cache_dir              :", args().zip_cache_dir)
-    print("output_static_mlflow_data  :", args().output_static_mlflow_data)
+    print("output_static_data_json    :", args().output_static_data_json)
 
-    # if output_static_mlflow_data is None, this sink is no-op
-    static_mlflow_data_sink = StaticMLFlowDataSink(args().output_static_mlflow_data)
+    # if output_static_data_json is None, this sink is no-op
+    static_mlflow_data_sink = StaticMLFlowDataSink(args().output_static_data_json)
 
     for artifact_zip in github_repo_artifact_zips(
         github_repository=args().github_repository,
