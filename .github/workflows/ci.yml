@@ -1,49 +1,30 @@
 name: "Automated tests"
 
 on:
-  push:
-    branches:
-      - development
+  workflow_call:
 
-  # See:
-  # https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
-  # https://docs.github.com/en/actions/reference/events-that-trigger-workflows#pull_request
-  pull_request:
-    types: [opened, synchronize, reopened]
-    branches:
-      - development
-    paths-ignore:
-      - 'docs/**'
-      - LICENSE.md
-      - README.md
 
-  workflow_dispatch:
+defaults:
+  run:
+    shell: bash
+    working-directory: .  # repo root
 
 # Note: the below does not test code under otel_output_parser
 
 jobs:
   run-all-tests:
-    runs-on: [ubuntu-20.04]
+    runs-on: ubuntu-20.04
 
     steps:
-      - name: "Determine run-environment"
-        shell: bash
-        run: |
-          echo "RUN_ENVIRONMENT=ci" >> $GITHUB_ENV
-
       - uses: actions/checkout@v2
         with:
           persist-credentials: false
 
       - name: "Build docker image"
-        shell: bash
-        working-directory: ${{ github.workspace }}
         run: |
           make docker-build-all
 
       - name: "Run unit tests"
-        shell: bash
-        working-directory: ${{ github.workspace }}
         run: |
           make \
               RUN_ENVIRONMENT="${{ env.RUN_ENVIRONMENT }}" \
@@ -51,24 +32,18 @@ jobs:
               docker-run-in-cicd
 
       - name: "Run mypy type checks"
-        shell: bash
-        working-directory: ${{ github.workspace }}
         run: |
           make \
               COMMAND="(cd pynb_dag_runner; make test-mypy )" \
               docker-run-in-cicd
 
       - name: "Check black formatting"
-        shell: bash
-        working-directory: ${{ github.workspace }}
         run: |
           make \
               COMMAND="(cd pynb_dag_runner; make test-black )" \
               docker-run-in-cicd
 
       - name: "Build Python wheel-file for the pynb-dag-runner library"
-        shell: bash
-        working-directory: ${{ github.workspace }}
         run: |
           make \
               COMMAND="(cd pynb_dag_runner; make clean build )" \
@@ -77,7 +52,7 @@ jobs:
       - name: "Store wheel-file as build artefact"
         uses: actions/upload-artifact@v2
         with:
-          name: pynb_dag_runner
+          name: pynb-dag-runner-wheel
           path: ${{ github.workspace }}/workspace/pynb_dag_runner/dist/
           if-no-files-found: error
-          retention-days: 10
+          retention-days: 5

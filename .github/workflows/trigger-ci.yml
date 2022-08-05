@@ -1,0 +1,27 @@
+name: "Automated tests"
+
+on:
+  push:
+    branches:
+      - development
+
+  # See:
+  # https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
+  # https://docs.github.com/en/actions/reference/events-that-trigger-workflows#pull_request
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - development
+    paths-ignore:
+      - 'docs/**'
+      - LICENSE.md
+      - README.md
+
+  workflow_dispatch:
+
+jobs:
+  trigger-ci:
+    permissions:
+      contents: none
+
+    uses: ./.github/workflows/ci.yml
