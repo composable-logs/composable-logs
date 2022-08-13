@@ -1,0 +1,36 @@
+name: "Main package release"
+
+on:
+  # Trigger version release when PYTHON_PACKAGE_VERSION file is updated in main.
+  push:
+    branches:
+      - main
+
+    paths:
+      - './workspace/pynb_dag_runner/PYTHON_PACKAGE_VERSION'
+
+  workflow_dispatch:
+
+  # debug trigger
+  push:
+    branches:
+      - gha-ci-refactor
+
+jobs:
+  test-code-and-build-python-pacakge:
+    permissions:
+      contents: none
+
+    uses: ./.github/workflows/_run-tests-and-build-python-package.yml
+    with:
+      python-package-release-target: "main-release"
+
+  push-wheel-to-pypi:
+    needs: test-code-and-build-python-pacakge
+
+    permissions:
+      contents: none
+
+    uses: ./.github/workflows/_push_wheel_to_pypi.yml
+
+  # TODO: tag main branch with PYTHON_PACKAGE_VERSION
