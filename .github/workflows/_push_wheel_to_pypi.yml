@@ -42,10 +42,7 @@ jobs:
           unzip -l ./workspace/pynb_dag_runner/dist/*.whl
           echo "======================================="
 
-          echo ${PRINT_DIAGNOSTICS_PY} > workspace/_diagnostics.py
-          echo "---"
-          cat workspace/_diagnostics.py
-          echo "---"
+          echo "${PRINT_DIAGNOSTICS_PY}" > workspace/_diagnostics.py
 
           make run-command[in-cd-docker] \
             COMMAND="(\
