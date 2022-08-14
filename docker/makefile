@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 ### Tasks to build Docker images
 
-build-base-env-docker-image:
+build-cd-env-docker-image:
 	docker \
 	    build \
 	    --file Dockerfile.base \
@@ -11,7 +11,7 @@ build-base-env-docker-image:
 	    --tag pynb-dag-runner-base \
 	    .
 
-build-cicd-env-docker-image:
+build-ci-env-docker-image:
 	docker \
 	    build \
 	    --file Dockerfile.cicd \

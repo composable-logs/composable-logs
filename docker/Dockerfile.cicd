@@ -9,7 +9,7 @@ COPY requirements.txt /home/host_user/
 # See https://stackoverflow.com/questions/72441758 re protobuf constraint
 RUN pip3 install --user -r /home/host_user/requirements.txt
 
-RUN pip3 install --user \
+RUN pip3 install --quiet --user \
         pytest==6.2.5 \
         pytest-asyncio==0.16.0 \
         black==22.3.0 \

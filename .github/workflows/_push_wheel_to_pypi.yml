@@ -1,0 +1,84 @@
+name: "Push wheel file built in previous step to pypi"
+
+on:
+  workflow_call:
+    secrets:
+      PYPI_SECRET_TOKEN:
+        required: true
+
+defaults:
+  run:
+    shell: bash
+    working-directory: .
+
+jobs:
+  run-all-tests:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Ensure repo has no data in dist-folder
+        run: |
+          rm -rf ./workspace/pynb_dag_runner/dist
+
+      - name: Build cd-docker image
+        run: |
+          (cd docker; make build-cd-env-docker-image)
+
+      - name: Download wheel file built in previously step
+        uses: actions/download-artifact@v3
+        with:
+          path: workspace/pynb_dag_runner/dist
+          name: pynb-dag-runner-wheel
+
+      - name: Diagnostic testing of wheel file
+        run: |
+          echo "======================================="
+          find ./workspace/pynb_dag_runner/dist/.
+          echo "======================================="
+          unzip -l ./workspace/pynb_dag_runner/dist/*.whl
+          echo "======================================="
+
+          echo ${PRINT_DIAGNOSTICS_PY} > workspace/_diagnostics.py
+          echo "---"
+          cat workspace/_diagnostics.py
+          echo "---"
+
+          make run-command[in-cd-docker] \
+            COMMAND="(\
+              pip install ./pynb_dag_runner/dist/*.whl; \
+              python _diagnostics.py \
+            )"
+
+          rm workspace/_diagnostics.py
+
+        env:
+          PRINT_DIAGNOSTICS_PY: |
+            import pynb_dag_runner
+
+            print('version', pynb_dag_runner.__version__)
+            print('git_sha', pynb_dag_runner.__git_sha__)
+
+
+      - name: Uploading to pypi
+        run: |
+          make run-command[in-cd-docker] \
+            DOCKER_ARGS=" \
+              -e TWINE_USERNAME \
+              -e TWINE_PASSWORD \
+            " \
+            COMMAND="(\
+              pip install --quiet --user twine==4.0.1; \
+              twine check ./pynb_dag_runner/dist/*.whl; \
+              twine upload \
+                  --verbose \
+                  --disable-progress-bar \
+                  ./pynb_dag_runner/dist/*.whl \
+            )"
+
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_SECRET_TOKEN }}

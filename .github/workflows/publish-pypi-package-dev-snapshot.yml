@@ -1,0 +1,25 @@
+name: "Publish pynb-dag-runner-snapshot dev-package to pypi"
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - gha-ci-refactor  # debug trigger
+      - development
+
+permissions:
+  contents: none
+
+jobs:
+  test-code-and-build-python-pacakge:
+    uses: ./.github/workflows/_run-tests-and-build-python-package.yml
+    with:
+      python-package-release-target: snapshot-release
+
+  push-wheel-to-pypi:
+    needs: test-code-and-build-python-pacakge
+
+    uses: ./.github/workflows/_push_wheel_to_pypi.yml
+    secrets:
+      PYPI_SECRET_TOKEN: ${{ secrets.PYPI_SECRET_TOKEN }}

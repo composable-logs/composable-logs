@@ -1,0 +1,77 @@
+name: "Run tests and build Python package wheel file"
+
+on:
+  workflow_call:
+    inputs:
+      python-package-release-target:
+        required: true
+        type: string
+        # "ci-build", "release-main-version", "snapshot-release"
+
+defaults:
+  run:
+    shell: bash
+    working-directory: .   # after checkout this is is the repo root
+
+# Note: the below does not test code under otel_output_parser
+
+jobs:
+  run-all-tests:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+
+      - name: "Determining unix epoch time stamp of commit"
+        run: |
+          # see https://git-scm.com/docs/git-show
+          echo "LAST_COMMIT_UNIX_EPOCH=$( \
+            git show ${GITHUB_SHA} --no-patch --format=%ct \
+          )" >> $GITHUB_ENV
+
+      - name: "Build docker image"
+        run: |
+          make docker-build-all
+
+      - name: "Run unit tests"
+        run: |
+          make \
+              RUN_ENVIRONMENT="${{ env.RUN_ENVIRONMENT }}" \
+              COMMAND="(cd pynb_dag_runner; make test-pytest )" \
+              run-command[in-ci-docker]
+
+      - name: "Run mypy type checks"
+        run: |
+          make \
+              COMMAND="(cd pynb_dag_runner; make test-mypy )" \
+              run-command[in-ci-docker]
+
+      - name: "Check black formatting"
+        run: |
+          make \
+              COMMAND="(cd pynb_dag_runner; make test-black )" \
+              run-command[in-ci-docker]
+
+      - name: "Build Python package for the pynb-dag-runner library"
+        run: |
+          make run-command[in-ci-docker] \
+              DOCKER_ARGS="\
+                  -e GITHUB_SHA \
+                  -e PYTHON_PACKAGE_RELEASE_TARGET \
+                  -e LAST_COMMIT_UNIX_EPOCH \
+              " \
+              COMMAND="(cd pynb_dag_runner; make clean build )"
+
+        env:
+          PYTHON_PACKAGE_RELEASE_TARGET: ${{ inputs.python-package-release-target }}
+
+      - name: "Save Python package wheel-file as a Github build artefact"
+        uses: actions/upload-artifact@v2
+        with:
+          name: pynb-dag-runner-wheel
+          path: ${{ github.workspace }}/workspace/pynb_dag_runner/dist/
+          if-no-files-found: error
+          retention-days: 5
