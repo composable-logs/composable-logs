@@ -49,7 +49,7 @@ jobs:
 
           make run-command[in-cd-docker] \
             COMMAND="(\
-              pip install ./pynb_dag_runner/dist/*.whl; \
+              pip install --quiet --user ./pynb_dag_runner/dist/*.whl; \
               python _diagnostics.py \
             )"
 
