@@ -1,4 +1,4 @@
-name: "ci/cd: publish snapshot package to PyPI"
+name: "ci/cd: publish snapshot to PyPI"
 
 on:
   workflow_dispatch:
