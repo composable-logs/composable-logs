@@ -44,9 +44,13 @@ jobs:
               python3 -c 'import pynb_dag_runner' \
             )"
 
-      - name: Diagnostic testing of wheel file
+      - name: Write summary file
         run: |
-          echo "## Built wheel file"                          > $GITHUB_STEP_SUMMARY
+          echo "# pypi-page: " > $GITHUB_STEP_SUMMARY
+          echo " - [https://pypi.org/project/pynb-dag-runner-snapshot/](https://pypi.org/project/pynb-dag-runner-snapshot/)" >> $GITHUB_STEP_SUMMARY
+          echo " - https://pypi.org/project/pynb-dag-runner-snapshot/" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Built wheel file"                          >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
           find ./workspace/pynb_dag_runner/dist/.             >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
@@ -61,6 +65,7 @@ jobs:
           unzip -p ./workspace/pynb_dag_runner/dist/*.whl \
                    pynb_dag_runner/__version__.py             >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
+
         env:
           THREE_BACKTICKS: "```"
           BACKTICK: "`"
