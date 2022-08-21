@@ -1,4 +1,4 @@
-name: "Push wheel file built in previous step to pypi"
+name: "CD: Push wheel file built in previous step to pypi"
 
 on:
   workflow_call:

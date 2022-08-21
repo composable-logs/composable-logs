@@ -1,4 +1,4 @@
-name: "Build and deploy static pynb-dag-runner documentation site to Github pages"
+name: "Docs: Build and deploy static docs site to Github pages"
 
 on:
   push:

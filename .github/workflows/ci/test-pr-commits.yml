@@ -1,10 +1,6 @@
-name: "Automated tests"
+name: "CI: Test PR commits"
 
 on:
-  push:
-    branches:
-      - main
-
   # See:
   # https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
   # https://docs.github.com/en/actions/reference/events-that-trigger-workflows#pull_request
@@ -24,6 +20,6 @@ jobs:
     permissions:
       contents: none
 
-    uses: ./.github/workflows/_run-tests-and-build-python-package.yml
+    uses: ./.github/workflows/ci/_run-tests-and-build-python-package.yml
     with:
       python-package-release-target: ci-build

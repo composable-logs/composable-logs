@@ -1,4 +1,4 @@
-name: "Publish pynb-dag-runner-snapshot dev-package to pypi"
+name: "CI/CD: Publish snapshot package to PyPI"
 
 on:
   workflow_dispatch:
@@ -12,15 +12,14 @@ permissions:
   contents: none
 
 jobs:
-  test-code-and-build-python-pacakge:
-    uses: ./.github/workflows/_run-tests-and-build-python-package.yml
+  ci--test-code-and-build-python-pacakge:
+    uses: ./.github/workflows/ci/_run-tests-and-build-python-package.yml
     with:
       python-package-release-target: snapshot-release
 
-  push-wheel-to-pypi:
-    needs: test-code-and-build-python-pacakge
-
-    uses: ./.github/workflows/_push_wheel_to_pypi.yml
+  cd--push-wheel-to-pypi:
+    needs: ci--test-code-and-build-python-pacakge
+    uses: ./.github/workflows/cicd/_push_wheel_to_pypi.yml
     with:
       python-package-release-target: snapshot-release
     secrets:

@@ -1,4 +1,4 @@
-name: "Run tests and build Python package wheel file"
+name: "CI: Run tests and build Python package wheel file"
 
 on:
   workflow_call:
