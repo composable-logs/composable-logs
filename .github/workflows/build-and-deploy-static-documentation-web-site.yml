@@ -3,7 +3,7 @@ name: "Build and deploy static pynb-dag-runner documentation site to Github page
 on:
   push:
     branches:
-    - development
+    - main
     paths:
     - 'docs/**'
 

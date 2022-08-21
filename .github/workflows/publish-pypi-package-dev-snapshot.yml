@@ -6,7 +6,7 @@ on:
   push:
     branches:
       - gha-ci-refactor  # debug trigger
-      - development
+      - main
 
 permissions:
   contents: none
