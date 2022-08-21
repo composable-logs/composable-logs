@@ -56,13 +56,14 @@ jobs:
           unzip -l ./workspace/pynb_dag_runner/dist/*.whl     >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
 
-          echo "## Version info (__version__.py content)"     >> $GITHUB_STEP_SUMMARY
+          echo "## ${BT}__version__.py${BT} file content"     >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
           unzip -p ./workspace/pynb_dag_runner/dist/*.whl \
                    pynb_dag_runner/__version__.py             >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
         env:
           THREE_BACKTICKS: "```"
+          BACKTICK: "`"
 
       - name: Uploading package to pypi
         run: |

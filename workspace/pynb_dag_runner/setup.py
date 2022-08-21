@@ -44,6 +44,7 @@ Path("./pynb_dag_runner/__version__.py").write_text(
         [
             f'__version__ = "{PYTHON_PACKAGE_VERSION}"',
             f'__git_sha__ = "{GIT_SHA}"',
+            '',
         ]
     )
 )
