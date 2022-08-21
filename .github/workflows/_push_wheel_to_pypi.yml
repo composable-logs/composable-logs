@@ -35,33 +35,25 @@ jobs:
           path: workspace/pynb_dag_runner/dist
           name: pynb-dag-runner-wheel
 
-      - name: Diagnostic testing of wheel file
+      - name: Check that wheel can be installed and imported
         run: |
-          echo "======================================="
-          find ./workspace/pynb_dag_runner/dist/.
-          echo "======================================="
-          unzip -l ./workspace/pynb_dag_runner/dist/*.whl
-          echo "======================================="
-
-          echo "${PRINT_DIAGNOSTICS_PY}" > workspace/_diagnostics.py
-
           make run-command[in-cd-docker] \
             COMMAND="(\
               pip install --quiet --user ./pynb_dag_runner/dist/*.whl; \
-              python3 _diagnostics.py \
+              python3 -c "import pynb_dag_runner" \
             )"
 
-          rm workspace/_diagnostics.py
+      - name: Diagnostic testing of wheel file
+        run: |
+          echo "## Built wheel file"                      > $GITHUB_STEP_SUMMARY
+          echo "```"                                      >> $GITHUB_STEP_SUMMARY
+          find ./workspace/pynb_dag_runner/dist/.         >> $GITHUB_STEP_SUMMARY
+          echo "```"                                      >> $GITHUB_STEP_SUMMARY
 
-        env:
-          PRINT_DIAGNOSTICS_PY: |
-            import pynb_dag_runner
+          echo "## Wheel file content"                    >> $GITHUB_STEP_SUMMARY
+          unzip -l ./workspace/pynb_dag_runner/dist/*.whl >> $GITHUB_STEP_SUMMARY
 
-            print('version', pynb_dag_runner.__version__)
-            print('git_sha', pynb_dag_runner.__git_sha__)
-
-
-      - name: Uploading to pypi
+      - name: Uploading package to pypi
         run: |
           make run-command[in-cd-docker] \
             DOCKER_ARGS=" \
