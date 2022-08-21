@@ -20,6 +20,6 @@ jobs:
     permissions:
       contents: none
 
-    uses: ./.github/workflows/_ci_run-tests-and-build-python-package.yml
+    uses: ./.github/workflows/_ci-run-tests-and-build-python-package.yml
     with:
       python-package-release-target: ci-build
