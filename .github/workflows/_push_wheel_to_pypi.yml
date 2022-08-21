@@ -41,7 +41,7 @@ jobs:
           make run-command[in-cd-docker] \
             COMMAND="(\
               pip install --quiet --user ./pynb_dag_runner/dist/*.whl; \
-              python3 -c "import pynb_dag_runner" \
+              python3 -c 'import pynb_dag_runner' \
             )"
 
       - name: Diagnostic testing of wheel file
