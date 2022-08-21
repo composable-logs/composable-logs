@@ -1,4 +1,4 @@
-name: "CI: Test PR commits"
+name: "ci: test PR commits"
 
 on:
   # See:
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  trigger-ci:
+  ci-run-tests-on-new-commit:
     permissions:
       contents: none
 

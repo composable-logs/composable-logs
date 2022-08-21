@@ -1,4 +1,4 @@
-name: "CI: Run tests and build Python package wheel file"
+name: "ci: Run tests and build Python package wheel file"
 
 on:
   workflow_call:
@@ -16,7 +16,7 @@ defaults:
 # Note: the below does not test code under otel_output_parser
 
 jobs:
-  run-all-tests:
+  ci-run-tests:
     runs-on: ubuntu-20.04
     timeout-minutes: 15
 

@@ -1,4 +1,4 @@
-name: "CD: Push wheel file built in previous step to pypi"
+name: "cd: Push wheel file built in previous step to pypi"
 
 on:
   workflow_call:
@@ -17,7 +17,7 @@ defaults:
     working-directory: .
 
 jobs:
-  run-all-tests:
+  cd-upload-package-to-pypi:
     runs-on: ubuntu-20.04
     timeout-minutes: 25
 

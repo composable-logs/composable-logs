@@ -1,4 +1,4 @@
-name: "Docs: Build and deploy static docs site to Github pages"
+name: "docs: build and deploy static docs site to Github pages"
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  build-and-deploy-documentation-site:
+  docs-build-and-deploy-documentation-site:
     name: Build and deploy documentation
 
     runs-on: ubuntu-20.04
