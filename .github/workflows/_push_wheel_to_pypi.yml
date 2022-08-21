@@ -47,18 +47,22 @@ jobs:
       - name: Diagnostic testing of wheel file
         run: |
           echo "## Built wheel file"                          > $GITHUB_STEP_SUMMARY
-          echo "```"                                          >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
           find ./workspace/pynb_dag_runner/dist/.             >> $GITHUB_STEP_SUMMARY
-          echo "```"                                          >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
 
           echo "## Wheel file content"                        >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
           unzip -l ./workspace/pynb_dag_runner/dist/*.whl     >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
 
           echo "## Version info (__version__.py content)"     >> $GITHUB_STEP_SUMMARY
-          echo "```"                                          >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
           unzip -p ./workspace/pynb_dag_runner/dist/*.whl \
                    pynb_dag_runner/__version__.py             >> $GITHUB_STEP_SUMMARY
-          echo "```"                                          >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
+        env:
+          THREE_BACKTICKS: "```"
 
       - name: Uploading package to pypi
         run: |
