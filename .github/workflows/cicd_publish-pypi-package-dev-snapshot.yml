@@ -13,13 +13,13 @@ permissions:
 
 jobs:
   ci--test-code-and-build-python-pacakge:
-    uses: ./.github/workflows/_ci/_run-tests-and-build-python-package.yml
+    uses: ./.github/workflows/_ci_run-tests-and-build-python-package.yml
     with:
       python-package-release-target: snapshot-release
 
   cd--push-wheel-to-pypi:
     needs: ci--test-code-and-build-python-pacakge
-    uses: ./.github/workflows/_cd/_push_wheel_to_pypi.yml
+    uses: ./.github/workflows/_cd_push_wheel_to_pypi.yml
     with:
       python-package-release-target: snapshot-release
     secrets:
