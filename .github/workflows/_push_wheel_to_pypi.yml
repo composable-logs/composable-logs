@@ -49,17 +49,17 @@ jobs:
           echo "## Package pypi-page" > $GITHUB_STEP_SUMMARY
           echo " - https://pypi.org/project/pynb-dag-runner-snapshot/" >> $GITHUB_STEP_SUMMARY
 
-          echo "### Built wheel file"                          >> $GITHUB_STEP_SUMMARY
+          echo "### Built wheel file"                         >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
-          find ./workspace/pynb_dag_runner/dist/.             >> $GITHUB_STEP_SUMMARY
+          find ./workspace/pynb_dag_runner/dist/. -type f     >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
 
-          echo "### Wheel file content"                        >> $GITHUB_STEP_SUMMARY
+          echo "### Wheel file content"                       >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
           unzip -l ./workspace/pynb_dag_runner/dist/*.whl     >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
 
-          echo "### ${BT}__version__.py${BT} file content"     >> $GITHUB_STEP_SUMMARY
+          echo "### ${BT}__version__.py${BT} file content"    >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
           unzip -p ./workspace/pynb_dag_runner/dist/*.whl \
                    pynb_dag_runner/__version__.py             >> $GITHUB_STEP_SUMMARY
