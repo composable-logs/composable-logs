@@ -54,7 +54,7 @@ jobs:
           echo "#### Package pypi-page"                       > $GITHUB_STEP_SUMMARY
           echo "https://pypi.org/project/pynb-dag-runner-snapshot/" >> $GITHUB_STEP_SUMMARY
         if: |
-          github.event.inputs.python-package-release-target == 'snapshot-release'
+          ${{ github.event.inputs.python-package-release-target == 'snapshot-release' }}
 
       - name: Write summary file
         run: |
