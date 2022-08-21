@@ -18,7 +18,7 @@ jobs:
       python-package-release-target: snapshot-release
 
   cd-upload-wheel-to-pypi:
-    needs: ci__test-code-and-build-python-pacakge
+    needs: ci-test-code-and-build-python-pacakge
     uses: ./.github/workflows/_cd-upload-wheel-to-pypi.yml
     with:
       python-package-release-target: snapshot-release
