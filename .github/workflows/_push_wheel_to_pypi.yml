@@ -2,6 +2,11 @@ name: "Push wheel file built in previous step to pypi"
 
 on:
   workflow_call:
+    inputs:
+      python-package-release-target:
+        required: true
+        type: string
+        # "ci-build", "release-main-version", "snapshot-release"
     secrets:
       PYPI_SECRET_TOKEN:
         required: true
@@ -44,11 +49,15 @@ jobs:
               python3 -c 'import pynb_dag_runner' \
             )"
 
-      - name: Write summary file
+      - name: Set package url (snapshot release)
         run: |
           echo "#### Package pypi-page"                       > $GITHUB_STEP_SUMMARY
           echo "https://pypi.org/project/pynb-dag-runner-snapshot/" >> $GITHUB_STEP_SUMMARY
+        if: |
+          github.event.inputs.python-package-release-target == 'snapshot-release'
 
+      - name: Write summary file
+        run: |
           echo "#### Built wheel file"                        >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
           find ./workspace/pynb_dag_runner/dist/. -type f     >> $GITHUB_STEP_SUMMARY

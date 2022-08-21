@@ -21,5 +21,7 @@ jobs:
     needs: test-code-and-build-python-pacakge
 
     uses: ./.github/workflows/_push_wheel_to_pypi.yml
+    with:
+      python-package-release-target: snapshot-release
     secrets:
       PYPI_SECRET_TOKEN: ${{ secrets.PYPI_SECRET_TOKEN }}
