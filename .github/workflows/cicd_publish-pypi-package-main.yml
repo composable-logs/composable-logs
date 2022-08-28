@@ -1,0 +1,64 @@
+name: "ci/cd: publish package to PyPI"
+
+# On commits to main that update the PYTHON_PACKAGE_VERSION file
+#  - Run automated tests
+#  - Build and publish pynb-dag-runner release (version <current-package-version>)
+#  - Also persist package as Github artifact for short-term debugging
+#  - Tag release commit to version in PYTHON_PACKAGE_VERSION
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+    paths:
+      - ./workspace/pynb_dag_runner/PYTHON_PACKAGE_VERSION
+
+jobs:
+  ci-run-tests-and-build-python-pacakge:
+    uses: ./.github/workflows/_ci-run-tests-and-build-python-package.yml
+    with:
+      python-package-release-target: main-release
+    permissions:
+      contents: none
+
+  cd-upload-wheel-to-pypi:
+    needs: ci-run-tests-and-build-python-pacakge
+    uses: ./.github/workflows/_cd-upload-wheel-to-pypi.yml
+    with:
+      python-package-release-target: main-release
+    secrets:
+      PYPI_SECRET_TOKEN: ${{ secrets.PYPI_SECRET_TOKEN }}
+    permissions:
+      contents: none
+
+  tag-release:
+    needs: cd-upload-wheel-to-pypi
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          persist-credentials: true
+
+      - name: Determining version
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          echo "PYTHON_PACKAGE_VERSION=$( \
+            cat ./workspace/pynb_dag_runner/PYTHON_PACKAGE_VERSION | head -n 1 - \
+          )" >> $GITHUB_ENV
+
+          echo "PYTHON_PACKAGE_VERSION = ${PYTHON_PACKAGE_VERSION}"
+
+      - name: Tag current release
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          git tag "v${PYTHON_PACKAGE_VERSION}" main
+
+          git tag list
+          git push origin "v${PYTHON_PACKAGE_VERSION}"
