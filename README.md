@@ -28,7 +28,7 @@ Eg. one can use Github actions for compute and Github pages for reporting. See b
 - `pip install pynb-dag-runner` (latest release)
 - `pip install pynb-dag-runner-snapshot` (dev-release, latest commit to main branch)
 
-#### Demo pipeline with task and experiment tracker hosted as static page as Github Pages
+#### Demo pipeline with task and experiment tracker hosted as static page on Github Pages
 - Demo: https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/
 
   ![Screenshot](https://pynb-dag-runner.github.io/pynb-dag-runner/live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png)
