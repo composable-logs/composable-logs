@@ -43,23 +43,23 @@ jobs:
         if: |
           ${{ inputs.python-package-release-target }} == 'ci-build'
 
-      - name: "test-ci-build X"
-        run: |
-          echo "cibuild"
-        if: |
-          "inputs.python-package-release-target == 'ci-build'"
+      # - name: "test-ci-build X"
+      #   run: |
+      #     echo "cibuild"
+      #   if: |
+      #     "inputs.python-package-release-target == 'ci-build'"
 
-      - name: "test-ci-build X2"
-        run: |
-          echo "cibuild"
-        if: |
-          "${{ inputs.python-package-release-target == 'ci-build' }}"
+      # - name: "test-ci-build X2"
+      #   run: |
+      #     echo "cibuild"
+      #   if: |
+      #     "${{ inputs.python-package-release-target == 'ci-build' }}"
 
-      - name: "test-ci-build X3"
-        run: |
-          echo "cibuild"
-        if: |
-          "${{ inputs.python-package-release-target }} == 'ci-build'"
+      # - name: "test-ci-build X3"
+      #   run: |
+      #     echo "cibuild"
+      #   if: |
+      #     "${{ inputs.python-package-release-target }} == 'ci-build'"
 
       - name: Determining unix epoch time stamp of commit
         run: |
