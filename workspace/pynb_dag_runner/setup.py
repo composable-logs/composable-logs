@@ -9,27 +9,27 @@ from pathlib import Path
 
 PYTHON_PACKAGE_RELEASE_TARGET: str = os.environ["PYTHON_PACKAGE_RELEASE_TARGET"]
 
-assert PYTHON_PACKAGE_RELEASE_TARGET in [
-    # CI build only test that we can build the package. No release
-    "ci-build",
-    # package built for a main release eg. 0.12.3 published to pypi
-    "main-release",
-    # nightly snapshot release
-    "snapshot-release",
-]
-
-
-# --- determine package name ---
+# --- determine package name and version ---
 PYTHON_PACKAGE_NAME: str = "pynb_dag_runner"
-
-if PYTHON_PACKAGE_RELEASE_TARGET == "snapshot-release":
-    PYTHON_PACKAGE_NAME += "_snapshot"
-
-# --- determine package version ---
 PYTHON_PACKAGE_VERSION: str = Path("PYTHON_PACKAGE_VERSION").read_text().splitlines()[0]
 
 if PYTHON_PACKAGE_RELEASE_TARGET == "snapshot-release":
+    # For each commit to main, publish snapshot release
+    PYTHON_PACKAGE_NAME += "_snapshot"
     PYTHON_PACKAGE_VERSION += f".dev{os.environ['LAST_COMMIT_UNIX_EPOCH']}"
+
+elif PYTHON_PACKAGE_RELEASE_TARGET == "ci-build":
+    # CI build only test that we can build the package. No release
+    # Mark CI-build as "local builds". They not be published to PyPI (PEP 440)
+    PYTHON_PACKAGE_VERSION += f"+ci-build"
+
+elif PYTHON_PACKAGE_RELEASE_TARGET ==  "main-release":
+    # Package built for a main release eg. 0.12.3 published to pypi.
+    # No changes needed to package name and version
+    pass
+
+else:
+    raise ValueError(f"Unknown release target {PYTHON_PACKAGE_RELEASE_TARGET}")
 
 # --- determine sha of current git commit ---
 GIT_SHA: str = os.environ["GITHUB_SHA"]

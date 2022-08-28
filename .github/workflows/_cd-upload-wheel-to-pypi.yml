@@ -6,7 +6,7 @@ on:
       python-package-release-target:
         required: true
         type: string
-        # "ci-build", "release-main-version", "snapshot-release"
+        # valid values: "release-main-version", "snapshot-release"
     secrets:
       PYPI_SECRET_TOKEN:
         required: true

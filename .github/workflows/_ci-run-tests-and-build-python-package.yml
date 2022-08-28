@@ -27,10 +27,14 @@ jobs:
 
       - name: "Determining unix epoch time stamp of commit"
         run: |
+          # For dev-snapshot releases, this is used in package version
+          #
           # see https://git-scm.com/docs/git-show
           echo "LAST_COMMIT_UNIX_EPOCH=$( \
             git show ${GITHUB_SHA} --no-patch --format=%ct \
           )" >> $GITHUB_ENV
+        if: |
+          ${{ github.event.inputs.python-package-release-target == 'snapshot-release' }}
 
       - name: "Build docker image"
         run: |
@@ -38,22 +42,19 @@ jobs:
 
       - name: "Run unit tests"
         run: |
-          make \
+          make run-command[in-ci-docker] \
               RUN_ENVIRONMENT="${{ env.RUN_ENVIRONMENT }}" \
-              COMMAND="(cd pynb_dag_runner; make test-pytest )" \
-              run-command[in-ci-docker]
+              COMMAND="(cd pynb_dag_runner; make test-pytest )"
 
       - name: "Run mypy type checks"
         run: |
-          make \
+          make run-command[in-ci-docker] \
               COMMAND="(cd pynb_dag_runner; make test-mypy )" \
-              run-command[in-ci-docker]
 
       - name: "Check black formatting"
         run: |
-          make \
-              COMMAND="(cd pynb_dag_runner; make test-black )" \
-              run-command[in-ci-docker]
+          make run-command[in-ci-docker] \
+              COMMAND="(cd pynb_dag_runner; make test-black )"
 
       - name: "Build Python package for the pynb-dag-runner library"
         run: |

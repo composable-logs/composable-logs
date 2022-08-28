@@ -1,5 +1,9 @@
 name: "ci: test PR commits"
 
+# On commits to PR:s into main branch (except for files listed below)
+#  - Run automated tests + check that package builds
+#  - Persist package as Github artifact for short-term debugging
+
 on:
   # See:
   # https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
