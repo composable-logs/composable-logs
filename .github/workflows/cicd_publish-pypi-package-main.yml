@@ -1,4 +1,4 @@
-name: "ci/cd: publish release to PyPI"
+name: "ci/cd: publish main package to PyPI"
 
 # On commits to main that update the PYTHON_PACKAGE_VERSION file
 #  - Run automated tests
