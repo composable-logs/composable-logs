@@ -28,10 +28,10 @@ Eg. one can use Github actions for compute and Github pages for reporting. See b
 - `pip install pynb-dag-runner` (latest release)
 - `pip install pynb-dag-runner-snapshot` (dev-release, latest commit to main branch)
 
-#### Demo pipeline with task and experiment tracker hosted as static page on Github Pages
-- Demo: https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/
+#### Public demo pipeline
+- Task and experiment tracker https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/ (hosted as static page on Github Page). The UI is based on a modified version of MLFlow.
 
-  ![Screenshot](https://pynb-dag-runner.github.io/pynb-dag-runner/live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png)
+  [![Screenshot](https://pynb-dag-runner.github.io/pynb-dag-runner/live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png)](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
 
 - Repo (MIT): https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline
 
