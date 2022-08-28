@@ -35,6 +35,9 @@ Eg. one can use Github actions for compute and Github pages for reporting. See b
 
 - Repo (MIT): https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline
 
+#### Project planning
+- https://github.com/orgs/pynb-dag-runner/projects/2/views/3
+
 ---
 
 Any feedback/ideas welcome!
