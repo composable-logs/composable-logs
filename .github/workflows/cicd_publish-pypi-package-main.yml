@@ -13,7 +13,7 @@ on:
     branches:
       - main
     paths:
-      - ./workspace/pynb_dag_runner/PYTHON_PACKAGE_VERSION
+      - workspace/pynb_dag_runner/PYTHON_PACKAGE_VERSION
 
 jobs:
   ci-run-tests-and-build-python-pacakge:
