@@ -25,7 +25,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: "Determining unix epoch time stamp of commit"
+      - name: Determining unix epoch time stamp of commit
         run: |
           # For dev-snapshot releases, this is used in package version
           #
@@ -36,27 +36,27 @@ jobs:
         if: |
           ${{ github.event.inputs.python-package-release-target == 'snapshot-release' }}
 
-      - name: "Build docker image"
+      - name: Build docker image
         run: |
           make docker-build-all
 
-      - name: "Run unit tests"
+      - name: Run unit tests
         run: |
           make run-command[in-ci-docker] \
               RUN_ENVIRONMENT="${{ env.RUN_ENVIRONMENT }}" \
               COMMAND="(cd pynb_dag_runner; make test-pytest )"
 
-      - name: "Run mypy type checks"
+      - name: Run mypy type checks
         run: |
           make run-command[in-ci-docker] \
               COMMAND="(cd pynb_dag_runner; make test-mypy )" \
 
-      - name: "Check black formatting"
+      - name: Check black formatting
         run: |
           make run-command[in-ci-docker] \
               COMMAND="(cd pynb_dag_runner; make test-black )"
 
-      - name: "Build Python package for the pynb-dag-runner library"
+      - name: Build Python package for the pynb-dag-runner library
         run: |
           make run-command[in-ci-docker] \
               DOCKER_ARGS="\
@@ -69,7 +69,7 @@ jobs:
         env:
           PYTHON_PACKAGE_RELEASE_TARGET: ${{ inputs.python-package-release-target }}
 
-      - name: "Save Python package wheel-file as a Github build artefact"
+      - name: Save Python package wheel-file as a Github build artefact
         uses: actions/upload-artifact@v2
         with:
           name: pynb-dag-runner-wheel
