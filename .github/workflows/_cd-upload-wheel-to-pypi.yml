@@ -51,13 +51,21 @@ jobs:
 
       - name: Set package url (snapshot release)
         run: |
-          echo "#### Package pypi-page"                       > $GITHUB_STEP_SUMMARY
-          echo "https://pypi.org/project/pynb-dag-runner-snapshot/" >> $GITHUB_STEP_SUMMARY
+          echo "PACKAGE_PYPI_URL=https://pypi.org/project/pynb-dag-runner-snapshot/" >> $GITHUB_ENV
         if: |
           ${{ github.event.inputs.python-package-release-target == 'snapshot-release' }}
 
+      - name: Set package url (main release)
+        run: |
+          echo "PACKAGE_PYPI_URL=https://pypi.org/project/pynb-dag-runner/" >> $GITHUB_ENV
+        if: |
+          ${{ github.event.inputs.python-package-release-target == 'main-release' }}
+
       - name: Write summary file
         run: |
+          echo "#### Package pypi-page"                       > $GITHUB_STEP_SUMMARY
+          echo "${PACKAGE_PYPI_URL}"                          >> $GITHUB_STEP_SUMMARY
+          echo ""
           echo "#### Built wheel file"                        >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
           find ./workspace/pynb_dag_runner/dist/. -type f     >> $GITHUB_STEP_SUMMARY
