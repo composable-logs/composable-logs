@@ -34,7 +34,7 @@ jobs:
             git show ${GITHUB_SHA} --no-patch --format=%ct \
           )" >> $GITHUB_ENV
         if: |
-          ${{ github.event.inputs.python-package-release-target == 'snapshot-release' }}
+          github.event.inputs.python-package-release-target == 'snapshot-release'
 
       - name: Build docker image
         run: |

@@ -53,13 +53,13 @@ jobs:
         run: |
           echo "PACKAGE_PYPI_URL=https://pypi.org/project/pynb-dag-runner-snapshot/" >> $GITHUB_ENV
         if: |
-          ${{ github.event.inputs.python-package-release-target == 'snapshot-release' }}
+          github.event.inputs.python-package-release-target == 'snapshot-release'
 
       - name: Set package url (main release)
         run: |
           echo "PACKAGE_PYPI_URL=https://pypi.org/project/pynb-dag-runner/" >> $GITHUB_ENV
         if: |
-          ${{ github.event.inputs.python-package-release-target == 'main-release' }}
+          github.event.inputs.python-package-release-target == 'main-release'
 
       - name: Write summary file
         run: |
