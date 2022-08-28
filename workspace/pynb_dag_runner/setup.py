@@ -23,7 +23,7 @@ elif PYTHON_PACKAGE_RELEASE_TARGET == "ci-build":
     # Mark CI-build as "local builds". They not be published to PyPI (PEP 440)
     PYTHON_PACKAGE_VERSION += f"+ci-build"
 
-elif PYTHON_PACKAGE_RELEASE_TARGET ==  "main-release":
+elif PYTHON_PACKAGE_RELEASE_TARGET == "main-release":
     # Package built for a main release eg. 0.12.3 published to pypi.
     # No changes needed to package name and version
     pass
