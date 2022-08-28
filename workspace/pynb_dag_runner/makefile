@@ -25,7 +25,9 @@ test-black:
 	$(CMD_PREFIX) black --check --diff .
 
 build:
-	echo ">> Building library wheel file ..."
+	@echo ">> Building library wheel file ..."
+	@echo "- PYTHON_PACKAGE_RELEASE_TARGET  : $(PYTHON_PACKAGE_RELEASE_TARGET)"
+	@echo "- GITHUB_SHA                     : $(GITHUB_SHA)"
 	make clean
 
 	python3 setup.py bdist_wheel

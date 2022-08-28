@@ -1,0 +1,99 @@
+name: "cd: Push wheel file built in previous step to pypi"
+
+on:
+  workflow_call:
+    inputs:
+      python-package-release-target:
+        required: true
+        type: string
+        # valid values: "release-main-version", "snapshot-release"
+    secrets:
+      PYPI_SECRET_TOKEN:
+        required: true
+
+defaults:
+  run:
+    shell: bash
+    working-directory: .
+
+jobs:
+  cd-upload-package-to-pypi:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+
+      - name: Ensure repo has no data in dist-folder
+        run: |
+          rm -rf ./workspace/pynb_dag_runner/dist
+
+      - name: Build cd-docker image
+        run: |
+          (cd docker; make build-cd-env-docker-image)
+
+      - name: Download wheel file built in previously step
+        uses: actions/download-artifact@v3
+        with:
+          path: workspace/pynb_dag_runner/dist
+          name: pynb-dag-runner-wheel
+
+      - name: Check that wheel can be installed and imported
+        run: |
+          make run-command[in-cd-docker] \
+            COMMAND="(\
+              pip install --quiet --user ./pynb_dag_runner/dist/*.whl; \
+              python3 -c 'import pynb_dag_runner' \
+            )"
+
+      - name: Set package url (snapshot release)
+        run: |
+          echo "#### Package pypi-page"                       > $GITHUB_STEP_SUMMARY
+          echo "https://pypi.org/project/pynb-dag-runner-snapshot/" >> $GITHUB_STEP_SUMMARY
+        if: |
+          ${{ github.event.inputs.python-package-release-target == 'snapshot-release' }}
+
+      - name: Write summary file
+        run: |
+          echo "#### Built wheel file"                        >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
+          find ./workspace/pynb_dag_runner/dist/. -type f     >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
+
+          echo "#### Wheel file listing"                      >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
+          unzip -l ./workspace/pynb_dag_runner/dist/*.whl     >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
+
+          echo "#### content of ${BT}__version__.py${BT}"     >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
+          unzip -p ./workspace/pynb_dag_runner/dist/*.whl \
+                   pynb_dag_runner/__version__.py             >> $GITHUB_STEP_SUMMARY
+          echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
+
+        env:
+          THREE_BACKTICKS: "```"
+          BT: "`"
+
+      - name: Uploading package to pypi
+        run: |
+          make run-command[in-cd-docker] \
+            DOCKER_ARGS=" \
+              -e TWINE_USERNAME \
+              -e TWINE_PASSWORD \
+            " \
+            COMMAND="(\
+              pip install --quiet --user twine==4.0.1; \
+              twine check ./pynb_dag_runner/dist/*.whl; \
+              twine upload \
+                  --verbose \
+                  --disable-progress-bar \
+                  ./pynb_dag_runner/dist/*.whl \
+            )"
+
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_SECRET_TOKEN }}

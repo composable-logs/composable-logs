@@ -1,9 +1,9 @@
-name: "Build and deploy static pynb-dag-runner documentation site to Github pages"
+name: "docs: build and deploy static docs site to Github pages"
 
 on:
   push:
     branches:
-    - development
+    - main
     paths:
     - 'docs/**'
 
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  build-and-deploy-documentation-site:
+  docs-build-and-deploy-documentation-site:
     name: Build and deploy documentation
 
     runs-on: ubuntu-20.04
@@ -22,21 +22,21 @@ jobs:
         submodules: false
         persist-credentials: true
 
-    - name: "Build docker image"
+    - name: Build docker image
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
         cd docs
         make docker-build
 
-    - name: "Build static site"
+    - name: Build static site
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
         cd docs
         make clean docker-mkdocs-build
 
-    - name: "Deploy static site"
+    - name: Deploy static site
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |

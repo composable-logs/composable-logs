@@ -61,7 +61,7 @@ def get_github_env_variables() -> Mapping[str, str]:
         # ===== Metadata for runs triggered by a pull request =====
         #
         "GITHUB_BASE_REF",
-        # target branch for pull request, eg., "development"
+        # target branch for pull request, eg., "main"
         #
         "GITHUB_HEAD_REF",
         # eg. feature branch name for pull request

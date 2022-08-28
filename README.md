@@ -2,7 +2,7 @@
 
   <!-- need an empty line above: https://stackoverflow.com/a/70293384 -->
   <a href="https://github.com/pynb-dag-runner/pynb-dag-runner/actions/workflows/ci.yml">![automated tests](https://github.com/pynb-dag-runner/pynb-dag-runner/actions/workflows/ci.yml/badge.svg)</a>
-  <a href="https://github.com/pynb-dag-runner/pynb-dag-runner/blob/development/LICENSE.md">![license=mit](https://img.shields.io/badge/license-MIT-blue)</a>
+  <a href="https://github.com/pynb-dag-runner/pynb-dag-runner/blob/main/LICENSE.md">![license=mit](https://img.shields.io/badge/license-MIT-blue)</a>
   <a href="https://github.com/pynb-dag-runner/pynb-dag-runner/issues/new">![Ideas and feedback=welcome](https://img.shields.io/badge/Ideas%20%26%20feedback-welcome-green)</a>
 
 </div>

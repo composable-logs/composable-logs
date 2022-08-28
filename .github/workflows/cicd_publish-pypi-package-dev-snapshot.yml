@@ -1,0 +1,31 @@
+name: "ci/cd: publish snapshot to PyPI"
+
+# On all commits to main:
+#  - Run automated tests
+#  - Build and publish pynb-dag-runner snapshot release
+#    (its version is <current-package-version>.dev<unix epoch of latest commit>)
+#  - Also persist package as Github artifact for short-term debugging
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: none
+
+jobs:
+  ci-run-tests-and-build-python-pacakge:
+    uses: ./.github/workflows/_ci-run-tests-and-build-python-package.yml
+    with:
+      python-package-release-target: snapshot-release
+
+  cd-upload-wheel-to-pypi:
+    needs: ci-run-tests-and-build-python-pacakge
+    uses: ./.github/workflows/_cd-upload-wheel-to-pypi.yml
+    with:
+      python-package-release-target: snapshot-release
+    secrets:
+      PYPI_SECRET_TOKEN: ${{ secrets.PYPI_SECRET_TOKEN }}
