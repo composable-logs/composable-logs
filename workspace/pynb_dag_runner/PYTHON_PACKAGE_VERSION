@@ -1,5 +1,6 @@
-0.0.2
+0.0.3
 
 # The first line in this file is the (last published) version of the Python
-# pynb-dag-runner package. Please see "Release process" in the documentation for
-# more details.
+# pynb-dag-runner package.
+#
+# Please see "Release process" in the documentation for more details.
