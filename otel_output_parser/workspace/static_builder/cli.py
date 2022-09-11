@@ -179,6 +179,8 @@ class StaticMLFlowDataSink:
             summary["id"]: {
                 **del_key(summary, "id"),
                 "metadata": to_epoch(summary["type"], summary["metadata"]),
+                # `all_children_ids` key and will be removed below before
+                # writing output to disk.
                 "all_children_ids": list(g.all_children_of(summary["id"])),
             }
             for summary in self.summaries
@@ -200,6 +202,12 @@ class StaticMLFlowDataSink:
                 summary["metadata"]["end_time"] = max(
                     s["metadata"]["end_time"] for s in all_children
                 )
+        # -----
+
+        # remove all `all_children_ids`-keys since no longer needed
+        for _, v in aug_summaries.items():
+            del v["all_children_ids"]
+
         # -----
 
         ensure_dir_exist(self.output_static_data_json).write_text(
