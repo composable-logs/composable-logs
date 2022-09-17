@@ -58,13 +58,7 @@ jobs:
 
       - name: Build Python package for the pynb-dag-runner library
         run: |
-          make run-command[in-ci-docker] \
-              DOCKER_ARGS="\
-                  -e GITHUB_SHA \
-                  -e PYTHON_PACKAGE_RELEASE_TARGET \
-                  -e LAST_COMMIT_UNIX_EPOCH \
-              " \
-              COMMAND="(cd pynb_dag_runner; make clean build )"
+          make build[in-ci-docker]
 
         env:
           PYTHON_PACKAGE_RELEASE_TARGET: ${{ inputs.python-package-release-target }}

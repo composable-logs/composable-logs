@@ -56,8 +56,14 @@ docker-run-in-dev:
 clean:
 	make COMMAND="(cd pynb_dag_runner; make clean)" run-command[in-ci-docker]
 
-build:
-	make COMMAND="(cd pynb_dag_runner; make build)" run-command[in-ci-docker]
+build[in-ci-docker]:
+	make run-command[in-ci-docker] \
+	    DOCKER_ARGS=" \
+	        -e GITHUB_SHA \
+	        -e PYTHON_PACKAGE_RELEASE_TARGET \
+	        -e LAST_COMMIT_UNIX_EPOCH \
+	    " \
+	    COMMAND="(cd pynb_dag_runner; make build)"
 
 test:
 	# Run all tests for library
