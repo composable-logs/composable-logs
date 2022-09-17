@@ -25,17 +25,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Determining unix epoch time stamp of commit
-        run: |
-          # For dev-snapshot releases, this is used in package version
-          #
-          # see https://git-scm.com/docs/git-show
-          echo "LAST_COMMIT_UNIX_EPOCH=$( \
-            git show ${GITHUB_SHA} --no-patch --format=%ct \
-          )" >> $GITHUB_ENV
-        if: |
-          inputs.python-package-release-target == 'snapshot-release'
-
       - name: Build docker image
         run: |
           make docker-build-all
@@ -56,15 +45,19 @@ jobs:
           make run-command[in-ci-docker] \
               COMMAND="(cd pynb_dag_runner; make test-black )"
 
+      - name: Determining unix epoch time stamp of commit (to version snapshot releases)
+        run: |
+          # For dev-snapshot releases, this is used in package version. However,
+          # the variable is here set for all build targets.
+          #
+          # see https://git-scm.com/docs/git-show
+          echo "LAST_COMMIT_UNIX_EPOCH=$( \
+            git show ${GITHUB_SHA} --no-patch --format=%ct \
+          )" >> $GITHUB_ENV
+
       - name: Build Python package for the pynb-dag-runner library
         run: |
-          make run-command[in-ci-docker] \
-              DOCKER_ARGS="\
-                  -e GITHUB_SHA \
-                  -e PYTHON_PACKAGE_RELEASE_TARGET \
-                  -e LAST_COMMIT_UNIX_EPOCH \
-              " \
-              COMMAND="(cd pynb_dag_runner; make clean build )"
+          make build[in-ci-docker]
 
         env:
           PYTHON_PACKAGE_RELEASE_TARGET: ${{ inputs.python-package-release-target }}

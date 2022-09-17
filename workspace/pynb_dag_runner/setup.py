@@ -33,6 +33,13 @@ else:
 
 # --- determine sha of current git commit ---
 GIT_SHA: str = os.environ["GITHUB_SHA"]
+
+# --- Path to markdown that will be shown in PyPI package page ---
+README_FILEPATH = os.environ["README_FILEPATH"]
+
+# ---
+
+print("setup.py - README_FILEPATH          :", README_FILEPATH)
 print("setup.py - GIT_SHA                  :", GIT_SHA)
 print("setup.py - PYTHON_PACKAGE_NAME      :", PYTHON_PACKAGE_NAME)
 print("setup.py - PYTHON_PACKAGE_VERSION   :", PYTHON_PACKAGE_VERSION)
@@ -53,9 +60,12 @@ Path("./pynb_dag_runner/__version__.py").write_text(
 
 setup(
     name=PYTHON_PACKAGE_NAME,
+    version=PYTHON_PACKAGE_VERSION,
     author="Matias Dahl",
     author_email="matias.dahl@iki.fi",
     license="MIT",
+    long_description=Path(README_FILEPATH).read_text(),
+    long_description_content_type="text/markdown",
     classifiers=[
         "License :: OSI Approved :: MIT License",
     ],
@@ -65,7 +75,6 @@ setup(
         ],
     },
     url="https://github.com/pynb-dag-runner/pynb-dag-runner",
-    version=PYTHON_PACKAGE_VERSION,
     install_requires=(Path("/home/host_user/requirements.txt").read_text().split("\n")),
     packages=find_packages(exclude=["tests", "tests.*"]),
 )
