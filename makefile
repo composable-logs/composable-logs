@@ -1,4 +1,13 @@
+.PHONY: *
 SHELL := /bin/bash
+
+# --- Helper tasks ---
+
+env_%:
+	@# Check that a variable is defined, see stackoverflow.com/a/7367903
+	@if [[ -z "${$*}" ]]; then exit 1; fi
+
+# --- Main tasks ---
 
 docker-build-all:
 	(cd docker; make \
@@ -37,26 +46,26 @@ docker-run-in-cicd:
 	# ---- deprecated; move to run[in-cicd-docker] ----
 	make COMMAND="$(COMMAND)" DOCKER_IMG="cicd" run-in-docker
 
-run-command[in-cd-docker]:
+run-command[in-cd-docker]: | env_DOCKER_ARGS env_COMMAND
 	make run-in-docker \
 	    DOCKER_ARGS="$(DOCKER_ARGS)" \
 	    COMMAND="$(COMMAND)" \
 		DOCKER_IMG="base"
 
-run-command[in-ci-docker]:
+run-command[in-ci-docker]: | env_DOCKER_ARGS env_COMMAND
 	@# Note: ci jobs run without network
 	make run-in-docker \
 	    DOCKER_ARGS="--network none $(DOCKER_ARGS)" \
 	    COMMAND="$(COMMAND)" \
 		DOCKER_IMG="cicd"
 
-docker-run-in-dev:
+docker-run-in-dev: | env_COMMAND
 	make COMMAND="$(COMMAND)" DOCKER_IMG="dev" run-in-docker
 
-clean:
+clean[in-ci-docker]:
 	make COMMAND="(cd pynb_dag_runner; make clean)" run-command[in-ci-docker]
 
-build[in-ci-docker]:
+build[in-ci-docker]: | env_GITHUB_SHA env_PYTHON_PACKAGE_RELEASE_TARGET env_LAST_COMMIT_UNIX_EPOCH
 	make run-command[in-ci-docker] \
 	    DOCKER_ARGS=" \
 	        -e GITHUB_SHA \
@@ -65,19 +74,21 @@ build[in-ci-docker]:
 	    " \
 	    COMMAND="(cd pynb_dag_runner; make build)"
 
-test:
-	# Run all tests for library
-	make COMMAND="( \
-	    cd pynb_dag_runner; \
-	    make \
-	        test-pytest \
-	        test-mypy \
-	        test-black \
-	)" run-command[in-ci-docker]
+test[in-ci-docker]:
+	@# Run all tests for library
+	make run-command[in-ci-docker] \
+	    COMMAND="( \
+	        cd pynb_dag_runner; \
+	        make \
+	            test-pytest \
+	            test-mypy \
+	            test-black \
+	    )"
 
 pytest-watch:
-	# run pytest in watch mode with ability to filter out specific test(s)
-	make COMMAND="( \
-	    cd pynb_dag_runner; \
-	    make WATCH_MODE=1 PYTEST_FILTER=\"$(PYTEST_FILTER)\" test-pytest \
-	)" docker-run-in-dev
+	@# run pytest in watch mode with ability to filter out specific test(s)
+	make docker-run-in-dev \
+	    COMMAND="( \
+	        cd pynb_dag_runner; \
+	        make WATCH_MODE=1 PYTEST_FILTER=\"$(PYTEST_FILTER)\" test-pytest \
+	    )"
