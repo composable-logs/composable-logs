@@ -47,14 +47,13 @@ jobs:
 
       - name: Determining unix epoch time stamp of commit (to version snapshot releases)
         run: |
-          # For dev-snapshot releases, this is used in package version
+          # For dev-snapshot releases, this is used in package version. However,
+          # the variable is here set for all build targets.
           #
           # see https://git-scm.com/docs/git-show
           echo "LAST_COMMIT_UNIX_EPOCH=$( \
             git show ${GITHUB_SHA} --no-patch --format=%ct \
           )" >> $GITHUB_ENV
-        if: |
-          inputs.python-package-release-target == 'snapshot-release'
 
       - name: Build Python package for the pynb-dag-runner library
         run: |
