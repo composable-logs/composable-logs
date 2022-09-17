@@ -33,34 +33,35 @@ dev-down:
 
 ### Define tasks run inside Docker
 
-run-in-docker:
+run-in-docker: | env_COMMAND env_DOCKER_IMG
 	@# Run bash command(s) in Docker image DOCKER_IMG (=cicd or dev)
 	docker run --rm -t \
-	    $(DOCKER_ARGS) \
+	    ${DOCKER_ARGS} \
 	    --volume $$(pwd)/workspace:/home/host_user/workspace \
 	    --workdir /home/host_user/workspace/ \
-	    pynb-dag-runner-$(DOCKER_IMG) \
-	    "$(COMMAND)"
+	    pynb-dag-runner-${DOCKER_IMG} \
+	    "${COMMAND}"
 
-docker-run-in-cicd:
+docker-run-in-cicd: | env_COMMAND
 	# ---- deprecated; move to run[in-cicd-docker] ----
-	make COMMAND="$(COMMAND)" DOCKER_IMG="cicd" run-in-docker
+	make COMMAND="${COMMAND}" DOCKER_IMG="cicd" run-in-docker
 
 run-command[in-cd-docker]: | env_DOCKER_ARGS env_COMMAND
 	make run-in-docker \
-	    DOCKER_ARGS="$(DOCKER_ARGS)" \
-	    COMMAND="$(COMMAND)" \
+	    DOCKER_ARGS="${DOCKER_ARGS}" \
+	    COMMAND="${COMMAND}" \
 		DOCKER_IMG="base"
 
-run-command[in-ci-docker]: | env_DOCKER_ARGS env_COMMAND
+run-command[in-ci-docker]: | env_COMMAND
 	@# Note: ci jobs run without network
+	@# DOCKER_ARGS optional
 	make run-in-docker \
-	    DOCKER_ARGS="--network none $(DOCKER_ARGS)" \
-	    COMMAND="$(COMMAND)" \
+	    DOCKER_ARGS="--network none ${DOCKER_ARGS}" \
+	    COMMAND="${COMMAND}" \
 		DOCKER_IMG="cicd"
 
 docker-run-in-dev: | env_COMMAND
-	make COMMAND="$(COMMAND)" DOCKER_IMG="dev" run-in-docker
+	make COMMAND="${COMMAND}" DOCKER_IMG="dev" run-in-docker
 
 clean[in-ci-docker]:
 	make COMMAND="(cd pynb_dag_runner; make clean)" run-command[in-ci-docker]
