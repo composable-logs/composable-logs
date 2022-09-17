@@ -46,7 +46,7 @@ docker-run-in-cicd: | env_COMMAND
 	# ---- deprecated; move to run[in-cicd-docker] ----
 	make COMMAND="${COMMAND}" DOCKER_IMG="cicd" run-in-docker
 
-run-command[in-cd-docker]: | env_DOCKER_ARGS env_COMMAND
+run-command[in-cd-docker]: | env_COMMAND
 	make run-in-docker \
 	    DOCKER_ARGS="${DOCKER_ARGS}" \
 	    COMMAND="${COMMAND}" \
