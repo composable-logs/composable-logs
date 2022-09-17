@@ -21,7 +21,7 @@ after pipeline execution one only needs to preserve the structured logs.
 - **https://pynb-dag-runner.github.io/pynb-dag-runner**
 
 #### Demo
-- The below demo shows how `pynb-dag-runner` can be used to execute an ML training pipeline using only Github infrastructure (Github actions for compute; Build artifacts for storage; Github pages for reporting). This also uses a fork of MLFlow that can be deployed as a static website (see, https://github.com/pynb-dag-runner/mlflow).
+- The below shows a demo ML training pipeline that uses only Github infrastructure (that is: Github actions for compute; Build artifacts for storage; and Github Pages for reporting). This uses `pynb-dag-runner` and a fork of MLFlow that can be deployed as a static website (see, https://github.com/pynb-dag-runner/mlflow).
 
   [![Screenshot](https://pynb-dag-runner.github.io/pynb-dag-runner/live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png)](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
 
