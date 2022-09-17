@@ -71,8 +71,13 @@ build[in-ci-docker]: | env_GITHUB_SHA env_PYTHON_PACKAGE_RELEASE_TARGET env_LAST
 	        -e GITHUB_SHA \
 	        -e PYTHON_PACKAGE_RELEASE_TARGET \
 	        -e LAST_COMMIT_UNIX_EPOCH \
+	        --volume $$(pwd):/repo-root:ro \
 	    " \
-	    COMMAND="(cd pynb_dag_runner; make build)"
+	    COMMAND="( \
+	        cd pynb_dag_runner; \
+	        make build \
+	            README_FILEPATH=/repo-root/README.md; \
+		)"
 
 test[in-ci-docker]:
 	@# Run all tests for library
