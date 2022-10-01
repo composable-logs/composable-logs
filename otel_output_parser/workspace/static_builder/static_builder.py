@@ -65,14 +65,20 @@ def get_pipeline_artifacts(
 
     with ZipFile(z_io, "r") as z:  # type: ignore
 
-        pipeline_artifacts = {
-            Path(filepath).name: z.read(filepath)
-            for filepath in [
-                "pipeline-outputs/pipeline.json",
-                "dag-diagram.png",
-                "gantt-diagram.png",
-            ]
-        }
+        pipeline_artifacts = {}
+        for filepath in [
+            "pipeline-outputs/pipeline.json",
+            "dag.mmd",
+            "dag-nolinks.mmd",
+            "dag-diagram.png",
+            "gantt.mmd",
+            "gantt-diagram.png",
+        ]:
+            try:
+                pipeline_artifacts[Path(filepath).name] = z.read(filepath)
+            except:
+                pass
+
         assert "pipeline.json" in pipeline_artifacts
 
         # We return nested lists (and not iterators). This allows us to close the
