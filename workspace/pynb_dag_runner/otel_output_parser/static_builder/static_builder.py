@@ -5,8 +5,8 @@ from pathlib import Path
 from zipfile import ZipFile
 
 #
-from common_helpers.utils import bytes_to_json
-from common_helpers.graph import Graph
+from otel_output_parser.common_helpers.utils import bytes_to_json
+from otel_output_parser.common_helpers.graph import Graph
 
 
 # ---- Implement get_pipeline_artifacts from content of zip file ----
