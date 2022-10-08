@@ -98,3 +98,13 @@ pytest-watch:
 	        cd pynb_dag_runner; \
 	        make WATCH_MODE=1 PYTEST_FILTER=\"$(PYTEST_FILTER)\" test-pytest \
 	    )"
+
+# TODO
+tmux-watch-all-tests[in-dev-docker]:
+	make docker-run-command \
+	    DOCKER_RUN_ARGS="-i" \
+	    COMMAND="( \
+	        make tmux-watch-all-tests \
+	        WATCH_MODE=1 \
+	        PYTEST_FILTER=\"$(PYTEST_FILTER)\" \
+	    )"
