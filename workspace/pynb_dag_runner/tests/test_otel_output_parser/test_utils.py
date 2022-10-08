@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 #
-from common_helpers.utils import (
+from otel_output_parser.common_helpers.utils import (
     bytes_to_json,
     del_key,
     ensure_dir_exist,

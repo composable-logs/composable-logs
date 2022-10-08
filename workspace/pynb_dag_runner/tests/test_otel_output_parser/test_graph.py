@@ -1,5 +1,4 @@
-from common_helpers.graph import Graph
-
+from otel_output_parser.common_helpers.graph import Graph
 
 def test_one_node_graph():
     g = Graph(set([(1, 1)]))
