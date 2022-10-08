@@ -7,3 +7,7 @@ papermill==2.3.3
 opentelemetry-api==1.8.0
 opentelemetry-sdk==1.8.0
 opentelemetry-exporter-otlp==1.8.0
+fastcore==1.4.3
+ghapi==0.1.19
+requests==2.27.1
+python-dateutil==2.8.2
