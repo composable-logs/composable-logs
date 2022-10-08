@@ -1,6 +1,7 @@
-SHELL := /bin/bash
+.PHONY: *
 
-ALL_CODE_FOLDERS = "pynb_dag_runner otel_output_parser tests/test_pynb_dag_runner tests/test_otel_output_parser"
+SHELL            := /bin/bash
+ALL_CODE_FOLDERS := "pynb_dag_runner otel_output_parser tests/test_pynb_dag_runner tests/test_otel_output_parser"
 
 ifdef WATCH_MODE
   $(info ">> Running unit tests in watch mode ...")
@@ -8,8 +9,6 @@ ifdef WATCH_MODE
 else
   CMD_PREFIX :=
 endif
-
-.PHONY: *
 
 test-pytest:
 	@echo ">> Running unit tests ..."
