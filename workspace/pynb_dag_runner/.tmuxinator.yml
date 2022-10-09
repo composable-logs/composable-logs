@@ -1,7 +1,7 @@
 # See, https://github.com/tmuxinator/tmuxinator
 
 name: watch_tests
-root: ~/workspace/
+root: .
 
 tmux_options: -f .tmux.conf
 
@@ -11,6 +11,6 @@ windows:
   - watch_tests:
       layout: main-vertical
       panes:
-        - make pytest WATCH_MODE=1
-        - make mypy WATCH_MODE=1
-        - make black WATCH_MODE=1
+        - make watch-test-pytest
+        - make watch-test-mypy
+        - make watch-test-black
