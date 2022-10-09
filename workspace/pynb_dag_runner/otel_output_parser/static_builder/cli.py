@@ -8,7 +8,11 @@ from argparse import ArgumentParser
 #
 from .github_helpers import list_artifacts_for_repo, download_artifact
 from .static_builder import linearize_log_events
-from otel_output_parser.common_helpers.utils import ensure_dir_exist, del_key, iso8601_to_epoch_ms
+from otel_output_parser.common_helpers.utils import (
+    ensure_dir_exist,
+    del_key,
+    iso8601_to_epoch_ms,
+)
 from otel_output_parser.common_helpers.graph import Graph
 
 """
