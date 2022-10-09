@@ -2,9 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "tmux-watch-all-tests: watch all Python tests",
+            "label": "watch-all (tmux): watch all Python tests",
             "type": "shell",
-            "command": "make tmux-watch-all-tests",
+            "command": "(cd /home/host_user/workspace/pynb_dag_runner; make watch-all)",
             "group": "none",
             "presentation": {
                 "reveal": "always",
