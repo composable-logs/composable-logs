@@ -6,7 +6,7 @@ ALL_CODE_FOLDERS := "pynb_dag_runner otel_output_parser tests/test_pynb_dag_runn
 # --- test related tasks ---
 
 test-pytest:
-	@echo "$$(date): Running unit tests ..."
+	@echo "$$(date): Running pytest unit tests ..."
 	@pytest \
 	    -k "$(PYTEST_FILTER)" \
 	    --durations=10 \
@@ -14,7 +14,7 @@ test-pytest:
 	    tests
 
 test-mypy:
-	@echo "$$(date): Running mypy type tests ..."
+	@echo "$$(date): Running mypy static type checking ..."
 	@mypy \
 	    --ignore-missing-imports \
 	    --exclude build \
@@ -27,37 +27,42 @@ test-black:
 	    --diff \
 	    "$(ALL_CODE_FOLDERS)"
 
-# Define
+# --- allow us to run tests in watch mode ---
+
+# Define recipes:
 #    watch-test-pytest
 #    watch-test-mypy
 #    watch-test-black
-# to run above tasks in watch mode.
+# that run the above test-recipes in watch mode.
 #
 # In watch mode:
 #  - test task is run when a Python file is saved.
 #  - This only watches files that existed when the test task started.
 #
 watch-%:
-	@find . | grep ".py" | entr bash -c "$(MAKE) --no-print-directory $*"
+	@find . \
+	    | grep ".py" \
+	    | entr \
+	    bash -c "$(MAKE) --no-print-directory $*"
 
-# Note:
-#  - both watch-all and watch-test-pytest accept PYTEST_FILTER parameter.
 watch-all:
+	@echo ">>> Running all tests in watch mode"
+	@echo " - pytest tests filtered with PYTEST_FILTER = $(PYTEST_FILTER)"
 	@tmuxinator start
 
 # --- build related tasks ---
 
-build:
-	@echo ">> Building library wheel file ..."
-	@echo "- PYTHON_PACKAGE_RELEASE_TARGET  : $(PYTHON_PACKAGE_RELEASE_TARGET)"
-	@echo "- GITHUB_SHA                     : $(GITHUB_SHA)"
-	@echo "- README_FILEPATH                : $(README_FILEPATH)"
-	$(MAKE) clean
-
-	python3 setup.py bdist_wheel
-
 clean:
+	@echo ">>> Deleting build directories ..."
 	rm -rf \
 	    build \
 	    dist \
 	    pynb_dag_runner.egg-info
+
+build: | clean
+	@# TODO: test that environment variables are set
+	@echo ">>> Building library wheel file ..."
+	@echo " - PYTHON_PACKAGE_RELEASE_TARGET  : $(PYTHON_PACKAGE_RELEASE_TARGET)"
+	@echo " - GITHUB_SHA                     : $(GITHUB_SHA)"
+	@echo " - README_FILEPATH                : $(README_FILEPATH)"
+	@python3 setup.py bdist_wheel
