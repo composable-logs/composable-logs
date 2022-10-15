@@ -6,7 +6,10 @@ FROM pynb-dag-runner-cicd
 #  - VS Code devcontainer
 
 USER root
-RUN apt-get install -y -qq --no-install-recommends entr
+RUN apt-get install -y -qq --no-install-recommends \
+    tmuxinator \
+    entr \
+    curl
 USER host_user
 
 RUN : && \

@@ -1,36 +1,69 @@
-SHELL := /bin/bash
+.PHONY: *
 
-ifdef WATCH_MODE
-  $(info ">> Running unit tests in watch mode ...")
-  CMD_PREFIX := find . | grep ".py" | entr
-else
-  CMD_PREFIX :=
-endif
+SHELL            := /bin/bash
+ALL_CODE_FOLDERS := "pynb_dag_runner otel_output_parser tests/test_pynb_dag_runner tests/test_otel_output_parser"
 
-.PHONY: build clean
+# --- test related tasks ---
 
 test-pytest:
-	echo ">> Running unit tests ..."
-	$(CMD_PREFIX) pytest \
+	@echo "$$(date): Running pytest unit tests ..."
+	@pytest \
 	    -k "$(PYTEST_FILTER)" \
 	    --durations=10 \
-	    --continue-on-collection-errors tests
+	    --continue-on-collection-errors \
+	    tests
 
 test-mypy:
-	echo ">> Running mypy type tests ..."
-	$(CMD_PREFIX) mypy --ignore-missing-imports --exclude build .
+	@echo "$$(date): Running mypy static type checking ..."
+	@mypy \
+	    --ignore-missing-imports \
+	    --exclude build \
+	    "$(ALL_CODE_FOLDERS)"
 
 test-black:
-	echo ">> Verify that code is black formatted ..."
-	$(CMD_PREFIX) black --check --diff .
+	@echo "$$(date): Verify that code is black formatted ..."
+	@black \
+	    --check \
+	    --diff \
+	    "$(ALL_CODE_FOLDERS)"
 
-build:
-	@echo ">> Building library wheel file ..."
-	@echo "- PYTHON_PACKAGE_RELEASE_TARGET  : $(PYTHON_PACKAGE_RELEASE_TARGET)"
-	@echo "- GITHUB_SHA                     : $(GITHUB_SHA)"
-	make clean
+# --- allow us to run tests in watch mode ---
 
-	python3 setup.py bdist_wheel
+# Define recipes:
+#    watch-test-pytest
+#    watch-test-mypy
+#    watch-test-black
+# that run the above test-recipes in watch mode.
+#
+# In watch mode:
+#  - test task is run when a Python file is saved.
+#  - This only watches files that existed when the test task started.
+#
+watch-%:
+	@find . \
+	    | grep ".py" \
+	    | entr \
+	    bash -c "$(MAKE) --no-print-directory $*"
+
+tmux-watch-all-tests:
+	@echo ">>> Running all tests in watch mode. "
+	@echo " - Exit with <Ctrl-B> + 'X' + 'y'"
+	@echo " - pytest tests filtered with PYTEST_FILTER = $(PYTEST_FILTER)"
+	@tmuxinator start
+
+# --- build related tasks ---
 
 clean:
-	rm -rf build dist pynb_dag_runner.egg-info
+	@echo ">>> Deleting build directories ..."
+	rm -rf \
+	    build \
+	    dist \
+	    pynb_dag_runner.egg-info
+
+build: | clean
+	@# TODO: test that environment variables are set
+	@echo ">>> Building library wheel file ..."
+	@echo " - PYTHON_PACKAGE_RELEASE_TARGET  : $(PYTHON_PACKAGE_RELEASE_TARGET)"
+	@echo " - GITHUB_SHA                     : $(GITHUB_SHA)"
+	@echo " - README_FILEPATH                : $(README_FILEPATH)"
+	@python3 setup.py bdist_wheel

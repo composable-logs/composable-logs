@@ -5,9 +5,9 @@ SHELL := /bin/bash
 
 env_%:
 	@# Check that a variable is defined, see stackoverflow.com/a/7367903
-	@if [[ -z "${$*}" ]]; then exit 1; fi
+	@if [[ -z "$($*)" ]]; then exit 1; fi
 
-# --- Main tasks ---
+# --- docker related tasks ---
 
 docker-build-all:
 	(cd docker; make \
@@ -15,7 +15,8 @@ docker-build-all:
 	    build-ci-env-docker-image \
 	    build-dev-env-docker-image)
 
-### Manually start/stop the dev-docker container (can be used without VS Code)
+# "dev-{up, down} tasks allow us to manually start/stop the dev-docker container (can be
+# used without VS Code)
 
 dev-up:
 	docker-compose \
@@ -31,37 +32,40 @@ dev-down:
 	    down \
 	    --remove-orphans
 
-### Define tasks run inside Docker
+# --- recipes to run commands inside Docker images ---
 
 run-in-docker: | env_COMMAND env_DOCKER_IMG
 	@# Run bash command(s) in Docker image DOCKER_IMG (=cicd or dev)
-	docker run --rm -t \
-	    ${DOCKER_ARGS} \
+	docker run --rm --tty \
+	    $(DOCKER_ARGS) \
 	    --volume $$(pwd)/workspace:/home/host_user/workspace \
 	    --workdir /home/host_user/workspace/ \
-	    pynb-dag-runner-${DOCKER_IMG} \
-	    "${COMMAND}"
-
-docker-run-in-cicd: | env_COMMAND
-	# ---- deprecated; move to run[in-cicd-docker] ----
-	make COMMAND="${COMMAND}" DOCKER_IMG="cicd" run-in-docker
+	    pynb-dag-runner-$(DOCKER_IMG) \
+	    "$(COMMAND)"
 
 run-command[in-cd-docker]: | env_COMMAND
 	make run-in-docker \
-	    DOCKER_ARGS="${DOCKER_ARGS}" \
-	    COMMAND="${COMMAND}" \
+	    DOCKER_ARGS="$(DOCKER_ARGS)" \
+	    COMMAND="$(COMMAND)" \
 		DOCKER_IMG="base"
 
 run-command[in-ci-docker]: | env_COMMAND
 	@# Note: ci jobs run without network
 	@# DOCKER_ARGS optional
 	make run-in-docker \
-	    DOCKER_ARGS="--network none ${DOCKER_ARGS}" \
-	    COMMAND="${COMMAND}" \
-		DOCKER_IMG="cicd"
+	    DOCKER_ARGS="--network none $(DOCKER_ARGS)" \
+	    COMMAND="$(COMMAND)" \
+	    DOCKER_IMG="cicd"
 
-docker-run-in-dev: | env_COMMAND
-	make COMMAND="${COMMAND}" DOCKER_IMG="dev" run-in-docker
+run-command[in-dev-docker]: | env_COMMAND
+	@# Note: ci jobs run without network
+	@# DOCKER_ARGS optional
+	make run-in-docker \
+	    DOCKER_ARGS="--network none $(DOCKER_ARGS)" \
+	    COMMAND="$(COMMAND)" \
+	    DOCKER_IMG="dev"
+
+# --- define dockerized recipes for testing and building pynb-dag-runner package---
 
 clean[in-ci-docker]:
 	make COMMAND="(cd pynb_dag_runner; make clean)" run-command[in-ci-docker]
@@ -80,21 +84,20 @@ build[in-ci-docker]: | env_GITHUB_SHA env_PYTHON_PACKAGE_RELEASE_TARGET env_LAST
 	            README_FILEPATH=/repo-root/README.md; \
 		)"
 
-test[in-ci-docker]:
-	@# Run all tests for library
-	make run-command[in-ci-docker] \
+watch-pytest[in-dev-docker]:
+	@# run pytest in watch mode with ability to filter out specific test(s)
+	make run-command[in-dev-docker] \
 	    COMMAND="( \
 	        cd pynb_dag_runner; \
-	        make \
-	            test-pytest \
-	            test-mypy \
-	            test-black \
+	        make watch-test-pytest \
+	            PYTEST_FILTER=\"$(PYTEST_FILTER)\" \
 	    )"
 
-pytest-watch:
-	@# run pytest in watch mode with ability to filter out specific test(s)
-	make docker-run-in-dev \
+tmux-watch-all-tests[in-dev-docker]:
+	make run-command[in-dev-docker] \
+	    DOCKER_ARGS="-i" \
 	    COMMAND="( \
 	        cd pynb_dag_runner; \
-	        make WATCH_MODE=1 PYTEST_FILTER=\"$(PYTEST_FILTER)\" test-pytest \
+	        make tmux-watch-all-tests \
+	            PYTEST_FILTER=\"$(PYTEST_FILTER)\" \
 	    )"
