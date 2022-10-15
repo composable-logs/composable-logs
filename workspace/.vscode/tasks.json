@@ -4,7 +4,7 @@
         {
             "label": "watch-all (tmux): watch all Python tests",
             "type": "shell",
-            "command": "(cd /home/host_user/workspace/pynb_dag_runner; make watch-all)",
+            "command": "(cd /home/host_user/workspace/pynb_dag_runner; make tmux-watch-all-tests)",
             "group": "none",
             "presentation": {
                 "reveal": "always",

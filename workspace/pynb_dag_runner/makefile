@@ -45,8 +45,9 @@ watch-%:
 	    | entr \
 	    bash -c "$(MAKE) --no-print-directory $*"
 
-watch-all:
-	@echo ">>> Running all tests in watch mode"
+tmux-watch-all-tests:
+	@echo ">>> Running all tests in watch mode. "
+	@echo " - Exit with <Ctrl-B> + 'X' + 'y'"
 	@echo " - pytest tests filtered with PYTEST_FILTER = $(PYTEST_FILTER)"
 	@tmuxinator start
 
