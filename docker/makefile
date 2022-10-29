@@ -1,13 +1,20 @@
 SHELL := /bin/bash
 
-### Tasks to build Docker images
+# --- Helper tasks ---
+
+env_%:
+	@# Check that a variable is defined, see stackoverflow.com/a/7367903
+	@if [[ -z "${$*}" ]]; then exit 1; fi
+
+
+# --- Tasks to build Docker images ---
 
 build-cd-env-docker-image:
 	docker \
 	    build \
 	    --file Dockerfile.base \
-	    --build-arg HOST_UID=$$(id -u) \
-	    --build-arg HOST_GID="$$(id -g)" \
+	    --build-arg HOST_UID=$(shell id -u) \
+	    --build-arg HOST_GID="$(shell id -g)" \
 	    --tag pynb-dag-runner-base \
 	    .
 
@@ -26,6 +33,27 @@ build-dev-env-docker-image: JUPYTER_TOKEN
 	docker \
 	    build \
 	    --file Dockerfile.dev \
-	    --build-arg JUPYTER_TOKEN=$$(cat JUPYTER_TOKEN) \
+	    --build-arg JUPYTER_TOKEN=$(shell cat JUPYTER_TOKEN) \
 	    --tag pynb-dag-runner-dev \
 	    .
+
+
+# --- run command in a docker container ---
+
+run-in-docker: | env_COMMAND env_DOCKER_IMG
+	@# Run bash command(s) in Docker image DOCKER_IMG (=cicd or dev)
+	docker run --rm --tty \
+	    ${DOCKER_ARGS} \
+	    --volume $(shell pwd)/../workspace:/home/host_user/workspace \
+	    --workdir /home/host_user/workspace/ \
+	    pynb-dag-runner-${DOCKER_IMG} \
+	    "${COMMAND}"
+
+in-dev-docker/run-command: | env_COMMAND
+	@# Note:
+	@#  - dev jobs run without network access
+	@#  - additional DOCKER_ARGS optional
+	make run-in-docker \
+	    DOCKER_ARGS="--network none ${DOCKER_ARGS}" \
+	    COMMAND="${COMMAND}" \
+	    DOCKER_IMG="dev"

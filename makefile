@@ -15,23 +15,6 @@ docker-build-all:
 	    build-ci-env-docker-image \
 	    build-dev-env-docker-image)
 
-# "dev-{up, down} tasks allow us to manually start/stop the dev-docker container (can be
-# used without VS Code)
-
-dev-up:
-	docker-compose \
-	    -f .devcontainer-docker-compose.yml \
-	    up \
-	    --remove-orphans \
-	    --abort-on-container-exit \
-	    dev-environment
-
-dev-down:
-	docker-compose \
-	    -f .devcontainer-docker-compose.yml \
-	    down \
-	    --remove-orphans
-
 # --- recipes to run commands inside Docker images ---
 
 run-in-docker: | env_COMMAND env_DOCKER_IMG
@@ -57,7 +40,7 @@ run-command[in-ci-docker]: | env_COMMAND
 	    COMMAND="$(COMMAND)" \
 	    DOCKER_IMG="cicd"
 
-run-command[in-dev-docker]: | env_COMMAND
+in-dev-docker/run-command: | env_COMMAND
 	@# Note: ci jobs run without network
 	@# DOCKER_ARGS optional
 	make run-in-docker \
@@ -84,17 +67,19 @@ build[in-ci-docker]: | env_GITHUB_SHA env_PYTHON_PACKAGE_RELEASE_TARGET env_LAST
 	            README_FILEPATH=/repo-root/README.md; \
 		)"
 
-watch-pytest[in-dev-docker]:
+in-dev-docker/watch-pytest:
 	@# run pytest in watch mode with ability to filter out specific test(s)
-	make run-command[in-dev-docker] \
+	cd docker; \
+	make in-dev-docker/run-command \
 	    COMMAND="( \
 	        cd pynb_dag_runner; \
 	        make watch-test-pytest \
 	            PYTEST_FILTER=\"$(PYTEST_FILTER)\" \
 	    )"
 
-tmux-watch-all-tests[in-dev-docker]:
-	make run-command[in-dev-docker] \
+in-dev-docker/tmux-watch-all-tests:
+	cd docker; \
+	make in-dev-docker/run-command \
 	    DOCKER_ARGS="-i" \
 	    COMMAND="( \
 	        cd pynb_dag_runner; \
