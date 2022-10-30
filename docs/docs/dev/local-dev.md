@@ -12,7 +12,29 @@ For more details, see VS Code remote development, [docs<sup><sup><sub>:material-
 
 ### Run tests and build Python wheel file
 
+Common development tasks are found in the root `makefile`.
+
 ```bash
+# --- setup ---
+# this will build three Docker images. For cd, ci and local-development.
 make build-docker-images
-make [test|build|clean]
+
+# --- testing ---
+# run all unit tests in watch mode
+make in-dev-docker/watch-pytest
+
+# run selected unit tests in watch mode.
+make in-dev-docker/watch-pytest PYTEST_FILTER="version"
+
+# Start tmux session to watch
+#  - black formatting
+#  - static type cheks
+#  - and unit tests [optionally filtered as above]
+make in-dev-docker/tmux-watch-all-tests [PYTEST_FILTER="version"]
+
+# --- build package locally ---
+# TODO, see the in-ci-docker/build task in the root makefile
+
+# --- clean up ---
+make clean
 ```

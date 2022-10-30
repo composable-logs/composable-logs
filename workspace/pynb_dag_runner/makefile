@@ -43,7 +43,7 @@ watch-%:
 	@find . \
 	    | grep ".py" \
 	    | entr \
-	    bash -c "$(MAKE) --no-print-directory $*"
+	    bash -c "${MAKE} --no-print-directory $*"
 
 tmux-watch-all-tests:
 	@echo ">>> Running all tests in watch mode. "

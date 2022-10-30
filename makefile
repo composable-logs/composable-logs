@@ -11,19 +11,18 @@ env_%:
 # --- docker related tasks ---
 
 build-docker-images:
-	(cd docker; $(MAKE) build-docker-images)
+	@(cd docker; ${MAKE} build-docker-images)
 
 
 # --- define main dockerized tasks for testing and building pynb-dag-runner Python package---
 
-in-ci-docker/clean:
-	cd docker; \
-	$(MAKE) in-ci-docker/run-command \
-	    COMMAND="(cd pynb_dag_runner; make clean)"
+clean:
+	@(cd workspace/pynb_dag_runner; ${MAKE} clean)
 
 in-ci-docker/build: | env_GITHUB_SHA env_PYTHON_PACKAGE_RELEASE_TARGET env_LAST_COMMIT_UNIX_EPOCH
+	# TODO: allow local run
 	cd docker; \
-	$(MAKE) in-ci-docker/run-command \
+	${MAKE} in-ci-docker/run-command \
 	    DOCKER_ARGS=" \
 	        -e GITHUB_SHA \
 	        -e PYTHON_PACKAGE_RELEASE_TARGET \
@@ -39,7 +38,7 @@ in-ci-docker/build: | env_GITHUB_SHA env_PYTHON_PACKAGE_RELEASE_TARGET env_LAST_
 in-dev-docker/watch-pytest:
 	@# run pytest in watch mode. Filter test names with PYTEST_FILTER argument
 	cd docker; \
-	$(MAKE) in-dev-docker/run-command \
+	${MAKE} in-dev-docker/run-command \
 	    COMMAND="( \
 	        cd pynb_dag_runner; \
 	        make watch-test-pytest \
@@ -49,7 +48,7 @@ in-dev-docker/watch-pytest:
 in-dev-docker/tmux-watch-all-tests:
 	@# run all tests in tmux/watch mode. Filter unit tests with PYTEST_FILTER argument
 	cd docker; \
-	$(MAKE) in-dev-docker/run-command \
+	${MAKE} in-dev-docker/run-command \
 	    DOCKER_ARGS="-i" \
 	    COMMAND="( \
 	        cd pynb_dag_runner; \
