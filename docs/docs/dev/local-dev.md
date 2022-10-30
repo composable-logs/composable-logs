@@ -2,7 +2,7 @@
 
 ### In VS Code
 - Open the root of the `pynb-dag-runner` repository in VS Code.
-- In the repo root run `make docker-build-all`.
+- In the repo root run `make build-docker-images`.
 - Ensure that the extension "Remote - Containers" (`ms-vscode-remote.remote-containers` published by Microsoft) is installed.
 - Press the `><`-button in the lower left VS Code window corner. Select "Reopen in container".
 - Inside container ensure that the "Python" extension is installed (`ms-python.python` also published by Microsoft) if it is not automatically installed. When installed and enabled, the lower row will show the Python version in use inside the container.
@@ -13,6 +13,6 @@ For more details, see VS Code remote development, [docs<sup><sup><sub>:material-
 ### Run tests and build Python wheel file
 
 ```bash
-make docker-build-all
+make build-docker-images
 make [test|build|clean]
 ```

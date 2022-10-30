@@ -25,9 +25,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build docker image
+      - name: Build docker images
         run: |
-          make docker-build-all
+          make build-docker-images
 
       - name: Run unit tests
         run: |
@@ -57,7 +57,7 @@ jobs:
 
       - name: Build Python package for the pynb-dag-runner library
         run: |
-          make build[in-ci-docker]
+          make in-ci-docker/build
 
         env:
           PYTHON_PACKAGE_RELEASE_TARGET: ${{ inputs.python-package-release-target }}

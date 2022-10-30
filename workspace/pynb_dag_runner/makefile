@@ -6,26 +6,26 @@ ALL_CODE_FOLDERS := "pynb_dag_runner otel_output_parser tests/test_pynb_dag_runn
 # --- test related tasks ---
 
 test-pytest:
-	@echo "$$(date): Running pytest unit tests ..."
+	@echo "$(shell date): Running pytest unit tests ..."
 	@pytest \
-	    -k "$(PYTEST_FILTER)" \
+	    -k "${PYTEST_FILTER}" \
 	    --durations=10 \
 	    --continue-on-collection-errors \
 	    tests
 
 test-mypy:
-	@echo "$$(date): Running mypy static type checking ..."
+	@echo "$(shell date): Running mypy static type checking ..."
 	@mypy \
 	    --ignore-missing-imports \
 	    --exclude build \
-	    "$(ALL_CODE_FOLDERS)"
+	    "${ALL_CODE_FOLDERS}"
 
 test-black:
-	@echo "$$(date): Verify that code is black formatted ..."
+	@echo "$(shell date): Verify that code is black formatted ..."
 	@black \
 	    --check \
 	    --diff \
-	    "$(ALL_CODE_FOLDERS)"
+	    "${ALL_CODE_FOLDERS}"
 
 # --- allow us to run tests in watch mode ---
 
@@ -48,7 +48,7 @@ watch-%:
 tmux-watch-all-tests:
 	@echo ">>> Running all tests in watch mode. "
 	@echo " - Exit with <Ctrl-B> + 'X' + 'y'"
-	@echo " - pytest tests filtered with PYTEST_FILTER = $(PYTEST_FILTER)"
+	@echo " - pytest tests filtered with PYTEST_FILTER = ${PYTEST_FILTER}"
 	@tmuxinator start
 
 # --- build related tasks ---
@@ -63,7 +63,7 @@ clean:
 build: | clean
 	@# TODO: test that environment variables are set
 	@echo ">>> Building library wheel file ..."
-	@echo " - PYTHON_PACKAGE_RELEASE_TARGET  : $(PYTHON_PACKAGE_RELEASE_TARGET)"
-	@echo " - GITHUB_SHA                     : $(GITHUB_SHA)"
-	@echo " - README_FILEPATH                : $(README_FILEPATH)"
+	@echo " - PYTHON_PACKAGE_RELEASE_TARGET  : ${PYTHON_PACKAGE_RELEASE_TARGET}"
+	@echo " - GITHUB_SHA                     : ${GITHUB_SHA}"
+	@echo " - README_FILEPATH                : ${README_FILEPATH}"
 	@python3 setup.py bdist_wheel

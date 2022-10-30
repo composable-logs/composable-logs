@@ -129,7 +129,7 @@ Internet --> web_static_mlflow
 git clone --recurse-submodules git@github.com:pynb-dag-runner/mnist-digits-demo-pipeline.git
 
 cd mnist-digits-demo-pipeline
-make docker-build-all
+make build-docker-images
 
 make clean
 
