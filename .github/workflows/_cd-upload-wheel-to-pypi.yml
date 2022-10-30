@@ -43,7 +43,8 @@ jobs:
 
       - name: Check that wheel can be installed and imported
         run: |
-          make run-command[in-cd-docker] \
+          cd docker
+          make in-cd-docker/run-command \
             COMMAND="(\
               pip install --quiet --user ./pynb_dag_runner/dist/*.whl; \
               python3 -c 'import pynb_dag_runner' \
@@ -88,7 +89,8 @@ jobs:
 
       - name: Uploading package to pypi
         run: |
-          make run-command[in-cd-docker] \
+          cd docker
+          make in-cd-docker/run-command \
             DOCKER_ARGS=" \
               -e TWINE_USERNAME \
               -e TWINE_PASSWORD \

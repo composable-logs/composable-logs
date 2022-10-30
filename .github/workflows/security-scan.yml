@@ -37,7 +37,7 @@ jobs:
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
-          make docker-build-all
+          make build-docker-images
 
       # ------
       # The below following instructions from here:
