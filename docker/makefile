@@ -23,6 +23,8 @@ ${BUILT_DOCKER_LOCK_FILE}-base: Dockerfile.base makefile
 	mkdir -p $(shell dirname $@)
 	touch $@
 
+build-docker-cd-image: ${BUILT_DOCKER_LOCK_FILE}-base
+
 ${BUILT_DOCKER_LOCK_FILE}-cicd: ${BUILT_DOCKER_LOCK_FILE}-base Dockerfile.cicd makefile
 	docker build \
 	    --no-cache \

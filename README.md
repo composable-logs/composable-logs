@@ -17,22 +17,28 @@ Instead, pipeline outputs are emitted using the [OpenTelemetry standard](https:/
 Since structured logs can be directed to a file (as one option), this can be used to run pipelines on limited or no cloud infrastructure;
 after pipeline execution one only needs to preserve the structured logs. 
 
-#### Documentation and architecture
+### Documentation and architecture
 - **https://pynb-dag-runner.github.io/pynb-dag-runner**
 
-#### Demo
+### Demo
 - The below shows a demo ML training pipeline that uses only Github infrastructure (that is: Github actions for compute; Build artifacts for storage; and Github Pages for reporting). This uses `pynb-dag-runner` and a fork of MLFlow that can be deployed as a static website (see, https://github.com/pynb-dag-runner/mlflow).
 
   [![Screenshot](https://pynb-dag-runner.github.io/pynb-dag-runner/live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png)](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
 
 - Codes for pipeline (MIT): https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline
 
-#### Roadmap and project planning
+### Roadmap and project planning
 - https://github.com/orgs/pynb-dag-runner/projects/2/views/3
 
-#### Install via PyPI
-- `pip install pynb-dag-runner` (latest release)
-- `pip install pynb-dag-runner-snapshot` (dev-release, latest commit to main branch)
+### Install via PyPI
+
+#### Latest release
+- `pip install pynb-dag-runner`
+- https://pypi.org/project/pynb-dag-runner
+
+#### Snapshot of latest commit to main branch
+- `pip install pynb-dag-runner-snapshot`
+- https://pypi.org/project/pynb-dag-runner-snapshot
 
 ---
 
