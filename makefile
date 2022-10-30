@@ -32,23 +32,7 @@ run-command[in-cd-docker]: | env_COMMAND
 	    COMMAND="${COMMAND}" \
 		DOCKER_IMG="base"
 
-run-command[in-ci-docker]: | env_COMMAND
-	@# Note: ci jobs run without network
-	@# DOCKER_ARGS optional
-	$(MAKE) run-in-docker \
-	    DOCKER_ARGS="--network none ${DOCKER_ARGS}" \
-	    COMMAND="${COMMAND}" \
-	    DOCKER_IMG="cicd"
-
-in-dev-docker/run-command: | env_COMMAND
-	@# Note: ci jobs run without network
-	@# DOCKER_ARGS optional
-	$(MAKE) run-in-docker \
-	    DOCKER_ARGS="--network none ${DOCKER_ARGS}" \
-	    COMMAND="${COMMAND}" \
-	    DOCKER_IMG="dev"
-
-# --- define dockerized recipes for testing and building pynb-dag-runner package---
+# --- define dockerized tasks for testing and building pynb-dag-runner Python package---
 
 in-ci-docker/clean:
 	cd docker; \
