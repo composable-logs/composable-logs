@@ -33,7 +33,7 @@ jobs:
 
       - name: Build cd-docker image
         run: |
-          (cd docker; make build-cd-env-docker-image)
+          (cd docker; make build-docker-cd-image)
 
       - name: Download wheel file built in previously step
         uses: actions/download-artifact@v3
