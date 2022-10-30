@@ -187,14 +187,17 @@ class PydarLogger:
     def __init__(self, P: Mapping[str, Any]):
         assert isinstance(P, dict)
 
-        # Connect to running Ray cluster. Without this, OpenTelemetry logging from
-        # notebook will not connect to Ray-cluster's logging setup.
-        ray.init(
-            address="auto",
-            namespace="pydar-ray-cluster",
-            # The below setting required for constructor to work in tests
-            ignore_reinit_error=True,
-        )
+        try:
+            # - Connect to running Ray cluster if running
+            # - Fail if no cluster running
+            ray.init(
+                address="auto",
+                namespace="pydar-ray-cluster",
+                ignore_reinit_error=True,
+            )
+        except:
+            # No cluster running, start
+            ray.init(namespace="pydar-ray-cluster")
 
         # Get context for Task that triggered notebook (for context propagation)
         self._traceparent = P.get("_opentelemetry_traceparent", None)
