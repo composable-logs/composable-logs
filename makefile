@@ -7,32 +7,14 @@ env_%:
 	@# Check that a variable is defined, see stackoverflow.com/a/7367903
 	@if [[ -z "$($*)" ]]; then exit 1; fi
 
+
 # --- docker related tasks ---
 
 build-docker-images:
-	(cd docker; make \
-	    build-cd-env-docker-image \
-	    build-ci-env-docker-image \
-	    build-dev-env-docker-image)
+	(cd docker; $(MAKE) build-docker-images)
 
-# --- recipes to run commands inside Docker images ---
 
-run-in-docker: | env_COMMAND env_DOCKER_IMG
-	@# Run bash command(s) in Docker image DOCKER_IMG (=cicd or dev)
-	docker run --rm --tty \
-	    ${DOCKER_ARGS} \
-	    --volume $(shell pwd)/workspace:/home/host_user/workspace \
-	    --workdir /home/host_user/workspace/ \
-	    pynb-dag-runner-$(DOCKER_IMG) \
-	    "${COMMAND}"
-
-run-command[in-cd-docker]: | env_COMMAND
-	$(MAKE) run-in-docker \
-	    DOCKER_ARGS="${DOCKER_ARGS}" \
-	    COMMAND="${COMMAND}" \
-		DOCKER_IMG="base"
-
-# --- define dockerized tasks for testing and building pynb-dag-runner Python package---
+# --- define main dockerized tasks for testing and building pynb-dag-runner Python package---
 
 in-ci-docker/clean:
 	cd docker; \

@@ -10,8 +10,7 @@ env_%:
 # --- Tasks to build Docker images ---
 
 build-cd-env-docker-image:
-	docker \
-	    build \
+	docker build \
 	    --file Dockerfile.base \
 	    --build-arg HOST_UID=$(shell id -u) \
 	    --build-arg HOST_GID="$(shell id -g)" \
@@ -19,8 +18,7 @@ build-cd-env-docker-image:
 	    .
 
 build-ci-env-docker-image:
-	docker \
-	    build \
+	docker build \
 	    --file Dockerfile.cicd \
 	    --tag pynb-dag-runner-cicd \
 	    .
@@ -30,24 +28,36 @@ JUPYTER_TOKEN:
 	openssl rand -base64 42 > JUPYTER_TOKEN
 
 build-dev-env-docker-image: JUPYTER_TOKEN
-	docker \
-	    build \
+	docker build \
 	    --file Dockerfile.dev \
 	    --build-arg JUPYTER_TOKEN=$(shell cat JUPYTER_TOKEN) \
 	    --tag pynb-dag-runner-dev \
 	    .
 
+build-docker-images:
+	(cd docker; $(MAKE) \
+	    build-cd-env-docker-image \
+	    build-ci-env-docker-image \
+	    build-dev-env-docker-image)
+
 
 # --- run command in a docker container ---
 
 run-in-docker: | env_COMMAND env_DOCKER_IMG
-	@# Run bash command(s) in Docker image DOCKER_IMG (=cicd or dev)
+	@# Run bash command(s) in Docker image DOCKER_IMG (=base, cicd or dev)
 	docker run --rm --tty \
 	    ${DOCKER_ARGS} \
 	    --volume $(shell pwd)/../workspace:/home/host_user/workspace \
 	    --workdir /home/host_user/workspace/ \
 	    pynb-dag-runner-${DOCKER_IMG} \
 	    "${COMMAND}"
+
+in-cd-docker/run-command: | env_COMMAND
+	@# This is used to deploy the Python package
+	$(MAKE) run-in-docker \
+	    DOCKER_ARGS="${DOCKER_ARGS}" \
+	    COMMAND="${COMMAND}" \
+		DOCKER_IMG="base"
 
 in-dev-docker/run-command: | env_COMMAND
 	@# Note:
