@@ -31,18 +31,21 @@ jobs:
 
       - name: Run unit tests
         run: |
-          make run-command[in-ci-docker] \
+          cd docker
+          make in-ci-docker/run-command \
               RUN_ENVIRONMENT="${{ env.RUN_ENVIRONMENT }}" \
               COMMAND="(cd pynb_dag_runner; make test-pytest )"
 
       - name: Run mypy type checks
         run: |
-          make run-command[in-ci-docker] \
+          cd docker
+          make in-ci-docker/run-command \
               COMMAND="(cd pynb_dag_runner; make test-mypy )" \
 
       - name: Check black formatting
         run: |
-          make run-command[in-ci-docker] \
+          cd docker
+          make in-ci-docker/run-command \
               COMMAND="(cd pynb_dag_runner; make test-black )"
 
       - name: Determining unix epoch time stamp of commit (to version snapshot releases)
@@ -68,4 +71,4 @@ jobs:
           name: pynb-dag-runner-wheel
           path: ${{ github.workspace }}/workspace/pynb_dag_runner/dist/
           if-no-files-found: error
-          retention-days: 5
+          retention-days: 1

@@ -50,12 +50,14 @@ in-dev-docker/run-command: | env_COMMAND
 
 # --- define dockerized recipes for testing and building pynb-dag-runner package---
 
-in-docker/clean:
-	$(MAKE) run-command[in-ci-docker] \
+in-ci-docker/clean:
+	cd docker; \
+	$(MAKE) in-ci-docker/run-command \
 	    COMMAND="(cd pynb_dag_runner; make clean)"
 
 in-ci-docker/build: | env_GITHUB_SHA env_PYTHON_PACKAGE_RELEASE_TARGET env_LAST_COMMIT_UNIX_EPOCH
-	$(MAKE) run-command[in-ci-docker] \
+	cd docker; \
+	$(MAKE) in-ci-docker/run-command \
 	    DOCKER_ARGS=" \
 	        -e GITHUB_SHA \
 	        -e PYTHON_PACKAGE_RELEASE_TARGET \

@@ -57,3 +57,11 @@ in-dev-docker/run-command: | env_COMMAND
 	    DOCKER_ARGS="--network none ${DOCKER_ARGS}" \
 	    COMMAND="${COMMAND}" \
 	    DOCKER_IMG="dev"
+
+in-ci-docker/run-command: | env_COMMAND
+	@# Note: ci jobs run without network
+	@# DOCKER_ARGS optional
+	$(MAKE) run-in-docker \
+	    DOCKER_ARGS="--network none ${DOCKER_ARGS}" \
+	    COMMAND="${COMMAND}" \
+	    DOCKER_IMG="cicd"
