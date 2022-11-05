@@ -31,9 +31,9 @@ jobs:
         run: |
           rm -rf ./workspace/pynb_dag_runner/dist
 
-      - name: Build cd-docker image
+      - name: Build base-docker image
         run: |
-          (cd docker; make build-docker-cd-image)
+          (cd docker; make build-docker-base-image)
 
       - name: Download wheel file built in previously step
         uses: actions/download-artifact@v3
@@ -44,8 +44,8 @@ jobs:
       - name: Check that wheel can be installed and imported
         run: |
           cd docker
-          make in-cd-docker/run-command \
-            COMMAND="(\
+          make in-base-docker/run-command \
+            COMMAND="( \
               pip install --quiet --user ./pynb_dag_runner/dist/*.whl; \
               python3 -c 'import pynb_dag_runner' \
             )"
@@ -90,12 +90,12 @@ jobs:
       - name: Uploading package to pypi
         run: |
           cd docker
-          make in-cd-docker/run-command \
+          make in-base-docker/run-command \
             DOCKER_ARGS=" \
               -e TWINE_USERNAME \
               -e TWINE_PASSWORD \
             " \
-            COMMAND="(\
+            COMMAND="( \
               pip install --quiet --user twine==4.0.1; \
               twine check ./pynb_dag_runner/dist/*.whl; \
               twine upload \
