@@ -3,6 +3,7 @@
 SHELL            := /bin/bash
 ALL_CODE_FOLDERS := "pynb_dag_runner otel_output_parser tests/test_pynb_dag_runner tests/test_otel_output_parser"
 
+
 # --- test related tasks ---
 
 test-pytest:
@@ -27,6 +28,7 @@ test-black:
 	    --diff \
 	    "${ALL_CODE_FOLDERS}"
 
+
 # --- allow us to run tests in watch mode ---
 
 # Define recipes:
@@ -50,6 +52,7 @@ tmux-watch-all-tests:
 	@echo " - Exit with <Ctrl-B> + 'X' + 'y'"
 	@echo " - pytest tests filtered with PYTEST_FILTER = ${PYTEST_FILTER}"
 	@tmuxinator start
+
 
 # --- build related tasks ---
 
