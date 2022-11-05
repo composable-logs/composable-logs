@@ -36,7 +36,12 @@ in-ci-docker/build: | env_GITHUB_SHA env_PYTHON_PACKAGE_RELEASE_TARGET env_LAST_
 		)"
 
 in-dev-docker/watch-pytest:
-	@# run pytest in watch mode. Filter test names with PYTEST_FILTER argument
+	@# run pytest in watch mode
+	@#
+	@#  - Unit test names can be filtered with optional PYTEST_FILTER argument
+	@#    (for faster feedback during development)
+	@#  - Only files that exist then the task is started are watched.
+	@#
 	cd docker; \
 	${MAKE} in-dev-docker/run-command \
 	    COMMAND="( \
@@ -46,7 +51,12 @@ in-dev-docker/watch-pytest:
 	    )"
 
 in-dev-docker/tmux-watch-all-tests:
-	@# run all tests in tmux/watch mode. Filter unit tests with PYTEST_FILTER argument
+	@# run all tests (unit, mypy, black) in watch mode
+	@#
+	@#  - This can be run in the terminal (eg without VS Code) and uses tmux to
+	@#    split terminal into three panes for different tests.
+	@#  - Same comments as for `in-dev-docker/watch-pytest` apply here.
+	@#
 	cd docker; \
 	${MAKE} in-dev-docker/run-command \
 	    DOCKER_ARGS="-i" \

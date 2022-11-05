@@ -12,7 +12,8 @@ env_%:
 
 # --- Tasks to build Docker images ---
 
-${BUILT_DOCKER_LOCK_FILE}-base: Dockerfile.base makefile
+${BUILT_DOCKER_LOCK_FILE}-base: Dockerfile.base \
+                                makefile
 	docker build \
 	    --no-cache \
 	    --file Dockerfile.base \
@@ -23,9 +24,13 @@ ${BUILT_DOCKER_LOCK_FILE}-base: Dockerfile.base makefile
 	mkdir -p $(shell dirname $@)
 	touch $@
 
-build-docker-cd-image: ${BUILT_DOCKER_LOCK_FILE}-base
+build-docker-base-image: ${BUILT_DOCKER_LOCK_FILE}-base
+	@# For now, the cd-image is used to deploy the Python package, so
+	@# provide separate task to build only this image
 
-${BUILT_DOCKER_LOCK_FILE}-cicd: ${BUILT_DOCKER_LOCK_FILE}-base Dockerfile.cicd makefile
+${BUILT_DOCKER_LOCK_FILE}-cicd: ${BUILT_DOCKER_LOCK_FILE}-base \
+                                Dockerfile.cicd \
+                                makefile
 	docker build \
 	    --no-cache \
 	    --file Dockerfile.cicd \
@@ -38,7 +43,10 @@ JUPYTER_TOKEN:
 	# Create random JUPYTER_TOKEN for Jupyter running in Docker
 	openssl rand -base64 42 > JUPYTER_TOKEN
 
-${BUILT_DOCKER_LOCK_FILE}-dev: JUPYTER_TOKEN ${BUILT_DOCKER_LOCK_FILE}-cicd makefile
+${BUILT_DOCKER_LOCK_FILE}-dev: JUPYTER_TOKEN \
+                               ${BUILT_DOCKER_LOCK_FILE}-cicd \
+                               Dockerfile.dev \
+                               makefile
 	docker build \
 	    --no-cache \
 	    --file Dockerfile.dev \
@@ -62,8 +70,7 @@ run-in-docker: | env_COMMAND env_DOCKER_IMG
 	    pynb-dag-runner-${DOCKER_IMG} \
 	    "${COMMAND}"
 
-in-cd-docker/run-command: | env_COMMAND
-	@# This is used to deploy the Python package
+in-base-docker/run-command: | env_COMMAND
 	${MAKE} run-in-docker \
 	    DOCKER_ARGS="${DOCKER_ARGS}" \
 	    COMMAND="${COMMAND}" \
