@@ -94,8 +94,8 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "static_builder = otel_output_parser.static_builder.cli:entry_point",
-            "pynb_log_parser = otel_output_parser.cli:entry_point",
+            "static_builder = otel_output_parser.old_static_builder_cli.cli:entry_point",
+            "pynb_log_parser = otel_output_parser.pynb_log_parser_cli:entry_point",
         ],
     },
     url="https://github.com/pynb-dag-runner/pynb-dag-runner",
