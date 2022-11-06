@@ -94,8 +94,15 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "static_builder = otel_output_parser.old_static_builder_cli.cli:entry_point",
-            "pynb_log_parser = otel_output_parser.pynb_log_parser_cli:entry_point",
+            # --- cli entry points ---
+            #
+            # expand one OpenTelemetry json log file (written by pynb-dag-runner) into a
+            # local directory structure for local debugging
+            "otel_log_to_local_directory = otel_output_parser.otel_log_to_local_directory_cli:entry_point",
+            #
+            # expand multiple OpenTelemetry log JSON files (written by pynb-dag-runner)
+            # into data artifacts that can be deployed as a static website.
+            "otel_logs_to_static_data = otel_output_parser.otel_logs_to_static_data_cli:entry_point",
         ],
     },
     url="https://github.com/pynb-dag-runner/pynb-dag-runner",

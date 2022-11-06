@@ -99,12 +99,15 @@ def _make_link_to_task_run(task_run_dict) -> str:
     return f"{host}/#/experiments/{task_id}/runs/{run_span_id}"
 
 
-def make_mermaid_dag_inputfile(spans: Spans) -> str:
+def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
     """
     Generate input file for Mermaid diagram generator for creating dependency diagram
     of tasks found in spans.
 
     Runs are not shown in this diagram.
+
+    The flag `generate_links` can be used to turn off html links. These do not seem to
+    work when converting mermaid into png. (Would an upgrade fix this?)
     """
     output_lines = [
         "graph LR",
@@ -135,14 +138,18 @@ def make_mermaid_dag_inputfile(spans: Spans) -> str:
         )
 
     def make_link(desc: str, attrs: List[str], last_run_dict) -> str:
-        url: str = _make_link_to_task_run(last_run_dict)
-        link_html_text: str = f"<b>{desc} 🔗</b> <br />" + "<br />".join(attrs)
+        if generate_links:
+            url: str = _make_link_to_task_run(last_run_dict)
+            link_html_text: str = f"<b>{desc} 🔗</b> <br />" + "<br />".join(attrs)
 
-        return (
-            f"<a href='{url}' style='text-decoration: none; color: black;'>"
-            f"{link_html_text}"
-            f"</a>"
-        )
+            return (
+                f"<a href='{url}' style='text-decoration: none; color: black;'>"
+                f"{link_html_text}"
+                f"</a>"
+            )
+
+        else:
+            return desc
 
     for task_dict, run_it in task_it:
         last_run_dict, _ = list(run_it)[-1]
