@@ -1,4 +1,5 @@
-import json
+import io, json
+from zipfile import ZipFile
 
 from typing import Any, List, Optional
 from pathlib import Path
@@ -6,14 +7,35 @@ from functools import lru_cache
 from argparse import ArgumentParser
 
 #
+from pynb_dag_runner.opentelemetry_helpers import Spans
+
+#
 from .common_helpers.github_helpers import github_repo_artifact_zips
 from .common_helpers.graph import Graph
-from .otel_log_processors.static_builder import linearize_log_events
-from otel_output_parser.common_helpers.utils import (
-    ensure_dir_exist,
+from .common_helpers.utils import (
+    bytes_to_json,
     del_key,
+    ensure_dir_exist,
     iso8601_to_epoch_ms,
 )
+from .otel_log_processors.log_aggregator import linearize_log_events
+
+
+def extract_spans_from_otel_zip(zip_file_content: bytes) -> Spans:
+    """
+    Input should be content of zip file (with a file "opentelemetry-spans.json"
+    with logged otel spans from a pynb-dag-runner pipeline run).
+
+    The function returns the spans (as a Spans object) in this json.
+
+    Any other files in the zip file are disregarded.
+    """
+    # wrap input byte-buffer into somethat that can be read using file i/o
+    zip_file_io: io.BytesIO = io.BytesIO(zip_file_content)
+
+    with ZipFile(zip_file_io, "r") as z:  # type: ignore
+        return Spans(bytes_to_json(z.read("opentelemetry-spans.json")))
+
 
 """
 Run as:
@@ -190,6 +212,8 @@ def entry_point():
         github_repository=args().github_repository,
         zip_cache_dir=args().zip_cache_dir,
     ):
+        spans: Spans = extract_spans_from_otel_zip(artifact_zip)
+
         for summary in linearize_log_events(artifact_zip):
             write_attachment_sink(args().output_dir, summary)
             static_mlflow_data_sink.push(summary)
