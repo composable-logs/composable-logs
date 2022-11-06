@@ -72,15 +72,18 @@ def github_repo_artifact_zips(
     1) github_repository=None, zip_cache_dir=None
        Not possible
 
-    2) github_repository=Set, zip_cache_dir=None
-       Return iterator with all zip artifacts fetched from the Github repo.
+    2) github_repository is set, zip_cache_dir=None
+       Return iterator with all zip files/artifacts fetched from the Github repo.
 
-    3) github_repository=None, zip_cache_dir set
-       Return iterator with all zip artifacts fetched from the cache directory.
+    3) github_repository=None, zip_cache_dir is set
+       Return iterator with all zip files in the cache directory.
 
-    3) github_repository set, zip_cache_dir set
-       Return iterator with all zip artifacts from the Github repo, and also write
-       each zip artifacts to cache directory.
+    4) github_repository set, zip_cache_dir set
+       Return iterator with all zip artifacts from the Github repo.
+       After each zip file is fetched it is also written to the cache directory.
+
+       Note/TODO: if cache directory already contains files we might want to iterate
+       over thoese too, but this is not done.
     """
 
     if github_repository is not None:
