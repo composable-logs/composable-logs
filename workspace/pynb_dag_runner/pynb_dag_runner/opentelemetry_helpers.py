@@ -113,6 +113,19 @@ def is_parent_child(span_parent: SpanDict, span_child: SpanDict) -> bool:
     return get_span_id(span_parent) == get_parent_span_id(span_child)
 
 
+def get_span_status(span_dict: SpanDict) -> str:
+    """
+    Return "OK" if span is success, and "FAILED" otherwise.
+
+    Note: the above summary (ie., that any span status code except OK is a failure)
+    requires that status are set appropriately.
+    """
+    if span_dict["status"]["status_code"] == "OK":
+        return "OK"
+    else:
+        return "FAILED"
+
+
 # --- span timestamp helpers ---
 
 

@@ -1,3 +1,8 @@
+# --- Note: Deprecated
+# ---
+# --- The below is only used in one place and to be deleted after this can be removed
+# ---
+
 from typing import Generic, Tuple, Iterable, Set, TypeVar
 
 A = TypeVar("A")

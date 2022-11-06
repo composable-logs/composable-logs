@@ -8,7 +8,7 @@ from argparse import ArgumentParser
 #
 from .common_helpers.github_helpers import list_artifacts_for_repo, download_artifact
 from .common_helpers.graph import Graph
-from .static_builder import linearize_log_events
+from .otel_log_processors.static_builder import linearize_log_events
 from otel_output_parser.common_helpers.utils import (
     ensure_dir_exist,
     del_key,

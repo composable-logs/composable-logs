@@ -19,8 +19,10 @@ from pynb_dag_runner.opentelemetry_helpers import (
     get_duration_s,
     read_key,
 )
-from otel_output_parser.cli import (
-    write_to_output_dir,
+
+#
+from otel_output_parser.pynb_log_parser_cli import (
+    write_spans_to_output_directory_structure,
     make_mermaid_gantt_inputfile,
     make_mermaid_dag_inputfile,
 )
@@ -479,7 +481,7 @@ def test__jupytext_notebook_task__otel_logging_from_notebook(tmp_path: Path):
         assert len(make_mermaid_gantt_inputfile(spans)) > 10
 
         # write directory structure from spans
-        write_to_output_dir(spans, output_path)
+        write_spans_to_output_directory_structure(spans, output_path)
 
         files = glob.glob(f"{output_path}/**/*", recursive=True)
         filenames = [Path(f).name for f in files if Path(f).is_file()]
