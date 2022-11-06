@@ -30,6 +30,7 @@ build-docker-base-image: ${BUILT_DOCKER_LOCK_FILE}-base
 
 ${BUILT_DOCKER_LOCK_FILE}-cicd: ${BUILT_DOCKER_LOCK_FILE}-base \
                                 Dockerfile.cicd \
+                                requirements.txt \
                                 makefile
 	docker build \
 	    --no-cache \
