@@ -477,7 +477,7 @@ def test__jupytext_notebook_task__otel_logging_from_notebook(tmp_path: Path):
 
     def validate_cli_tool(spans: Spans, output_path: Path):
         # check: rendering Mermaid input file contents does not crash
-        assert len(make_mermaid_dag_inputfile(spans)) > 10
+        assert len(make_mermaid_dag_inputfile(spans, generate_links=False)) > 10
         assert len(make_mermaid_gantt_inputfile(spans)) > 10
 
         # write directory structure from spans
