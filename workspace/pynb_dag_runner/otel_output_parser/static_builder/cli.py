@@ -1,12 +1,11 @@
 import json
 
-from typing import Any, List, Iterable, Optional
+from typing import Any, List, Optional
 from pathlib import Path
 from functools import lru_cache
 from argparse import ArgumentParser
 
 #
-from .github_helpers import list_artifacts_for_repo, download_artifact
 from .static_builder import linearize_log_events
 from otel_output_parser.common_helpers.utils import (
     ensure_dir_exist,
@@ -55,65 +54,6 @@ def args():
         help="Output JSON file path with static metadata for use in static UI site",
     )
     return parser.parse_args()
-
-
-def github_repo_artifact_zips(
-    github_repository: Optional[str], zip_cache_dir: Optional[Path]
-) -> Iterable[bytes]:
-    """
-    Arguments:
-     - `github_repository` reference to Github repo in format owner/repo-name
-     - `zip_cache_dir` local directory for caching artifacts.
-
-    At least one argument should be set (ie. not None).
-
-    Input parameter combinations and actions:
-
-    1) github_repository=None, zip_cache_dir=None
-       Not possible
-
-    2) github_repository=Set, zip_cache_dir=None
-       Return iterator with all zip artifacts fetched from the Github repo.
-
-    3) github_repository=None, zip_cache_dir set
-       Return iterator with all zip artifacts fetched from the cache directory.
-
-    3) github_repository set, zip_cache_dir set
-       Return iterator with all zip artifacts from the Github repo, and also write
-       each zip artifacts to cache directory.
-    """
-
-    if github_repository is not None:
-        # fetch artifacts from Github, and possibly cache them to local directory
-
-        print("Fetching artefacts from Github : ", github_repository)
-        for entry in list_artifacts_for_repo(github_repository=github_repository):
-            if entry["expired"] or ("opentelemetry-outputs-v1" not in entry["name"]):
-                continue
-
-            artifact_id: str = str(entry["id"])
-            artifact_zip: Optional[bytes] = download_artifact(
-                github_repository=github_repository, artifact_id=artifact_id
-            )
-
-            if artifact_zip is None:
-                continue  # artifact could have expired after list was created?
-
-            if zip_cache_dir is not None:
-                cache_file: Path = zip_cache_dir / (artifact_id + ".zip")
-                print(f" - Caching {cache_file} ({len(artifact_zip)} bytes) ...")
-                ensure_dir_exist(Path(cache_file)).write_bytes(artifact_zip)
-
-            yield artifact_zip
-
-    elif zip_cache_dir is not None and github_repository is None:
-        # use local cache; no requests to Github
-        for f in zip_cache_dir.glob("*.zip"):
-            yield f.read_bytes()
-
-    else:
-        assert github_repository is None and zip_cache_dir is None
-        raise ValueError("Both github_repository and zip_cache_dir can not be None")
 
 
 # --- sinks for processing {pipeline, task, run} summaries ----
