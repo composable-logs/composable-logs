@@ -32,7 +32,7 @@ def convert_ipynb_to_html(ipynb_notebook_content: str) -> str:
     tmp_path: str = tempfile.mkdtemp(prefix="pynb-dag-runner-temp")
     tmp_filepath: Path = Path(tmp_path) / "temp-notebook.ipynb"
     tmp_filepath.write_text(ipynb_notebook_content)
-    output, _ = HTMLExporter(template_name="classic").from_filename(tmp_filepath)
+    output, _ = HTMLExporter(template_name="classic").from_filename(str(tmp_filepath))
 
     os.remove(tmp_filepath)
     return output
@@ -90,7 +90,9 @@ class JupyterIpynbNotebook:
 
         output_filepath = self.filepath.with_suffix(".html")
 
-        output, _ = HTMLExporter(template_name="classic").from_filename(self.filepath)
+        output, _ = HTMLExporter(template_name="classic").from_filename(
+            str(self.filepath)
+        )
         output_filepath.write_text(output)
 
         return output_filepath
