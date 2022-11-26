@@ -16,7 +16,7 @@ from .mermaid_graphs import (
 )
 
 
-def write_to_output_dir(spans: Spans, out_basepath: Path):
+def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
     """
     Write out tasks/runs/artefacts found in spans into a directory structure for
     inspection using a file browser.
@@ -132,7 +132,7 @@ def entry_point():
     print(f"Number of spans loaded {len(spans)}")
 
     if args().output_directory is not None:
-        write_to_output_dir(spans, args().output_directory)
+        write_spans_to_output_directory_structure(spans, args().output_directory)
 
     if args().output_filepath_mermaid_gantt is not None:
         args().output_filepath_mermaid_gantt.write_text(
