@@ -20,7 +20,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     read_key,
 )
 from otel_output_parser.cli import (
-    write_to_output_dir,
+    write_spans_to_output_directory_structure,
     make_mermaid_gantt_inputfile,
     make_mermaid_dag_inputfile,
 )
@@ -475,11 +475,10 @@ def test__jupytext_notebook_task__otel_logging_from_notebook(tmp_path: Path):
 
     def validate_cli_tool(spans: Spans, output_path: Path):
         # check: rendering Mermaid input file contents does not crash
-        assert len(make_mermaid_dag_inputfile(spans)) > 10
+        assert len(make_mermaid_dag_inputfile(spans, generate_links=False)) > 10
         assert len(make_mermaid_gantt_inputfile(spans)) > 10
 
-        # write directory structure from spans
-        write_to_output_dir(spans, output_path)
+        write_spans_to_output_directory_structure(spans, output_path)
 
         files = glob.glob(f"{output_path}/**/*", recursive=True)
         filenames = [Path(f).name for f in files if Path(f).is_file()]
