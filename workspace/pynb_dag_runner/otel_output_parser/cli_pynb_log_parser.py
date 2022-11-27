@@ -13,6 +13,7 @@ from .mermaid_graphs import (
     make_mermaid_gantt_inputfile,
     _status_summary,
 )
+from .common_helpers.utils import ensure_dir_exist
 
 
 def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
@@ -134,12 +135,14 @@ def entry_point():
         write_spans_to_output_directory_structure(spans, args().output_directory)
 
     if args().output_filepath_mermaid_gantt is not None:
-        args().output_filepath_mermaid_gantt.write_text(
-            make_mermaid_gantt_inputfile(spans)
+        (
+            ensure_dir_exist(args().output_filepath_mermaid_gantt)
+            # -
+            .write_text(make_mermaid_gantt_inputfile(spans))
         )
 
     if args().output_filepath_mermaid_dag is not None:
-        dag_output_path: Path = args().output_filepath_mermaid_dag
+        dag_output_path: Path = ensure_dir_exist(args().output_filepath_mermaid_dag)
         assert dag_output_path.suffix == ".mmd"
 
         dag_output_path.write_text(

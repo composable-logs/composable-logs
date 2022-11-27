@@ -6,6 +6,7 @@ pip install -e .    # Install cli:s for local dev
 # print out syntax
 static_builder --help
 pynb_log_parser --help
+generate_static_data --help
 ```
 
 #### Expand one OpenTelemetry JSON into a directory structure (eg for debugging)
@@ -20,6 +21,21 @@ pynb_log_parser \
 #### Generate data suitable for static website
 ```bash
 # First: download selection of zip files to `./cache` directory
+generate_static_data \
+    --zip_cache_dir $(pwd)/cache \
+    --output_www_root_directory $(pwd)/www-root
+```
+
+#### (deprecated) Generate data suitable for static website
+```bash
+# First: download selection of zip files to `./cache` directory
+#
+# Note:
+# This command assumes that the json in each zip file has been expanded into a
+# directory structure using pynb_log_parser
+#
+# This should no longer be used, and the command should be removed when no
+# longer needed.
 static_builder \
     --zip_cache_dir $(pwd)/cache \
     --output_dir $(pwd)/out/ \

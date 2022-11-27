@@ -12,6 +12,12 @@ def bytes_to_json(b: bytes) -> Any:
 
 
 def ensure_dir_exist(p: Path) -> Path:
+    """
+    For a filepath `p` (eg /tmp/foo/bar/baz.txt) ensure that the path /tmp/foo/bar
+    exists.
+
+    The input filepath is returned, so that the function can be chained.
+    """
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
 
