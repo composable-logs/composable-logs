@@ -78,8 +78,6 @@ def linearize_log_events(spans: Spans) -> Iterable[Any]:
      - artifacts: list of dicts with "file_name", "artifact_path, "content" (see below)
 
     """
-    # copied from static_builder/cli
-
     pipeline_metadata, task_iterator = get_pipeline_iterators(spans)
     pipeline_id: str = pipeline_metadata["attributes"]["pipeline.pipeline_run_id"]
 
@@ -106,37 +104,45 @@ def linearize_log_events(spans: Spans) -> Iterable[Any]:
         ],
     }
 
-    return  #
-    for task_artefacts, run_iterator in task_iterator:
-        task_metadata = bytes_to_json(task_artefacts["task.json"])
-        task_id: str = task_metadata["span_id"]
+    for task_dict, task_run_it in task_iterator:
+        task_id: str = task_dict["span_id"]
+        task_json: str = json.dumps(task_dict, indent=2)
 
         yield {
             "type": "task",
             "id": task_id,
             "parent_id": pipeline_id,
-            "metadata": task_metadata,
+            "metadata": task_dict,
             "artifacts_location": str(
                 Path("pipeline") / pipeline_id / "task" / task_id
             ),
             "artifacts": [
                 {
-                    "name": k,
-                    "content": v,
-                    "size": len(v),
+                    "name": "task.json",
+                    "content": task_json,
+                    "size": len(task_json),
                 }
-                for k, v in task_artefacts.items()
             ],
         }
 
-        for run_artefacts in run_iterator:
-            run_metadata = bytes_to_json(run_artefacts["run.json"])
-            run_id = run_metadata["span_id"]
+        for task_run_dict, task_run_artefacts in task_run_it:
+            run_id = task_run_dict["span_id"]
+
+            run_artifacts = {
+                "run.json": json.dumps(task_run_dict, indent=2),
+            }
+
+            for run_artefacts_dict in add_html_notebook_artefacts(task_run_artefacts):
+                assert run_artefacts_dict["name"] != "run.json"
+                run_artifacts[run_artefacts_dict["name"]] = run_artefacts_dict[
+                    "content"
+                ]
+
             yield {
                 "type": "run",
                 "id": run_id,
                 "parent_id": task_id,
-                "metadata": run_metadata,
+                "metadata": task_run_dict,
                 "artifacts_location": str(
                     Path("pipeline") / pipeline_id / "task" / task_id / "run" / run_id
                 ),
@@ -146,7 +152,7 @@ def linearize_log_events(spans: Spans) -> Iterable[Any]:
                         "content": v,
                         "size": len(v),
                     }
-                    for k, v in run_artefacts.items()
+                    for k, v in run_artifacts.items()
                 ],
             }
 
