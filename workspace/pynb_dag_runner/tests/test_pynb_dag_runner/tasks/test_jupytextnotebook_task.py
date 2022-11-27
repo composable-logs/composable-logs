@@ -19,7 +19,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     get_duration_s,
     read_key,
 )
-from otel_output_parser.cli import (
+from otel_output_parser.cli_pynb_log_parser import (
     write_spans_to_output_directory_structure,
     make_mermaid_gantt_inputfile,
     make_mermaid_dag_inputfile,
