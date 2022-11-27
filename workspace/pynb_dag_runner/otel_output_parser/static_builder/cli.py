@@ -1,3 +1,5 @@
+# --- deprecated; move to generate_static_data cli ---
+
 import json
 
 from typing import Any, List, Optional
@@ -178,6 +180,7 @@ def write_attachment_sink(output_dir: Optional[Path], summary):
 
 
 def entry_point():
+    print("--- static_builder (deprecated; move to generate_static_data) ---")
     print("output_dir                 :", args().output_dir)
     print("github_repository          :", args().github_repository)
     print("zip_cache_dir              :", args().zip_cache_dir)
