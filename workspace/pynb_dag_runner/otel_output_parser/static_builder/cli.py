@@ -174,9 +174,16 @@ def write_attachment_sink(output_dir: Optional[Path], summary):
         return
 
     for artifact in summary["artifacts"]:
-        ensure_dir_exist(
-            output_dir / summary["artifacts_location"] / artifact["name"]
-        ).write_bytes(artifact["content"])
+
+        output_path = output_dir / summary["artifacts_location"] / artifact["name"]
+        content = artifact["content"]
+
+        if isinstance(content, bytes):
+            ensure_dir_exist(output_path).write_bytes(content)
+        elif isinstance(content, str):
+            ensure_dir_exist(output_path).write_text(content)
+        else:
+            raise Exception(f"Unknown type {type(content)}")
 
 
 def entry_point():
