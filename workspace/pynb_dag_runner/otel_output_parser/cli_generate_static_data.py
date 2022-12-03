@@ -16,7 +16,7 @@ from .mermaid_graphs import (
     make_mermaid_dag_inputfile,
     make_mermaid_gantt_inputfile,
 )
-from .static_builder.cli import write_attachment_sink, StaticMLFlowDataSink
+from .static_builder.writers import write_attachment_sink, StaticMLFlowDataSink
 
 # -
 from .common_helpers.github_helpers import github_repo_artifact_zips

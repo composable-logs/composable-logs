@@ -33,19 +33,19 @@ Eg. start VS Code dev container in the pynb-dag-runner repo's `otel_output_parse
 pip install -e .
 export GITHUB_TOKEN="<see above>"
 
-# verify that static_builder cli is installed
-static_builder --help
+# verify that generate_static_data cli is installed
+generate_static_data --help
 ```
 
 #### 2a. Download pipeline (zip) artifacts into local cache directory
 The below will download available build artifacts from past pipeline runs into a `./cache` directory.
 ```bash
 rm -rf ./cache    # <-- !!
-static_builder \
+generate_static_data \
    --github_repository pynb-dag-runner/mnist-digits-demo-pipeline \
    --zip_cache_dir ./cache
 ```
-#### 2b. Delete the token created above using Github UI
+#### 2b. Delete the token created above in the Github UI
 
 #### 2c. Parse zip file content into form suitable for for static ML Flow website
 - this step does not require network/API access and uses only files in the `./cache` directory.
@@ -54,18 +54,14 @@ static_builder \
 ```bash
 rm -rf static_output    # <-- !!
 
-static_builder \
+generate_static_data \
    --zip_cache_dir ./cache \
-   --output_static_data_json ./static_output/static-data.json \
-   --output_dir ./static_output/pipeline-artifacts
-
-# TODO: Create StaticData.js from static-data.json, see demo pipeline GHA pipeline
-# (no longer needed after UI loads data from static-data.json)
+   --output_www_root_directory ./static_output/www_root
 ```
 
-### 3. Copy data into mlflow repo
+### 3. Copy data into ML Flow repo
 
-Copy the outputs into the mlflow repo:
+Copy the outputs into correct directories in the (forked) ML Flow repo:
 
 ```bash
 # See step above where repos where cloned:
@@ -73,15 +69,10 @@ cd /some-work-dir/
 
 rm -rf mlflow/mlflow/server/js/public/pipeline-artifacts    # <-- !!
 
+# TODO: review details for the below commands.
 cp -r \
    pynb-dag-runner/otel_output_parser/workspace/static_output/static-data.json \
    mlflow/mlflow/server/js/public/
-
-# -- (this step no longer needed after UI loads data from static-data.json)
-cp \
-   pynb-dag-runner/otel_output_parser/workspace/static_output/js/StaticData.js \
-   mlflow/mlflow/server/js/src/experiment-tracking/static-data/
-# --
 
 cp -r \
    pynb-dag-runner/otel_output_parser/workspace/static_output/pipeline-artifacts \
