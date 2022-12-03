@@ -94,7 +94,6 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "static_builder = otel_output_parser.static_builder.cli:entry_point",
             "pynb_log_parser = otel_output_parser.cli_pynb_log_parser:entry_point",
             "generate_static_data = otel_output_parser.cli_generate_static_data:entry_point",
         ],

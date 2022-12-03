@@ -1,62 +1,15 @@
-# --- deprecated; move to generate_static_data cli ---
-
 import json
 
 from typing import Any, List, Optional
 from pathlib import Path
-from functools import lru_cache
-from argparse import ArgumentParser
 
 #
-from .static_builder import linearize_log_events
 from otel_output_parser.common_helpers.utils import (
     ensure_dir_exist,
     del_key,
     iso8601_to_epoch_ms,
 )
 from otel_output_parser.common_helpers.graph import Graph
-from otel_output_parser.common_helpers.github_helpers import github_repo_artifact_zips
-
-"""
-Run as:
-$ pip install -e .
-
-Set Github token (should have public repo scope, for personal access token):
-$ export GITHUB_TOKEN="..."
-
-Download artifact into cache directory, parse into output directory:
-$ static_builder --zip_cache_dir ./cache --github_repository pynb-dag-runner/mnist-digits-demo-pipeline --output_dir ./output
-"""
-
-
-@lru_cache
-def args():
-    parser = ArgumentParser()
-    parser.add_argument(
-        "--github_repository",
-        required=False,
-        type=str,
-        help="Github repo owner and name. eg. myorg/myrepo",
-    )
-    parser.add_argument(
-        "--zip_cache_dir",
-        required=False,
-        type=Path,
-        help="Directory with cached zip artefacts (or directory where to write zips)",
-    )
-    parser.add_argument(
-        "--output_dir",
-        required=False,
-        type=Path,
-        help="Output directory for parsed content (json:s and logged artifacts)",
-    )
-    parser.add_argument(
-        "--output_static_data_json",
-        required=False,
-        type=Path,
-        help="Output JSON file path with static metadata for use in static UI site",
-    )
-    return parser.parse_args()
 
 
 # --- sinks for processing {pipeline, task, run} summaries ----
@@ -184,26 +137,3 @@ def write_attachment_sink(output_dir: Optional[Path], summary):
             ensure_dir_exist(output_path).write_text(content)
         else:
             raise Exception(f"Unknown type {type(content)}")
-
-
-def entry_point():
-    print("--- static_builder (deprecated; move to generate_static_data) ---")
-    print("output_dir                 :", args().output_dir)
-    print("github_repository          :", args().github_repository)
-    print("zip_cache_dir              :", args().zip_cache_dir)
-    print("output_static_data_json    :", args().output_static_data_json)
-
-    # if output_static_data_json is None, this sink is no-op
-    static_mlflow_data_sink = StaticMLFlowDataSink(args().output_static_data_json)
-
-    for artifact_zip in github_repo_artifact_zips(
-        github_repository=args().github_repository,
-        zip_cache_dir=args().zip_cache_dir,
-    ):
-        for summary in linearize_log_events(artifact_zip):
-            write_attachment_sink(args().output_dir, summary)
-            static_mlflow_data_sink.push(summary)
-
-    static_mlflow_data_sink.close()
-
-    print("Done")
