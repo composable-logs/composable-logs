@@ -36,39 +36,6 @@ from pynb_dag_runner.opentelemetry_helpers import (
 
 from .py_test_helpers import get_time_range
 
-### ---- Test Python task evaluation ----
-
-
-def test__python_function_task__run_in_parallel():
-    def get_test_spans():
-        with SpanRecorder() as rec:
-            tasks = [
-                task_from_python_function(
-                    lambda _: time.sleep(1.0),
-                    attributes={"task.function_id": f"id#{function_id}"},
-                    timeout_s=10.0,
-                )
-                for function_id in range(2)
-            ]
-
-            _ = start_and_await_tasks(tasks, tasks, timeout_s=100, arg="dummy value")
-
-        return rec.spans
-
-    def validate_spans(spans: Spans):
-        assert len(spans.filter(["name"], "execute-task")) == 2
-
-        t0_us_range = get_time_range(spans, "id#0", inner=False)
-        t1_us_range = get_time_range(spans, "id#1", inner=False)
-
-        # Check: since there are no order constraints, the time ranges should
-        # overlap provided tests are run on 2+ CPUs
-        assert range_intersect(t0_us_range, t1_us_range)
-
-        # assert_compatibility(spans)
-
-    validate_spans(get_test_spans())
-
 
 ### ---- test order dependence for Python tasks ----
 
