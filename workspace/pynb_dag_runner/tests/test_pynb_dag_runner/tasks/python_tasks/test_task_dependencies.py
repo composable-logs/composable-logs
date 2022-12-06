@@ -1,9 +1,8 @@
-import time, random, itertools
+import time, random
 from typing import List, Set, Tuple
 
 #
 import pytest
-import opentelemetry as otel
 
 #
 from pynb_dag_runner.opentelemetry_helpers import SpanId, Spans
@@ -11,33 +10,23 @@ from pynb_dag_runner.opentelemetry_task_span_parser import extract_task_dependen
 from pynb_dag_runner.helpers import (
     one,
     pairs,
-    flatten,
-    range_intersect,
-    range_intersection,
-    range_is_empty,
 )
 from pynb_dag_runner.core.dag_runner import (
-    TaskOutcome,
     fan_in,
     run_in_sequence,
     start_and_await_tasks,
-    RemoteTaskP,
     task_from_python_function,
 )
 from pynb_dag_runner.opentelemetry_helpers import (
-    get_duration_range_us,
-    read_key,
     get_span_id,
-    get_span_exceptions,
     Spans,
-    SpanDict,
     SpanRecorder,
 )
 
-from .py_test_helpers import get_time_range
 
-
-### ---- test order dependence for Python tasks ----
+# Note/TODO:
+# The implementation be the below needs to be reviewd after upgrading Ray
+# and switching to Ray workflows. Would this test be relevant after that?
 
 
 @pytest.mark.asyncio
@@ -159,7 +148,7 @@ from .py_test_helpers import get_time_range
         },
     ],
 )
-async def test__python_function_task__random_sleep_tasks_with_order_dependencies(
+async def test__python_task__random_sleep_tasks_with_order_dependencies(
     dummy_loop_parameter, arg, ray_reinit
 ):
     """

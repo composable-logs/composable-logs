@@ -1,6 +1,3 @@
-from typing import List, Set, Tuple
-
-#
 import time
 from functools import lru_cache
 
@@ -8,8 +5,7 @@ from functools import lru_cache
 import pytest
 
 #
-from pynb_dag_runner.opentelemetry_helpers import SpanId, Spans
-from pynb_dag_runner.opentelemetry_task_span_parser import extract_task_dependencies
+from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.core.dag_runner import (
     TaskOutcome,

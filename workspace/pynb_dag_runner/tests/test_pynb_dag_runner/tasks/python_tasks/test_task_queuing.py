@@ -5,8 +5,7 @@ from functools import lru_cache
 import pytest
 
 #
-from pynb_dag_runner.opentelemetry_helpers import SpanId, Spans
-from pynb_dag_runner.opentelemetry_task_span_parser import extract_task_dependencies
+from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.helpers import range_intersection, range_is_empty
 from pynb_dag_runner.core.dag_runner import (
     start_and_await_tasks,
@@ -14,7 +13,6 @@ from pynb_dag_runner.core.dag_runner import (
 )
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
-    SpanDict,
     SpanRecorder,
 )
 
