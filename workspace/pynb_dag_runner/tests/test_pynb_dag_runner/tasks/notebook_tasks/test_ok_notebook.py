@@ -8,11 +8,7 @@ import pytest
 from pynb_dag_runner.core.dag_runner import start_and_await_tasks
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.opentelemetry_task_span_parser import get_pipeline_iterators
-from pynb_dag_runner.opentelemetry_helpers import (
-    Spans,
-    SpanRecorder,
-    read_key,
-)
+from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder, read_key
 
 from .nb_test_helpers import assert_no_exceptions, make_test_nb_task, TEST_NOTEBOOK_PATH
 
@@ -33,7 +29,28 @@ def spans() -> Spans:
     return rec.spans
 
 
-def test__jupytext__ok_notebook__parsed_spans(spans: Spans):
+def test__jupytext__ok_notebook__validate_spans(spans: Spans):
+    assert_no_exceptions(spans)
+
+    jupytext_span = one(
+        spans.filter(["name"], "execute-task")
+        #
+        .filter(["attributes", "task.task_type"], "jupytext")
+    )
+    assert jupytext_span["status"] == {"status_code": "OK"}
+
+    assert read_key(jupytext_span, ["attributes", "task.notebook"]) == NB_PATH
+
+    artefact_span = one(spans.filter(["name"], "artefact"))
+
+    # see notebook for motivation behind these string-tests
+    for content in [str(1 + 12 + 123), "variable_a=task-value"]:
+        assert content in artefact_span["attributes"]["content_encoded"]
+
+    spans.contains_path(jupytext_span, artefact_span)
+
+
+def test__jupytext__ok_notebook__validate_parsed_spans_1(spans: Spans):
     # test parsed spans:
     #   - pipeline, task, run attributes
     #   - notebook is logged as artifact
@@ -68,28 +85,7 @@ def test__jupytext__ok_notebook__parsed_spans(spans: Spans):
             assert len(artefacts["notebook.ipynb"]["content"]) > 1000
 
 
-def test__jupytext__ok_notebook__validate_spans(spans: Spans):
-    assert len(spans.exception_events()) == 0
-
-    jupytext_span = one(
-        spans.filter(["name"], "execute-task")
-        #
-        .filter(["attributes", "task.task_type"], "jupytext")
-    )
-    assert jupytext_span["status"] == {"status_code": "OK"}
-
-    assert read_key(jupytext_span, ["attributes", "task.notebook"]) == NB_PATH
-
-    artefact_span = one(spans.filter(["name"], "artefact"))
-
-    # see notebook for motivation behind these string-tests
-    for content in [str(1 + 12 + 123), "variable_a=task-value"]:
-        assert content in artefact_span["attributes"]["content_encoded"]
-
-    spans.contains_path(jupytext_span, artefact_span)
-
-
-def test__jupytext__ok_notebook__validate_parsed_spans(spans: Spans):
+def test__jupytext__ok_notebook__validate_parsed_spans_2(spans: Spans):
     pipeline_dict, task_it = get_pipeline_iterators(spans)
 
     common_keys = {
