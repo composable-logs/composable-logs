@@ -1,4 +1,4 @@
-import glob, json
+import glob
 from pathlib import Path
 from functools import lru_cache
 from typing import Any, Dict
@@ -7,12 +7,10 @@ from typing import Any, Dict
 import pytest
 
 #
-from pynb_dag_runner.tasks.tasks import make_jupytext_task_ot
 from pynb_dag_runner.tasks.task_opentelemetry_logging import SerializedData
 from pynb_dag_runner.core.dag_runner import start_and_await_tasks
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.opentelemetry_task_span_parser import get_pipeline_iterators
-from pynb_dag_runner.notebooks_helpers import JupytextNotebook
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
@@ -25,32 +23,7 @@ from otel_output_parser.cli_pynb_log_parser import (
     make_mermaid_dag_inputfile,
 )
 
-
-def assert_no_exceptions(spans: Spans):
-    exceptions = spans.exception_events()
-
-    if len(exceptions) == 0:
-        print("***** No exceptions ******")
-    else:
-        print(f"***** {len(exceptions)} exceptions in total ******")
-        for e in exceptions:
-            print(100 * "=")
-            print(json.dumps(e, indent=2))
-
-
-TEST_NOTEBOOK_PATH = (Path(__file__).parent) / "jupytext_test_notebooks"
-
-
-def make_test_nb_task(
-    nb_name: str, max_nr_retries: int, parameters={}, timeout_s: float = 10.0
-):
-    return make_jupytext_task_ot(
-        notebook=JupytextNotebook(TEST_NOTEBOOK_PATH / nb_name),
-        tmp_dir=TEST_NOTEBOOK_PATH,
-        timeout_s=timeout_s,
-        max_nr_retries=max_nr_retries,
-        parameters=parameters,
-    )
+from .helpers import assert_no_exceptions, make_test_nb_task, TEST_NOTEBOOK_PATH
 
 
 @pytest.fixture
