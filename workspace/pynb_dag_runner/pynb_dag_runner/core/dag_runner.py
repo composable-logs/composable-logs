@@ -236,6 +236,10 @@ def task_from_python_function(
     """
     Lift a Python function f (U -> B) into a Task.
     """
+
+    # Added 12/2022: remove support for task retries
+    assert max_nr_retries == 1
+
     try_f_remote: Callable[[U], Awaitable[Try[B]]] = try_f_with_timeout_guard(
         f=f, timeout_s=timeout_s, num_cpus=num_cpus
     )
