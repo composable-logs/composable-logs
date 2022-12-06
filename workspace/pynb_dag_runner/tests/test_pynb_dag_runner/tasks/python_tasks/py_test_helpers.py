@@ -2,7 +2,7 @@ from typing import List, Set, Tuple
 
 #
 from pynb_dag_runner.opentelemetry_helpers import SpanId, Spans
-from pynb_dag_runner.helpers import pairs, flatten
+from pynb_dag_runner.helpers import one, pairs, flatten
 from pynb_dag_runner.opentelemetry_helpers import get_duration_range_us, Spans
 
 
@@ -59,3 +59,23 @@ def assert_compatibility(spans: Spans, task_id_dependencies):
         ts0 = max([get_duration_range_us(s).stop for s in spans_from])
         ts1 = min([get_duration_range_us(s).start for s in spans_to])
         assert ts0 < ts1
+
+
+def get_time_range(spans: Spans, function_id: str, inner: bool):
+    task_top_span = one(
+        spans.filter(["name"], "execute-task")
+        # -
+        .filter(["attributes", "task.function_id"], function_id)
+    )
+
+    task_spans = spans.bound_under(task_top_span)
+
+    inner_flag_to_span_dict = {
+        # inner=True: return time range for span used for (inner) python
+        # function call; this is where task cpu resources are reserved.
+        True: one(task_spans.filter(["name"], "call-python-function")),
+        # inner=False: return time range for top span of entire task
+        False: task_top_span,
+    }
+
+    return get_duration_range_us(inner_flag_to_span_dict[inner])
