@@ -18,8 +18,8 @@ from .nb_test_helpers import make_test_nb_task
 # Eg., there would be no notebook artifact logged from a timeout-canceled task
 
 
-@pytest.fixture
-def stuck_notebook_spans() -> Spans:
+@pytest.fixture(scope="module")
+def spans() -> Spans:
     with SpanRecorder() as rec:
         jupytext_task = make_test_nb_task(
             nb_name="notebook_stuck.py",
@@ -32,10 +32,10 @@ def stuck_notebook_spans() -> Spans:
     return rec.spans
 
 
-def test__jupytext__stuck_notebook__validate_spans(stuck_notebook_spans: Spans):
+def test__jupytext__stuck_notebook__validate_spans(spans: Spans):
 
     top_task_span = one(
-        stuck_notebook_spans.filter(["name"], "execute-task")
+        spans.filter(["name"], "execute-task")
         #
         .filter(["attributes", "task.task_type"], "jupytext")
     )
@@ -45,18 +45,18 @@ def test__jupytext__stuck_notebook__validate_spans(stuck_notebook_spans: Spans):
         "status_code": "ERROR",
     }
 
-    timeout_guard_span = one(stuck_notebook_spans.filter(["name"], "timeout-guard"))
+    timeout_guard_span = one(spans.filter(["name"], "timeout-guard"))
     assert timeout_guard_span["status"] == {
         "status_code": "ERROR",
         "description": "Timeout",
     }
 
-    stuck_notebook_spans.contains_path(top_task_span, timeout_guard_span)
+    spans.contains_path(top_task_span, timeout_guard_span)
 
     assert get_duration_s(top_task_span) > get_duration_s(timeout_guard_span) > 10.0
 
-    assert len(stuck_notebook_spans.exception_events()) == 1
+    assert len(spans.exception_events()) == 1
 
     # notebook evaluation never finishes, and is cancled by Ray. Therefore no
     # artefact ipynb content is logged
-    assert len(stuck_notebook_spans.filter(["name"], "artefact")) == 0
+    assert len(spans.filter(["name"], "artefact")) == 0
