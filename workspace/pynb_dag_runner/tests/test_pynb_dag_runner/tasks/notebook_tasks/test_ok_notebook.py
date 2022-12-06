@@ -21,7 +21,7 @@ def spans() -> Spans:
     with SpanRecorder() as rec:
         jupytext_task = make_test_nb_task(
             nb_name="notebook_ok.py",
-            max_nr_retries=2,
+            max_nr_retries=1,
             parameters={"pipeline.foo": "bar", "task.variable_a": "task-value"},
         )
         _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
@@ -62,7 +62,7 @@ def test__jupytext__ok_notebook__validate_parsed_spans_1(spans: Spans):
         expected_task_attributes = {
             **expected_pipeline_attributes,
             "task.variable_a": "task-value",
-            "task.max_nr_retries": 2,
+            "task.max_nr_retries": 1,
             "task.notebook": str(TEST_NOTEBOOK_PATH / "notebook_ok.py"),
             "task.num_cpus": 1,
             "task.task_type": "jupytext",
@@ -112,7 +112,7 @@ def test__jupytext__ok_notebook__validate_parsed_spans_2(spans: Spans):
 
         expected_task_attributes: Dict[str, Any] = {
             "task.variable_a": "task-value",
-            "task.max_nr_retries": 2,
+            "task.max_nr_retries": 1,
             "task.notebook": NB_PATH,
             "task.num_cpus": 1,
             "task.task_type": "jupytext",

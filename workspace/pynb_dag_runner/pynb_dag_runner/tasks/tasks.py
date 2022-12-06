@@ -43,6 +43,9 @@ def make_jupytext_task_ot(
     num_cpus: int = 1,
     parameters: AttributesDict = {},
 ):
+    # added 12/2022: remove support for task retries
+    assert max_nr_retries == 1
+
     # Determine task run-attributes (except baggage which can only be determined at
     # run time).
     run_attributes: AttributesDict = {

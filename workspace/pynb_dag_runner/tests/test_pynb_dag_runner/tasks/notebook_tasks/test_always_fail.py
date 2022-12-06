@@ -14,16 +14,13 @@ from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder, read_key
 from .nb_test_helpers import make_test_nb_task, TEST_NOTEBOOK_PATH
 
 
-N_retries = 3
-
-
 @pytest.fixture(scope="module")
 @lru_cache
 def spans() -> Spans:
     with SpanRecorder() as rec:
         jupytext_task = make_test_nb_task(
             nb_name="notebook_always_fail.py",
-            max_nr_retries=N_retries,
+            max_nr_retries=1,
             parameters={"task.injected_parameter": 19238},
         )
         _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
@@ -52,18 +49,15 @@ def test__jupytext__always_fail__validate_spans(spans: Spans):
 
     top_retry_span = one(spans.filter(["name"], "retry-wrapper"))
     assert spans.contains_path(top_task_span, top_retry_span)
-    assert read_key(top_retry_span, ["attributes", "task.max_nr_retries"]) == N_retries
+    assert read_key(top_retry_span, ["attributes", "task.max_nr_retries"]) == 1
 
-    retry_call_spans = spans.filter(["name"], "retry-call")
-    assert len(retry_call_spans) == N_retries
+    retry_span = one(spans.filter(["name"], "retry-call"))
 
-    for retry_span in retry_call_spans:
-        retry_spans: Spans = spans.bound_under(retry_span)
-        assert len(retry_spans.exception_events()) == 1
+    # there is one exception
+    retry_spans: Spans = spans.bound_under(retry_span)
+    assert len(retry_spans.exception_events()) == 1
 
-        artefact_span = one(retry_spans.filter(["name"], "artefact"))
-        assert (
-            "task.injected_parameter" in artefact_span["attributes"]["content_encoded"]
-        )
+    artefact_span = one(retry_spans.filter(["name"], "artefact"))
+    assert "task.injected_parameter" in artefact_span["attributes"]["content_encoded"]
 
-        spans.contains_path(top_task_span, top_retry_span, retry_span, artefact_span)
+    spans.contains_path(top_task_span, top_retry_span, retry_span, artefact_span)
