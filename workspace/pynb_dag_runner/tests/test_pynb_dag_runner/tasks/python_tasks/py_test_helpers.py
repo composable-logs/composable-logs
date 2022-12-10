@@ -1,8 +1,5 @@
-from typing import List
-
-#
-from pynb_dag_runner.opentelemetry_helpers import SpanId, Spans
-from pynb_dag_runner.helpers import one, pairs, flatten
+from pynb_dag_runner.opentelemetry_helpers import Spans
+from pynb_dag_runner.helpers import one
 from pynb_dag_runner.opentelemetry_helpers import get_duration_range_us, Spans
 
 
