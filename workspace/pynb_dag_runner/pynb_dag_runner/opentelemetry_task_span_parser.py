@@ -20,9 +20,9 @@ from pynb_dag_runner.opentelemetry_helpers import (
 )
 from pynb_dag_runner.notebooks_helpers import convert_ipynb_to_html
 from pynb_dag_runner.tasks.task_opentelemetry_logging import SerializedData
+from pynb_dag_runner.opentelemetry_helpers import iso8601_range_to_epoch_us_range
 
 # -
-from pydantic import BaseModel
 import pydantic as p
 
 
@@ -32,13 +32,11 @@ def extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
     SpanID tuples.
     """
     return set(
-        [
-            (
-                span["attributes"]["from_task_span_id"],
-                span["attributes"]["to_task_span_id"],
-            )
-            for span in spans.filter(["name"], "task-dependency")
-        ]
+        (
+            span["attributes"]["from_task_span_id"],
+            span["attributes"]["to_task_span_id"],
+        )
+        for span in spans.filter(["name"], "task-dependency")
     )
 
 
@@ -238,8 +236,8 @@ class PipelineSummary(p.BaseModel):
 
 class TaskRunSummary(p.BaseModel):
     span_id: str
-    start_time: str
-    end_time: str
+    start_time_iso8601: str
+    end_time_iso8601: str
     duration_s: float
     status: Any
 
@@ -256,8 +254,10 @@ class TaskRunSummary(p.BaseModel):
             )
         return v
 
-    def time_range(self):
-        pass
+    def time_range_epoch_us(self):
+        return iso8601_range_to_epoch_us_range(
+            self.start_time_iso8601, self.end_time_iso8601
+        )
 
 
 def _task_run_iterator(
@@ -282,8 +282,8 @@ def _task_run_iterator(
 
         task_run_summary = TaskRunSummary(
             span_id=task_top_span["context"]["span_id"],
-            start_time=task_top_span["start_time"],
-            end_time=task_top_span["end_time"],
+            start_time_iso8601=task_top_span["start_time"],
+            end_time_iso8601=task_top_span["end_time"],
             duration_s=get_duration_s(task_top_span),
             status=status,
             attributes=task_attributes,
