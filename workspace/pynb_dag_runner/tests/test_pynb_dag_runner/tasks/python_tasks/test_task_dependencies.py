@@ -224,6 +224,4 @@ async def test__python_task__random_sleep_tasks_with_order_dependencies(
 
         assert set(expected_dependencies) == log_dependencies
 
-        # assert_compatibility(spans)
-
     validate_spans(await get_test_spans())

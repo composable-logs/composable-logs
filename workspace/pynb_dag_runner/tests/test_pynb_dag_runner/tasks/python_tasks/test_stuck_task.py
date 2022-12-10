@@ -63,5 +63,3 @@ def test__python_task__otel_logs_for_stuck_task(spans: Spans):
 
     # check nesting of above spans
     assert spans.contains_path(top_task_span, timeout_span)
-
-    # assert_compatibility(spans)

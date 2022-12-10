@@ -18,7 +18,6 @@ from pynb_dag_runner.opentelemetry_task_span_parser import (
 
 from pynb_dag_runner.opentelemetry_helpers import (
     read_key,
-    get_span_exceptions,
     Spans,
     SpanDict,
     SpanRecorder,
@@ -70,13 +69,13 @@ def get_spans(task_should_fail: bool) -> Spans:
 def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
     spans = get_spans(task_should_fail)  # manually get spans for parameter
 
-    pipeline_summary, task_it = get_pipeline_task_artifact_iterators(spans)
+    pipeline_summary, task_run_it = get_pipeline_task_artifact_iterators(spans)
 
     assert pipeline_summary.task_dependencies == []
     expected_pipeline_attributes = {"pipeline.foo": "bar"}
     assert pipeline_summary.attributes == expected_pipeline_attributes
 
-    for task_run_summary, artefact_it in [one(task_it)]:  # type: ignore
+    for task_run_summary, artefact_it in [one(task_run_it)]:  # type: ignore
 
         assert len(task_run_summary.logged_values) == 0
         assert len(artefact_it) == 0

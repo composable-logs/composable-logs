@@ -58,5 +58,3 @@ def test__python_task__parallel_tasks_are_queued_based_on_available_ray_worker_c
     # the intersection of three runtime ranges should always be empty.
     for r1, r2, r3 in itertools.combinations(task_runtime_ranges, 3):
         assert range_is_empty(range_intersection(r1, range_intersection(r2, r3)))
-
-    # assert_compatibility(spans)

@@ -295,7 +295,7 @@ def _task_run_iterator(
 
 def get_pipeline_task_artifact_iterators(
     spans: Spans,
-) -> Tuple[PipelineSummary, Sequence[Tuple[TaskRunSummary, Iterable[ArtefactDict]]]]:
+) -> Tuple[PipelineSummary, Sequence[Tuple[TaskRunSummary, Sequence[ArtefactDict]]]]:
     """
     --- New parser: this will replace `get_pipeline_iterators` ---
 
