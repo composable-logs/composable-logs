@@ -256,6 +256,9 @@ class TaskRunSummary(p.BaseModel):
             )
         return v
 
+    def time_range(self):
+        pass
+
 
 def _task_run_iterator(
     pipeline_attributes: Mapping[str, Any], spans: Spans
@@ -292,7 +295,7 @@ def _task_run_iterator(
 
 def get_pipeline_task_artifact_iterators(
     spans: Spans,
-) -> Tuple[PipelineSummary, Iterable[Tuple[TaskRunSummary, Iterable[ArtefactDict]]]]:
+) -> Tuple[PipelineSummary, Sequence[Tuple[TaskRunSummary, Iterable[ArtefactDict]]]]:
     """
     --- New parser: this will replace `get_pipeline_iterators` ---
 
