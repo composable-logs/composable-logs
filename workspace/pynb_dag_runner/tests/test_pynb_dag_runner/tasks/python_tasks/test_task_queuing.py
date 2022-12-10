@@ -1,6 +1,5 @@
 import time, datetime
 import itertools as it
-from functools import lru_cache
 
 #
 import pytest
@@ -28,7 +27,6 @@ import opentelemetry as ot
 
 
 @pytest.fixture(scope="module")
-@lru_cache
 def spans() -> Spans:
     def f_sleep(_):
         tracer = ot.trace.get_tracer(__name__)

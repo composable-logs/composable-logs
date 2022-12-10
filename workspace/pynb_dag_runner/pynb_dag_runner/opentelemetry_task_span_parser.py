@@ -230,7 +230,7 @@ def get_pipeline_iterators(
 
 
 class PipelineSummary(p.BaseModel):
-    task_dependencies: Any
+    task_dependencies: Set[Any]
     attributes: Mapping[str, Any]
 
 
@@ -325,7 +325,7 @@ def get_pipeline_task_artifact_iterators(
     pipeline_attributes = spans.get_attributes(allowed_prefixes={"pipeline."})
 
     pipeline_summary: PipelineSummary = PipelineSummary(
-        task_dependencies=list(extract_task_dependencies(spans)),
+        task_dependencies=set(extract_task_dependencies(spans)),
         attributes=pipeline_attributes,
     )
 

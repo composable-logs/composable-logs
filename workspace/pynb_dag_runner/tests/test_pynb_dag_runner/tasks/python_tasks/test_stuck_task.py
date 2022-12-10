@@ -1,5 +1,4 @@
 import time
-from functools import lru_cache
 
 #
 import pytest
@@ -24,7 +23,6 @@ from pynb_dag_runner.opentelemetry_task_span_parser import (
 
 
 @pytest.fixture(scope="module")
-@lru_cache
 def spans() -> Spans:
     with SpanRecorder() as rec:
 

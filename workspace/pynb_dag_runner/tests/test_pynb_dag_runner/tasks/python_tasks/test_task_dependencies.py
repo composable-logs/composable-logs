@@ -6,7 +6,9 @@ import pytest
 
 #
 from pynb_dag_runner.opentelemetry_helpers import SpanId, Spans
-from pynb_dag_runner.opentelemetry_task_span_parser import extract_task_dependencies
+from pynb_dag_runner.opentelemetry_task_span_parser import (
+    get_pipeline_task_artifact_iterators,
+)
 from pynb_dag_runner.helpers import (
     one,
     pairs,
@@ -220,8 +222,11 @@ async def test__python_task__random_sleep_tasks_with_order_dependencies(
                     (lookup_task_span_id(dependency), lookup_task_span_id(target_task))
                 ]
 
-        log_dependencies: Set[Tuple[SpanId, SpanId]] = extract_task_dependencies(spans)
+        # -- parse spans --
 
-        assert set(expected_dependencies) == log_dependencies
+        pipeline_summary, task_runs = get_pipeline_task_artifact_iterators(spans)
+
+        assert set(expected_dependencies) == pipeline_summary.task_dependencies
+        assert len(task_runs) == 5
 
     validate_spans(await get_test_spans())

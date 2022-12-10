@@ -71,7 +71,7 @@ def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
 
     pipeline_summary, task_run_it = get_pipeline_task_artifact_iterators(spans)
 
-    assert pipeline_summary.task_dependencies == []
+    assert pipeline_summary.task_dependencies == set()
     expected_pipeline_attributes = {"pipeline.foo": "bar"}
     assert pipeline_summary.attributes == expected_pipeline_attributes
 
