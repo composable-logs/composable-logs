@@ -5,7 +5,6 @@ from typing import (
     Iterable,
     Mapping,
     MutableMapping,
-    Sequence,
     Tuple,
     Set,
     List,
@@ -289,7 +288,7 @@ def _task_run_iterator(
             start_time_iso8601=task_top_span["start_time"],
             end_time_iso8601=task_top_span["end_time"],
             duration_s=get_duration_s(task_top_span),
-            # outcome
+            # was task run a success?
             is_success=len(exceptions) == 0,
             exceptions=exceptions,
             # logged metadata
