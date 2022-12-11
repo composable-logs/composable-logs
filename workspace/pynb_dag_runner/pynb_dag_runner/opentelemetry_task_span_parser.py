@@ -8,6 +8,7 @@ from typing import (
     MutableMapping,
     Union,
     Set,
+    Sequence,
     Tuple,
 )
 
@@ -228,24 +229,42 @@ def get_pipeline_iterators(
 
 # --- new stuff below ---
 
-AttributeKey = str
-AttributeValues = Union[int, float, bool, str]
+# --- artifact ---
+
+ArtifactName = p.StrictStr
+
+
+class Artifact(p.BaseModel):
+    name: ArtifactName
+    type: p.StrictStr
+    content: Union[p.StrictStr, p.StrictBytes]
+
+    @p.validator("type")
+    def validate_type(cls, v):
+        assert v in ["utf-8", "bytes"]
+        return v
+
+
+# --- Model artifact dictionaries ---
+
+AttributeKey = p.StrictStr
+AttributeValues = Union[p.StrictInt, p.StrictFloat, p.StrictBool, p.StrictStr]
 AttributeMapping = Mapping[AttributeKey, AttributeValues]
 
 
 class TaskRunSummary(p.BaseModel):
-    span_id: str
+    span_id: p.StrictStr
 
-    start_time_iso8601: str
-    end_time_iso8601: str
-    duration_s: float
+    start_time_iso8601: p.StrictStr
+    end_time_iso8601: p.StrictStr
+    duration_s: p.StrictFloat
 
-    is_success: bool
+    is_success: p.StrictBool
     exceptions: List[Any]
 
     attributes: AttributeMapping
     logged_values: Any
-    logged_artifacts: Any
+    logged_artifacts: Sequence[Artifact]
 
     @p.validator("span_id")
     def validate_otel_span_id(cls, v):
@@ -260,6 +279,9 @@ class TaskRunSummary(p.BaseModel):
         return iso8601_range_to_epoch_us_range(
             self.start_time_iso8601, self.end_time_iso8601
         )
+
+
+# ---
 
 
 class PipelineSummary(p.BaseModel):
@@ -299,7 +321,9 @@ def _task_run_iterator(
             # logged metadata
             attributes=task_attributes,
             logged_values=list(_get_logged_named_values(spans, task_top_span)),
-            logged_artifacts=list(_artefact_iterator(spans, task_top_span)),
+            logged_artifacts=[
+                Artifact(**a) for a in _artefact_iterator(spans, task_top_span)
+            ],
         )
 
         yield task_run_summary

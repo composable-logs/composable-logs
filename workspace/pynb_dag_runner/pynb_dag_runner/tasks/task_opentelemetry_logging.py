@@ -16,6 +16,7 @@ from opentelemetry.trace.propagation.tracecontext import (
 #
 from pynb_dag_runner.opentelemetry_helpers import Spans
 
+
 # ---- encode/decode functions -----
 
 LoggableTypes = Union[str, bytes, int, float, bool]
