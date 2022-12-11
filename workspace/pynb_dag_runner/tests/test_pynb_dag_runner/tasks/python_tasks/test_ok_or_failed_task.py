@@ -12,9 +12,7 @@ from pynb_dag_runner.core.dag_runner import (
     RemoteTaskP,
     task_from_python_function,
 )
-from pynb_dag_runner.opentelemetry_task_span_parser import (
-    get_pipeline_task_artifact_iterators,
-)
+from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 
 from pynb_dag_runner.opentelemetry_helpers import (
     read_key,
@@ -69,19 +67,17 @@ def get_spans(task_should_fail: bool) -> Spans:
 def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
     spans = get_spans(task_should_fail)  # manually get spans for parameter
 
-    pipeline_summary, task_run_it = get_pipeline_task_artifact_iterators(spans)
+    pipeline_summary = parse_spans(spans)
 
     assert pipeline_summary.task_dependencies == set()
-    expected_pipeline_attributes = {"pipeline.foo": "bar"}
-    assert pipeline_summary.attributes == expected_pipeline_attributes
+    assert pipeline_summary.attributes == {"pipeline.foo": "bar"}
 
-    for task_run_summary, artefact_it in [one(task_run_it)]:  # type: ignore
+    for task_summary in [one(pipeline_summary.task_runs)]:  # type: ignore
+        assert len(task_summary.logged_values) == 0
+        assert len(task_summary.logged_artifacts) == 0
 
-        assert len(task_run_summary.logged_values) == 0
-        assert len(artefact_it) == 0
-
-        assert task_run_summary.is_success == (not task_should_fail)
-        assert task_run_summary.attributes == {
+        assert task_summary.is_success == (not task_should_fail)
+        assert task_summary.attributes == {
             "pipeline.foo": "bar",
             "task.foo": "my_test_func",
             "task.max_nr_retries": 1,
@@ -91,9 +87,9 @@ def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
 
         if task_should_fail:
             # now two exceptions: same exception is raised in function and in runner
-            assert len(task_run_summary.exceptions) == 2
+            assert len(task_summary.exceptions) == 2
 
-            for e in task_run_summary.exceptions:
+            for e in task_summary.exceptions:
                 assert e["attributes"]["exception.message"] == ERROR_MSG
 
 

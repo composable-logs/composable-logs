@@ -15,9 +15,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
 )
-from pynb_dag_runner.opentelemetry_task_span_parser import (
-    get_pipeline_task_artifact_iterators,
-)
+from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 
 #
 from pynb_dag_runner.opentelemetry_helpers import iso8601_range_to_epoch_us_range
@@ -82,22 +80,22 @@ def test__python_task__parallel_tasks_are_queued_based_on_available_ray_worker_c
     spans: Spans,
 ):
 
-    _, task_run_it = get_pipeline_task_artifact_iterators(spans)
-    assert len(task_run_it) == 4
+    pipeline_summary = parse_spans(spans)
+    assert len(pipeline_summary.task_runs) == 4
 
     task_runtime_ranges = []
 
-    for task_run_summary, artefacts in task_run_it:  # type: ignore
-        assert len(artefacts) == 0
+    for task_summary in pipeline_summary.task_runs:  # type: ignore
+        assert task_summary.is_success
+        assert len(task_summary.logged_artifacts) == 0
+        assert len(task_summary.logged_values) == 0
 
         task_runtime_ranges.append(
             iso8601_range_to_epoch_us_range(
-                task_run_summary.attributes["task.inner_start_timestamp"],
-                task_run_summary.attributes["task.inner_end_timestamp"],
+                task_summary.attributes["task.inner_start_timestamp"],
+                task_summary.attributes["task.inner_end_timestamp"],
             )
         )
-
-        assert task_run_summary.is_success
 
     # Check: since only 2 CPU:s are reserved (for unit tests, see above)
     # the intersection of three runtime ranges should always be empty.

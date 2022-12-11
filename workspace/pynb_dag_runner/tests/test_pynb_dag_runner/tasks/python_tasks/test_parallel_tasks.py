@@ -14,9 +14,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
 )
-from pynb_dag_runner.opentelemetry_task_span_parser import (
-    get_pipeline_task_artifact_iterators,
-)
+from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 
 
 @pytest.fixture(scope="module")
@@ -36,18 +34,19 @@ def spans() -> Spans:
 
 
 def test__python_task__parallel_tasks__parse_spans(spans: Spans):
-    _, task_run_it = get_pipeline_task_artifact_iterators(spans)
+    pipeline_summary = parse_spans(spans)
 
     # check attributes
     ids = []
 
     ranges = []
-    for task_run_summary, artefacts in task_run_it:  # type: ignore
-        assert task_run_summary.is_success
-        assert len(artefacts) == 0
+    for task_summary in pipeline_summary.task_runs:  # type: ignore
+        assert task_summary.is_success
+        assert len(task_summary.logged_artifacts) == 0
+        assert len(task_summary.logged_values) == 0
 
-        ids.append(task_run_summary.attributes["task.function_id"])
-        ranges.append(task_run_summary.time_range_epoch_us())
+        ids.append(task_summary.attributes["task.function_id"])
+        ranges.append(task_summary.time_range_epoch_us())
 
     # both tasks were run and found in logs
     assert set(ids) == {"id#0", "id#1"}

@@ -241,6 +241,7 @@ class TaskRunSummary(p.BaseModel):
 
     attributes: Mapping[str, Any]
     logged_values: Any
+    logged_artifacts: Any
 
     @p.validator("span_id")
     def validate_otel_span_id(cls, v):
@@ -258,13 +259,18 @@ class TaskRunSummary(p.BaseModel):
 
 
 class PipelineSummary(p.BaseModel):
-    task_dependencies: Set[Any]
+    # pipeline-level attributes
     attributes: Mapping[str, Any]
+
+    # summaries of all task runs than executed as part of pipeline
+    task_runs: List[TaskRunSummary]
+
+    task_dependencies: Set[Any]
 
 
 def _task_run_iterator(
     pipeline_attributes: Mapping[str, Any], spans: Spans
-) -> Iterable[Tuple[TaskRunSummary, Sequence[ArtefactDict]]]:
+) -> Iterable[TaskRunSummary]:
     for task_top_span in spans.filter(["name"], "execute-task").sort_by_start_time():
         task_attributes: Dict[str, Any] = {
             **pipeline_attributes,  # inherited attributes from pipeline
@@ -289,45 +295,26 @@ def _task_run_iterator(
             # logged metadata
             attributes=task_attributes,
             logged_values=list(_get_logged_named_values(spans, task_top_span)),
+            logged_artifacts=list(_artefact_iterator(spans, task_top_span)),
         )
 
-        yield task_run_summary, list(_artefact_iterator(spans, task_top_span))
+        yield task_run_summary
 
 
-def get_pipeline_task_artifact_iterators(
-    spans: Spans,
-) -> Tuple[PipelineSummary, Sequence[Tuple[TaskRunSummary, Sequence[ArtefactDict]]]]:
+def parse_spans(spans: Spans) -> PipelineSummary:
     """
     --- New parser: this will replace `get_pipeline_iterators` ---
 
-    Returns dict and iterator object to loop over tasks and task artefacts.
+    Parse spans into an easy to use object summarising outcomes of pipeline and
+    individual tasks.
 
     Input is all OpenTelemetry spans logged for one pipeline run.
 
-    Unpack return value as follows:
-
-    ```
-    pipeline_dict, task_run_it = get_pipeline_task_artifact_iterators(spans)
-    # pipeline metadata in pipeline_dict
-
-    # loop over tasks
-    for task_run_dict, run_artifact_it in task_run_it:
-        # task metadata in task_run_dict
-
-        # loop over artifacts logged from task_run_dict
-        for artifact_dict in run_artifact_it:
-            # artifact metadata in artifact_dict
-            ...
-    ```
-
-    Note: this replaces deprecated get_pipeline_iterators (and the new function
-    does not allow for task retries).
     """
     pipeline_attributes = spans.get_attributes(allowed_prefixes={"pipeline."})
 
-    pipeline_summary: PipelineSummary = PipelineSummary(
+    return PipelineSummary(
         task_dependencies=set(extract_task_dependencies(spans)),
         attributes=pipeline_attributes,
+        task_runs=list(_task_run_iterator(pipeline_attributes, spans)),
     )
-
-    return pipeline_summary, list(_task_run_iterator(pipeline_attributes, spans))

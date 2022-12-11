@@ -14,12 +14,9 @@ from pynb_dag_runner.core.dag_runner import (
 )
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
-    SpanDict,
     SpanRecorder,
 )
-from pynb_dag_runner.opentelemetry_task_span_parser import (
-    get_pipeline_task_artifact_iterators,
-)
+from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 
 
 @pytest.fixture(scope="module")
@@ -43,14 +40,14 @@ def spans() -> Spans:
 
 
 def test__python_task__stuck_tasks__parse_spans(spans: Spans):
-    _, task_run_it = get_pipeline_task_artifact_iterators(spans)
+    pipeline_summary = parse_spans(spans)
 
-    for task_run_summary, artefacts in [one(task_run_it)]:  # type: ignore
-        assert len(artefacts) == 0
+    for task_summary in [one(pipeline_summary.task_runs)]:  # type: ignore
+        assert not task_summary.is_success
+        assert "timeout" in str(task_summary.exceptions).lower()
 
-        assert not task_run_summary.is_success
-        assert len(task_run_summary.exceptions) == 1
-        assert "timeout" in str(task_run_summary.exceptions).lower()
+        assert len(task_summary.logged_artifacts) == 0
+        assert len(task_summary.logged_values) == 0
 
-        assert task_run_summary.attributes["task.id"] == "stuck-function"
-        assert task_run_summary.attributes["task.timeout_s"] == 1.0
+        assert task_summary.attributes["task.id"] == "stuck-function"
+        assert task_summary.attributes["task.timeout_s"] == 1.0
