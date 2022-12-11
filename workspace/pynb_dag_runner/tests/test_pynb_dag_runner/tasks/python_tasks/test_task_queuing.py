@@ -97,7 +97,7 @@ def test__python_task__parallel_tasks_are_queued_based_on_available_ray_worker_c
             )
         )
 
-        assert task_run_summary.status == {"status_code": "OK"}
+        assert task_run_summary.is_success
 
     # Check: since only 2 CPU:s are reserved (for unit tests, see above)
     # the intersection of three runtime ranges should always be empty.

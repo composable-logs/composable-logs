@@ -80,25 +80,21 @@ def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
         assert len(task_run_summary.logged_values) == 0
         assert len(artefact_it) == 0
 
+        assert task_run_summary.is_success == (not task_should_fail)
+        assert task_run_summary.attributes == {
+            "pipeline.foo": "bar",
+            "task.foo": "my_test_func",
+            "task.max_nr_retries": 1,
+            "task.num_cpus": 1,
+            "task.task_type": "Python",
+        }
+
         if task_should_fail:
-            assert task_run_summary.status["status_code"] == "ERROR"
-
-            assert task_run_summary.attributes == {
-                "pipeline.foo": "bar",
-                "task.foo": "my_test_func",
-                "task.max_nr_retries": 1,
-                "task.num_cpus": 1,
-                "task.task_type": "Python",
-            }
-
             # now two exceptions: same exception is raised in function and in runner
-            assert len(task_run_summary.status["exceptions"]) == 2
+            assert len(task_run_summary.exceptions) == 2
 
-            for e in task_run_summary.status["exceptions"]:
+            for e in task_run_summary.exceptions:
                 assert e["attributes"]["exception.message"] == ERROR_MSG
-
-        else:
-            assert task_run_summary.status == {"status_code": "OK"}
 
 
 def test__python_task__ok_or_fail__validate_spans():

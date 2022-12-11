@@ -48,11 +48,9 @@ def test__python_task__stuck_tasks__parse_spans(spans: Spans):
     for task_run_summary, artefacts in [one(task_run_it)]:  # type: ignore
         assert len(artefacts) == 0
 
+        assert not task_run_summary.is_success
+        assert len(task_run_summary.exceptions) == 1
+        assert "timeout" in str(task_run_summary.exceptions).lower()
+
         assert task_run_summary.attributes["task.id"] == "stuck-function"
         assert task_run_summary.attributes["task.timeout_s"] == 1.0
-        assert task_run_summary.status["status_code"] == "ERROR"
-
-        # -
-        exceptions = task_run_summary.status["exceptions"]
-        assert len(exceptions) == 1
-        assert "timeout" in str(exceptions).lower()

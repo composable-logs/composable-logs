@@ -229,19 +229,16 @@ def get_pipeline_iterators(
 # --- new stuff below ---
 
 
-class PipelineSummary(p.BaseModel):
-    task_dependencies: Set[Any]
-    attributes: Mapping[str, Any]
-
-
 class TaskRunSummary(p.BaseModel):
     span_id: str
+
     start_time_iso8601: str
     end_time_iso8601: str
     duration_s: float
-    status: Any
 
-    # -
+    is_success: bool
+    exceptions: List[Any]
+
     attributes: Mapping[str, Any]
     logged_values: Any
 
@@ -260,6 +257,11 @@ class TaskRunSummary(p.BaseModel):
         )
 
 
+class PipelineSummary(p.BaseModel):
+    task_dependencies: Set[Any]
+    attributes: Mapping[str, Any]
+
+
 def _task_run_iterator(
     pipeline_attributes: Mapping[str, Any], spans: Spans
 ) -> Iterable[Tuple[TaskRunSummary, Sequence[ArtefactDict]]]:
@@ -273,19 +275,18 @@ def _task_run_iterator(
             ),
         }
 
-        # determine status
         exceptions = spans.bound_inclusive(task_top_span).exception_events()
-        if len(exceptions) == 0:
-            status = {"status_code": "OK"}
-        else:
-            status = {"status_code": "ERROR", "exceptions": exceptions}
 
         task_run_summary = TaskRunSummary(
             span_id=task_top_span["context"]["span_id"],
+            # timing
             start_time_iso8601=task_top_span["start_time"],
             end_time_iso8601=task_top_span["end_time"],
             duration_s=get_duration_s(task_top_span),
-            status=status,
+            # outcome
+            is_success=len(exceptions) == 0,
+            exceptions=exceptions,
+            # logged metadata
             attributes=task_attributes,
             logged_values=list(_get_logged_named_values(spans, task_top_span)),
         )

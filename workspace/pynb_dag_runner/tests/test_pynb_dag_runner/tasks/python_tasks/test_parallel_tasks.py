@@ -43,6 +43,7 @@ def test__python_task__parallel_tasks__parse_spans(spans: Spans):
 
     ranges = []
     for task_run_summary, artefacts in task_run_it:  # type: ignore
+        assert task_run_summary.is_success
         assert len(artefacts) == 0
 
         ids.append(task_run_summary.attributes["task.function_id"])
