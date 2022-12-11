@@ -12,9 +12,10 @@ from pynb_dag_runner.core.dag_runner import (
     RemoteTaskP,
     task_from_python_function,
 )
+from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
+
 from pynb_dag_runner.opentelemetry_helpers import (
     read_key,
-    get_span_exceptions,
     Spans,
     SpanDict,
     SpanRecorder,
@@ -46,7 +47,7 @@ def get_spans(task_should_fail: bool) -> Spans:
                 return 123
 
         task: RemoteTaskP = task_from_python_function(
-            f, attributes={"task.foo": "my_test_func"}
+            f, attributes={"pipeline.foo": "bar", "task.foo": "my_test_func"}
         )
         [outcome] = start_and_await_tasks(
             [task], [task], timeout_s=10, arg="dummy value"
@@ -63,8 +64,37 @@ def get_spans(task_should_fail: bool) -> Spans:
 
 
 @pytest.mark.parametrize("task_should_fail", [True, False])
-def test__python_task__ok_or_fail__validate_spans(task_should_fail: bool):
+def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
     spans = get_spans(task_should_fail)  # manually get spans for parameter
+
+    pipeline_summary = parse_spans(spans)
+
+    assert pipeline_summary.task_dependencies == set()
+    assert pipeline_summary.attributes == {"pipeline.foo": "bar"}
+
+    for task_summary in [one(pipeline_summary.task_runs)]:  # type: ignore
+        assert len(task_summary.logged_values) == 0
+        assert len(task_summary.logged_artifacts) == 0
+
+        assert task_summary.is_success == (not task_should_fail)
+        assert task_summary.attributes == {
+            "pipeline.foo": "bar",
+            "task.foo": "my_test_func",
+            "task.max_nr_retries": 1,
+            "task.num_cpus": 1,
+            "task.task_type": "Python",
+        }
+
+        if task_should_fail:
+            # now two exceptions: same exception is raised in function and in runner
+            assert len(task_summary.exceptions) == 2
+
+            for e in task_summary.exceptions:
+                assert e["attributes"]["exception.message"] == ERROR_MSG
+
+
+def test__python_task__ok_or_fail__validate_spans():
+    spans = get_spans(task_should_fail=False)
 
     assert len(spans.filter(["name"], "task-dependency")) == 0
 
@@ -72,28 +102,7 @@ def test__python_task__ok_or_fail__validate_spans(task_should_fail: bool):
     assert read_key(top_task_span, ["attributes", "task.foo"]) == "my_test_func"
     assert read_key(top_task_span, ["attributes", "task.task_type"]) == "Python"
 
-    error_spans: Spans = Spans(
-        [span for span in spans if len(get_span_exceptions(span)) > 0]
-    )
-    if task_should_fail:
-        assert len(error_spans) > 0
-
-        assert top_task_span["status"] == {
-            "status_code": "ERROR",
-            "description": "Remote function call failed",
-        }
-    else:
-        assert len(error_spans) == 0
-        assert top_task_span["status"] == {"status_code": "OK"}
-
-    # --- check retry spans ---
-    retry_wrapper_span = one(spans.filter(["name"], "retry-wrapper"))
-    assert spans.contains_path(top_task_span, retry_wrapper_span)
-    assert read_key(retry_wrapper_span, ["attributes", "task.max_nr_retries"]) == 1
-
-    retry_span = one(spans.filter(["name"], "retry-call"))
-    assert spans.contains_path(top_task_span, retry_wrapper_span, retry_span)
-    assert read_key(retry_span, ["attributes", "run.retry_nr"]) == 0
+    assert len(spans.bound_inclusive(top_task_span).exception_events()) == 0
 
     # --- check timeout-guard span ---
     timeout_span: SpanDict = one(spans.filter(["name"], "timeout-guard"))
@@ -101,27 +110,11 @@ def test__python_task__ok_or_fail__validate_spans(task_should_fail: bool):
 
     # --- check call-python-function span ---
     call_function_span: SpanDict = one(spans.filter(["name"], "call-python-function"))
-
-    if task_should_fail:
-        assert call_function_span["status"] == {
-            "status_code": "ERROR",
-            "description": "Failure",
-        }
-
-        # call span should record exception from function
-        call_function_span_exception = one(get_span_exceptions(call_function_span))[
-            "attributes"
-        ]
-        assert call_function_span_exception["exception.type"] == "Exception"
-        assert call_function_span_exception["exception.message"] == ERROR_MSG
-    else:
-        assert call_function_span["status"] == {"status_code": "OK"}
+    assert call_function_span["status"] == {"status_code": "OK"}
 
     # check nesting of above spans
     assert spans.contains_path(
         top_task_span,
-        retry_wrapper_span,
-        retry_span,
         timeout_span,
         call_function_span,
     )

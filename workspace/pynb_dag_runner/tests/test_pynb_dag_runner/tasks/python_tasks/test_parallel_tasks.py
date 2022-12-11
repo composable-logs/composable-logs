@@ -14,8 +14,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
 )
-
-from .py_test_helpers import get_time_range
+from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 
 
 @pytest.fixture(scope="module")
@@ -34,14 +33,24 @@ def spans() -> Spans:
     return rec.spans
 
 
-def test__python_task__run_in_parallel(spans: Spans):
-    assert len(spans.filter(["name"], "execute-task")) == 2
+def test__python_task__parallel_tasks__parse_spans(spans: Spans):
+    pipeline_summary = parse_spans(spans)
 
-    t0_us_range = get_time_range(spans, "id#0", inner=False)
-    t1_us_range = get_time_range(spans, "id#1", inner=False)
+    # check attributes
+    ids = []
+
+    ranges = []
+    for task_summary in pipeline_summary.task_runs:  # type: ignore
+        assert task_summary.is_success
+        assert len(task_summary.logged_artifacts) == 0
+        assert len(task_summary.logged_values) == 0
+
+        ids.append(task_summary.attributes["task.function_id"])
+        ranges.append(task_summary.time_range_epoch_us())
+
+    # both tasks were run and found in logs
+    assert set(ids) == {"id#0", "id#1"}
 
     # Check: since there are no order constraints, the time ranges should
-    # overlap provided tests are run on 2+ CPUs
-    assert range_intersect(t0_us_range, t1_us_range)
-
-    # assert_compatibility(spans)
+    # overlap provided tests are run on 2+ CPU cores
+    assert range_intersect(*ranges)

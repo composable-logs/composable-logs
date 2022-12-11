@@ -122,10 +122,14 @@ def iso8601_to_epoch_s(iso8601_datetime: str) -> float:
     return dp.parse(iso8601_datetime).timestamp()
 
 
-def get_duration_range_us(span: SpanDict):
-    start_epoch_us: int = int(iso8601_to_epoch_s(span["start_time"]) * 1e6)
-    end_epoch_us: int = int(iso8601_to_epoch_s(span["end_time"]) * 1e6)
+def iso8601_range_to_epoch_us_range(iso8601_start, iso8601_end):
+    start_epoch_us: int = int(iso8601_to_epoch_s(iso8601_start) * 1e6)
+    end_epoch_us: int = int(iso8601_to_epoch_s(iso8601_end) * 1e6)
     return range(start_epoch_us, end_epoch_us)
+
+
+def get_duration_range_us(span: SpanDict):
+    return iso8601_range_to_epoch_us_range(span["start_time"], span["end_time"])
 
 
 def get_duration_s(span: SpanDict) -> float:
