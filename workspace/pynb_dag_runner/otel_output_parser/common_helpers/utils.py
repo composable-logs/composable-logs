@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Dict, TypeVar
+from typing import Any, TypeVar
 import dateutil.parser as dp  # type: ignore
 
 A = TypeVar("A")
@@ -20,10 +20,6 @@ def ensure_dir_exist(p: Path) -> Path:
     """
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
-
-
-def del_key(a_dict: Dict[A, B], key: A) -> Dict[A, B]:
-    return {k: v for k, v in a_dict.items() if k != key}
 
 
 def iso8601_to_epoch_s(iso8601_datetime: str) -> float:

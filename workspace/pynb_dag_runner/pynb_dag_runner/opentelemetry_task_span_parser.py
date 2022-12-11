@@ -3,11 +3,12 @@ from typing import (
     Any,
     Dict,
     Iterable,
+    List,
     Mapping,
     MutableMapping,
-    Tuple,
+    Union,
     Set,
-    List,
+    Tuple,
 )
 
 #
@@ -227,6 +228,10 @@ def get_pipeline_iterators(
 
 # --- new stuff below ---
 
+AttributeKey = str
+AttributeValues = Union[int, float, bool, str]
+AttributeMapping = Mapping[AttributeKey, AttributeValues]
+
 
 class TaskRunSummary(p.BaseModel):
     span_id: str
@@ -238,7 +243,7 @@ class TaskRunSummary(p.BaseModel):
     is_success: bool
     exceptions: List[Any]
 
-    attributes: Mapping[str, Any]
+    attributes: AttributeMapping
     logged_values: Any
     logged_artifacts: Any
 
@@ -259,7 +264,7 @@ class TaskRunSummary(p.BaseModel):
 
 class PipelineSummary(p.BaseModel):
     # pipeline-level attributes
-    attributes: Mapping[str, Any]
+    attributes: AttributeMapping
 
     # summaries of all task runs than executed as part of pipeline
     task_runs: List[TaskRunSummary]

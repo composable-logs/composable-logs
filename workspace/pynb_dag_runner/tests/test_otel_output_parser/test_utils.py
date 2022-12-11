@@ -4,9 +4,7 @@ from pathlib import Path
 #
 from otel_output_parser.common_helpers.utils import (
     bytes_to_json,
-    del_key,
     ensure_dir_exist,
-    del_key,
     iso8601_to_epoch_ms,
 )
 
@@ -27,14 +25,6 @@ def test_ensure_dir_exist(tmp_path: Path):
     ensure_dir_exist(filepath).write_text(test_data)
 
     assert test_data == filepath.read_text()
-
-
-def test_del_key():
-    a_dict = {"a": 1, "b": 2, "c": 3}
-    b_dict = del_key(a_dict, "b")
-
-    a_dict["a"] = 12345
-    assert {"a": 1, "c": 3} == b_dict
 
 
 def test_iso8601_to_epoch_ms():

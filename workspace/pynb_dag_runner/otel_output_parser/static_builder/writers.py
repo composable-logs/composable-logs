@@ -4,9 +4,11 @@ from typing import Any, List, Optional
 from pathlib import Path
 
 #
+from pynb_dag_runner.helpers import del_key
+
+#
 from otel_output_parser.common_helpers.utils import (
     ensure_dir_exist,
-    del_key,
     iso8601_to_epoch_ms,
 )
 from otel_output_parser.common_helpers.graph import Graph
