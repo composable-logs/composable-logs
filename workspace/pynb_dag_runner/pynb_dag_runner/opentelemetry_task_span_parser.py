@@ -330,6 +330,7 @@ class TaskRunSummary(p.BaseModel):
 
     start_time_iso8601: p.StrictStr
     end_time_iso8601: p.StrictStr
+
     duration_s: p.StrictFloat
 
     is_success: p.StrictBool
@@ -339,6 +340,14 @@ class TaskRunSummary(p.BaseModel):
     logged_values: Dict[LoggedValueName, LoggedValueContent]
     logged_artifacts: Dict[ArtifactName, ArtifactContent]
 
+    def get_task_timestamp_range_us_epoch(self):
+        """
+        Return task execution timestamp range (as a range expressed in unix epoch us)
+        """
+        return iso8601_range_to_epoch_us_range(
+            self.start_time_iso8601, self.end_time_iso8601
+        )
+
     @p.validator("span_id")
     def validate_otel_span_id(cls, v):
         if not v.startswith("0x"):
@@ -347,11 +356,6 @@ class TaskRunSummary(p.BaseModel):
                 "Expected id to start with 0x."
             )
         return v
-
-    def time_range_epoch_us(self):
-        return iso8601_range_to_epoch_us_range(
-            self.start_time_iso8601, self.end_time_iso8601
-        )
 
 
 # --- Data structure to represent: pipeline (of multiple tasks) run summary ---

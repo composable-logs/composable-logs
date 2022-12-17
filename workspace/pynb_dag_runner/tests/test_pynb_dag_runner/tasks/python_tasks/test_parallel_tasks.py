@@ -46,7 +46,7 @@ def test__python_task__parallel_tasks__parse_spans(spans: Spans):
         assert len(task_summary.logged_values) == 0
 
         ids.append(task_summary.attributes["task.function_id"])
-        ranges.append(task_summary.time_range_epoch_us())
+        ranges.append(task_summary.get_task_timestamp_range_us_epoch())
 
     # both tasks were run and found in logs
     assert set(ids) == {"id#0", "id#1"}

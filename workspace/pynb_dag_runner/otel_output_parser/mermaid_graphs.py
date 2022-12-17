@@ -2,9 +2,14 @@ import datetime
 from typing import List, Tuple
 
 #
-from pynb_dag_runner.opentelemetry_helpers import Spans, get_duration_range_us
+from pynb_dag_runner.opentelemetry_helpers import (
+    Spans,
+    get_duration_range_us,
+    iso8601_range_to_epoch_us_range,
+)
 from pynb_dag_runner.opentelemetry_task_span_parser import (
     get_pipeline_iterators,
+    parse_spans,
 )
 
 
@@ -106,7 +111,7 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
 def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     """
     Generate input file for Mermaid diagram generator for creating Gantt diagram
-    of tasks/runs found in spans.
+    of tasks that have run.
     """
     output_lines = [
         "gantt",
@@ -119,38 +124,33 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
         "    dateFormat x",
         "    %%",
     ]
+    pipeline_summary = parse_spans(spans)
 
-    _, task_it = get_pipeline_iterators(spans)
+    for task_run_summary in pipeline_summary.task_runs:
+        attributes = task_run_summary.attributes
 
-    for task_dict, task_retry_it in task_it:
-        print("task", task_dict)
-        print(get_duration_range_us(task_dict).start)
+        if attributes["task.task_type"] != "jupytext":
+            raise Exception(f"Unknown task type for {task_run_summary.attributes}")
 
-        # -- write json with task-specific data --
-        if task_dict["attributes"]["task.task_type"] != "jupytext":
-            raise Exception(f"Unknown task type for {task_dict}")
+        output_lines += [f"""    section {attributes["task.notebook"]}"""]
 
-        output_lines += [f"""    section {task_dict["attributes"]["task.notebook"]}"""]
+        if task_run_summary.is_success:
+            description = "OK"
+            modifier = ""
+        else:
+            description = "FAILED"
+            modifier = "crit"
 
-        for task_run_dict, _ in task_retry_it:
-            print("run", task_run_dict)
-
-            if _status_summary(task_run_dict) == "OK":
-                modifier = ""
-            else:
-                modifier = "crit"
-
-            us_range = get_duration_range_us(task_run_dict)
-
-            output_lines += [
-                ", ".join(
-                    [
-                        f"""    {render_seconds(us_range)} - {_status_summary(task_run_dict)} :{modifier} """,
-                        f"""{us_range.start // 1000000} """,
-                        f"""{us_range.stop // 1000000} """,
-                    ]
-                )
-            ]
+        us_range = task_run_summary.get_task_timestamp_range_us_epoch()
+        output_lines += [
+            ", ".join(
+                [
+                    f"""    {render_seconds(us_range)} - {description} :{modifier} """,
+                    f"""{us_range.start // 1000000} """,
+                    f"""{us_range.stop // 1000000} """,
+                ]
+            )
+        ]
 
     return "\n".join(output_lines)
 

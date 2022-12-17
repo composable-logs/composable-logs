@@ -155,3 +155,5 @@ def entry_point():
         nolinks_output_path.write_text(
             make_mermaid_dag_inputfile(spans, generate_links=False)
         )
+
+    print(" - Done")
