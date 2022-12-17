@@ -1,8 +1,20 @@
 import json
 from pathlib import Path
-from typing import Any, Generic, TypeVar, List, Iterable, Sequence, Tuple, Optional
+from typing import (
+    Any,
+    Dict,
+    Generic,
+    TypeVar,
+    List,
+    Mapping,
+    Iterable,
+    Sequence,
+    Tuple,
+    Optional,
+)
 
 A = TypeVar("A")
+B = TypeVar("B")
 
 # --- range helper functions ---
 
@@ -35,7 +47,7 @@ def range_intersect(range1, range2) -> bool:
     return not range_is_empty(range_intersection(range1, range2))
 
 
-# --- sequence helper functions ---
+# --- sequence/data manipulation helper functions ---
 
 
 def _is_iterable(maybe_iterable):
@@ -82,6 +94,16 @@ def one(xs: Iterable[A]) -> A:
         )
 
     return xs_list[0]
+
+
+def del_key(a_dict: Mapping[A, B], key: A) -> Mapping[A, B]:
+    """
+    Return new dictionary that is identical to `a_dict` with `key`
+    removed (if `key` exists).
+
+    Input dictionary is not modified.
+    """
+    return {k: v for k, v in a_dict.items() if k != key}
 
 
 # --- function helper functions ---

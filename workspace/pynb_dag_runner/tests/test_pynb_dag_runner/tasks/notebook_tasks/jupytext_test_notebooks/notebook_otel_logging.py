@@ -44,20 +44,23 @@ logger.log_string("string_abc", "abc")
 
 # %%
 
-# Trying to log None with typed-loggers will fail
-
-
-def assert_fails(f):
-    try:
-        f()
-    except:
-        return
-    raise Exception("function call did not raise Exception")
-
-
-assert_fails(lambda: logger.log_value("value_fail", None))  # type: ignore
-assert_fails(lambda: logger.log_boolean("bool_fail", None))  # type: ignore
-assert_fails(lambda: logger.log_int("int_fail", None))  # type: ignore
-assert_fails(lambda: logger.log_float("float_fail", None))  # type: ignore
-assert_fails(lambda: logger.log_string("string_fail", None))  # type: ignore
+# Trying to log None with typed-loggers should fail
+#
+# TODO: Check this.
+# TODO: It seems an exception is logged even if we catch the exception
+# TODO: what should be behavior?
+#
+# def assert_fails(f):
+#     try:
+#         f()
+#     except:
+#         return
+#     raise Exception("function call did not raise Exception")
+#
+#
+# assert_fails(lambda: logger.log_value("value_fail", None))  # type: ignore
+# assert_fails(lambda: logger.log_boolean("bool_fail", None))  # type: ignore
+# assert_fails(lambda: logger.log_int("int_fail", None))  # type: ignore
+# assert_fails(lambda: logger.log_float("float_fail", None))  # type: ignore
+# assert_fails(lambda: logger.log_string("string_fail", None))  # type: ignore
 # %%

@@ -6,11 +6,13 @@ import pytest
 
 #
 from pynb_dag_runner.helpers import (
+    del_key,
     range_is_empty,
     range_intersection,
     range_intersect,
     flatten,
     compose,
+    del_key,
     write_json,
     read_json,
     one,
@@ -101,6 +103,14 @@ def test_one():
 def test_one_raises_exception():
     with pytest.raises(Exception):
         assert one([1, 2])
+
+
+def test_del_key():
+    a_dict = {"a": 1, "b": 2, "c": 3}
+    b_dict = del_key(a_dict, "b")
+
+    a_dict["a"] = 12345
+    assert {"a": 1, "c": 3} == b_dict
 
 
 # --- function helper functions ---
