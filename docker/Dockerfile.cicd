@@ -7,6 +7,8 @@ COPY requirements.txt /home/host_user/
 
 # See https://github.com/jupyter/nbconvert/issues/1736 re jinja2 constraint
 # See https://stackoverflow.com/questions/72441758 re protobuf constraint
+# 2022/12 jsonschema[format-nongpl]==4.3.0 constraint added due to problems running cli:s
+#
 RUN pip3 install --user -r /home/host_user/requirements.txt
 
 RUN pip3 install --quiet --user \
