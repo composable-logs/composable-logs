@@ -2,17 +2,8 @@ import datetime
 from typing import List, Tuple
 
 #
-from pynb_dag_runner.opentelemetry_helpers import Spans, get_duration_range_us
-from pynb_dag_runner.opentelemetry_task_span_parser import (
-    get_pipeline_iterators,
-)
-
-
-def _status_summary(span_dict) -> str:
-    if span_dict["status"]["status_code"] == "OK":
-        return "OK"
-    else:
-        return "FAILED"
+from pynb_dag_runner.opentelemetry_helpers import Spans
+from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 
 
 def render_seconds(us_range) -> str:
@@ -29,6 +20,27 @@ def render_seconds(us_range) -> str:
             .replace("0h ", "")
             .replace("00m ", "")
         )
+
+
+def make_link_to_task_run(task_summary) -> str:
+    # -- This is not provided during unit tests
+    if "pipeline.github.repository" in task_summary.attributes:
+        repo_owner, repo_name = task_summary.attributes[
+            "pipeline.github.repository"
+        ].split("/")
+
+        host = f"https://{repo_owner}.github.io/{repo_name}"
+    else:
+        host = "."
+
+    # Determine experiment name, eg 'notebooks/summary.py' -> 'summary'
+    task_id = task_summary.attributes["task.notebook"].split("/")[-1].replace(".py", "")
+
+    # Breaking change 12/2022:
+    #    previously last span was id for run of task. This is now changed to the
+    #    span-id of the task (and we hereafter assume that there is only one run
+    #    per task).
+    return f"{host}/#/experiments/{task_id}/runs/{task_summary.span_id}"
 
 
 def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
@@ -48,30 +60,30 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
         "    %%",
     ]
 
-    pipeline_dict, task_it = get_pipeline_iterators(spans)
+    pipeline_summary = parse_spans(spans)
 
     def dag_node_id(span_id: str) -> str:
         # span_id:s are of form "0x<hex>" and can not be used as Mermaid node_ids as-is.
         return f"TASK_SPAN_ID_{span_id}"
 
-    def dag_node_description(task_dict) -> Tuple[str, List[str]]:
-        assert task_dict["attributes"]["task.task_type"] == "jupytext"
+    def dag_node_description(attributes) -> Tuple[str, List[str]]:
+        assert attributes["task.task_type"] == "jupytext"
 
         out_lines = []
-        for k, v in task_dict["attributes"].items():
+        for k, v in attributes.items():
             if k.startswith("task.") and k not in ["task.task_type", "task.notebook"]:
                 out_lines += [f"{k}={v}"]
 
         # here one could potentially also add total length of task w.
         # outcome status (success/failure)
         return (
-            task_dict["attributes"]["task.notebook"] + " (jupytext task)",
+            attributes["task.notebook"] + " (jupytext task)",
             list(sorted(out_lines)),
         )
 
-    def make_link(desc: str, attrs: List[str], last_run_dict) -> str:
+    def make_link(desc: str, attrs: List[str], task_summary) -> str:
         if generate_links:
-            url: str = make_link_to_task_run(last_run_dict)
+            url: str = make_link_to_task_run(task_summary)
             link_html_text: str = f"<b>{desc} 🔗</b> <br />" + "<br />".join(attrs)
 
             return (
@@ -82,20 +94,19 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
         else:
             return desc
 
-    for task_dict, run_it in task_it:
-        last_run_dict, _ = list(run_it)[-1]
+    for task_summary in pipeline_summary.task_runs:
+        if task_summary.attributes["task.task_type"] != "jupytext":
+            raise Exception(f"Unknown task type for {task_summary}")
 
-        if task_dict["attributes"]["task.task_type"] != "jupytext":
-            raise Exception(f"Unknown task type for {task_dict}")
-
-        linkify = lambda x, ys: make_link(x, ys, last_run_dict)
+        linkify = lambda x, ys: make_link(x, ys, task_summary)
 
         output_lines += [
-            f"    {dag_node_id(task_dict['span_id'])}"
-            f"""["{linkify(*dag_node_description(task_dict))}"]"""
+            f"    {dag_node_id(task_summary.span_id)}"
+            f"""["{linkify(*dag_node_description(task_summary.attributes))}"]"""
         ]
 
-    for span_id_from, span_id_to in pipeline_dict["task_dependencies"]:
+    # add links between noded in graph
+    for span_id_from, span_id_to in pipeline_summary.task_dependencies:
         output_lines += [
             f"    {dag_node_id(span_id_from)} --> {dag_node_id(span_id_to)}"
         ]
@@ -106,7 +117,7 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
 def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     """
     Generate input file for Mermaid diagram generator for creating Gantt diagram
-    of tasks/runs found in spans.
+    of tasks that have run.
     """
     output_lines = [
         "gantt",
@@ -119,58 +130,32 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
         "    dateFormat x",
         "    %%",
     ]
+    pipeline_summary = parse_spans(spans)
 
-    _, task_it = get_pipeline_iterators(spans)
+    for task_run_summary in pipeline_summary.task_runs:
+        attributes = task_run_summary.attributes
 
-    for task_dict, task_retry_it in task_it:
-        print("task", task_dict)
-        print(get_duration_range_us(task_dict).start)
+        if attributes["task.task_type"] != "jupytext":
+            raise Exception(f"Unknown task type for {task_run_summary.attributes}")
 
-        # -- write json with task-specific data --
-        if task_dict["attributes"]["task.task_type"] != "jupytext":
-            raise Exception(f"Unknown task type for {task_dict}")
+        output_lines += [f"""    section {attributes["task.notebook"]}"""]
 
-        output_lines += [f"""    section {task_dict["attributes"]["task.notebook"]}"""]
+        if task_run_summary.is_success:
+            description = "OK"
+            modifier = ""
+        else:
+            description = "FAILED"
+            modifier = "crit"
 
-        for task_run_dict, _ in task_retry_it:
-            print("run", task_run_dict)
-
-            if _status_summary(task_run_dict) == "OK":
-                modifier = ""
-            else:
-                modifier = "crit"
-
-            us_range = get_duration_range_us(task_run_dict)
-
-            output_lines += [
-                ", ".join(
-                    [
-                        f"""    {render_seconds(us_range)} - {_status_summary(task_run_dict)} :{modifier} """,
-                        f"""{us_range.start // 1000000} """,
-                        f"""{us_range.stop // 1000000} """,
-                    ]
-                )
-            ]
+        us_range = task_run_summary.get_task_timestamp_range_us_epoch()
+        output_lines += [
+            ", ".join(
+                [
+                    f"""    {render_seconds(us_range)} - {description} :{modifier} """,
+                    f"""{us_range.start // 1000000} """,
+                    f"""{us_range.stop // 1000000} """,
+                ]
+            )
+        ]
 
     return "\n".join(output_lines)
-
-
-def make_link_to_task_run(task_run_dict) -> str:
-    # -- This is not provided during unit tests
-    if "pipeline.github.repository" in task_run_dict["attributes"]:
-        repo_owner, repo_name = task_run_dict["attributes"][
-            "pipeline.github.repository"
-        ].split("/")
-
-        host = f"https://{repo_owner}.github.io/{repo_name}"
-    else:
-        host = "."
-
-    task_id = (
-        task_run_dict["attributes"]["task.notebook"]
-        # -
-        .split("/")[-1].replace(".py", "")
-    )
-    run_span_id = task_run_dict["span_id"]
-
-    return f"{host}/#/experiments/{task_id}/runs/{run_span_id}"
