@@ -45,11 +45,11 @@ def test__jupytext__ok_notebook__parse_spans(spans: Spans):
     }
 
     # Check properties of artifact with the evaluated notebook
-    artifact = one(task_summary.logged_artifacts)
+    artifact_name, artifact = one(task_summary.logged_artifacts.items())
     assert isinstance(artifact.content, str)
     assert len(artifact.content) > 1000
     assert artifact.type == "utf-8"
-    assert artifact.name == "notebook.ipynb"
+    assert artifact_name == "notebook.ipynb"
 
     # Notebook prints:
     #  - 1 + 12 + 123 + 1234 + 12345

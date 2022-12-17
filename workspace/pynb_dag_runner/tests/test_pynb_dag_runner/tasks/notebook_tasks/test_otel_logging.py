@@ -9,7 +9,7 @@ import pytest
 from pynb_dag_runner.tasks.task_opentelemetry_logging import SerializedData
 from pynb_dag_runner.core.dag_runner import start_and_await_tasks
 from pynb_dag_runner.helpers import one
-from pynb_dag_runner.opentelemetry_task_span_parser import get_pipeline_iterators
+from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
@@ -20,7 +20,7 @@ from otel_output_parser.cli_pynb_log_parser import (
     make_mermaid_dag_inputfile,
 )
 
-from .nb_test_helpers import assert_no_exceptions, make_test_nb_task, TEST_NOTEBOOK_PATH
+from .nb_test_helpers import make_test_nb_task
 
 
 @pytest.fixture(scope="module")
@@ -44,29 +44,6 @@ def spans() -> Spans:
 
 
 def test__jupytext__otel_logging_from_notebook__validate_spans(spans: Spans):
-    assert_no_exceptions(spans)
-
-    jupytext_span = one(
-        spans.filter(["name"], "execute-task")
-        #
-        .filter(["attributes", "task.task_type"], "jupytext")
-        #
-        .filter(["status", "status_code"], "OK")
-    )
-
-    artefacts_span = one(
-        spans.filter(["name"], "artefact")
-        #
-        .filter(["attributes", "name"], "README.md")
-        #
-        .filter(["status", "status_code"], "OK")
-    )
-    assert artefacts_span["attributes"]["content_encoded"] == "foobar123"
-    assert artefacts_span["attributes"]["encoding"] == "utf-8"
-
-    # artefacts logged from notebook are logged as subspans under the notebook span
-    assert spans.contains_path(jupytext_span, artefacts_span)
-
     def check_named_value(key, value):
         value_span = one(
             spans.filter(["name"], "named-value")
@@ -75,7 +52,6 @@ def test__jupytext__otel_logging_from_notebook__validate_spans(spans: Spans):
             #
             .filter(["status", "status_code"], "OK")
         )
-        assert spans.contains_path(jupytext_span, value_span)
         assert (
             SerializedData(
                 type=value_span["attributes"]["type"],
@@ -99,25 +75,25 @@ def test__jupytext__otel_logging_from_notebook__validate_spans(spans: Spans):
     check_named_value("string_abc", "abc")
 
 
-def test__jupytext__otel_logging_from_notebook__validate_parsed_spans(spans: Spans):
-    _, task_it = get_pipeline_iterators(spans)
+def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans: Spans):
+    pipeline_summary = parse_spans(spans)
 
-    for _, run_it in [one(task_it)]:  # type: ignore
-        for _, artefact_it in [one(run_it)]:  # type: ignore
-            artefacts = {a["name"]: a for a in artefact_it}
+    assert pipeline_summary.is_success()
 
-            assert artefacts["README.md"] == {
-                "name": "README.md",
-                "type": "utf-8",
-                "content": "foobar123",
-            }
-            assert artefacts["class_a/binary.bin"] == {
-                "name": "class_a/binary.bin",
-                "type": "bytes",
-                "content": bytes(range(256)),
-            }
+    task_summary = one(pipeline_summary.task_runs)
+    assert task_summary.is_success
 
-            assert len(artefacts) == 3
+    # Check properties of artifact logged from the evaluated notebook
+    artifacts = task_summary.logged_artifacts
+    assert artifacts.keys() == {"README.md", "class_a/binary.bin", "notebook.ipynb"}
+    assert artifacts["README.md"].type == "utf-8"
+    assert artifacts["README.md"].content == "foobar123"
+
+    assert artifacts["notebook.ipynb"].type == "utf-8"
+    assert len(artifacts["notebook.ipynb"].content) > 1000
+
+    assert artifacts["class_a/binary.bin"].type == "bytes"
+    assert artifacts["class_a/binary.bin"].content == bytes(range(256))
 
 
 def test__jupytext__otel_logging_from_notebook__validate_cli_tool(
@@ -138,9 +114,11 @@ def test__jupytext__otel_logging_from_notebook__validate_cli_tool(
         # --- one task in pipeline run ---
         "task.json",
         # --- files for single run of task ---
-        "notebook.ipynb",
-        "notebook.html",
         "run.json",
+        # artifacts are written to disk
+        "notebook.ipynb",
         "binary.bin",
         "README.md",
+        # notebooks are converted into html
+        "notebook.html",
     }

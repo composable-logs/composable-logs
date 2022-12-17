@@ -8,11 +8,11 @@ from typing import (
     MutableMapping,
     Union,
     Set,
-    Sequence,
     Tuple,
 )
 
 #
+from pynb_dag_runner.helpers import del_key
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanDict,
@@ -46,7 +46,7 @@ def extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
 PipelineDict = Mapping[str, Any]
 TaskDict = Mapping[str, Any]
 RunDict = Mapping[str, Any]
-ArtefactDict = Mapping[str, Any]  # {name, type, content} in decoded form
+ArtifactDict = Mapping[str, Any]  # {name, type, content} in decoded form
 
 
 def _key_span_details(span):
@@ -73,7 +73,7 @@ def _decode_data_content_span(span: SpanDict):
     }
 
 
-def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
+def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtifactDict]:
     result = []
     for artefact_span in (
         spans.bound_under(task_run_top_span)
@@ -88,15 +88,15 @@ def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtefactDict]:
 
 
 def add_html_notebook_artefacts(
-    artefacts: Iterable[ArtefactDict],
-) -> List[ArtefactDict]:
+    artefacts: Iterable[ArtifactDict],
+) -> List[ArtifactDict]:
     """
     Helper function for iterating through a list of artefacts.
 
     The function returns the input list, but appended with html-artefact versions of
     any Jupyter notebook ipynb-artefacts (if present).
     """
-    result: List[ArtefactDict] = []
+    result: List[ArtifactDict] = []
 
     for artefact_dict in artefacts:
         if (
@@ -154,7 +154,7 @@ def _get_logged_named_values(spans: Spans, task_run_top_span) -> Mapping[str, An
 
 def _run_iterator(
     task_attributes: Mapping[str, Any], spans: Spans, task_top_span
-) -> Iterable[Tuple[RunDict, Iterable[ArtefactDict]]]:
+) -> Iterable[Tuple[RunDict, Iterable[ArtifactDict]]]:
     # --- deprecated ---
     for task_run_top_span in (
         spans.bound_under(task_top_span)
@@ -182,7 +182,7 @@ def _run_iterator(
 
 def _task_iterator(
     pipeline_attributes: Mapping[str, Any], spans: Spans
-) -> Iterable[Tuple[TaskDict, Iterable[Tuple[RunDict, Iterable[ArtefactDict]]]],]:
+) -> Iterable[Tuple[TaskDict, Iterable[Tuple[RunDict, Iterable[ArtifactDict]]]],]:
     # --- deprecated ---
     for task_top_span in spans.filter(["name"], "execute-task").sort_by_start_time():
         # get all task attributes including attributes inherited from pipeline
@@ -209,7 +209,7 @@ def get_pipeline_iterators(
     spans: Spans,
 ) -> Tuple[
     PipelineDict,
-    Iterable[Tuple[TaskDict, Iterable[Tuple[RunDict, Iterable[ArtefactDict]]]]],
+    Iterable[Tuple[TaskDict, Iterable[Tuple[RunDict, Iterable[ArtifactDict]]]]],
 ]:
     """
     Top level function that returns dict with pipeline scoped data and nested
@@ -229,13 +229,12 @@ def get_pipeline_iterators(
 
 # --- new stuff below ---
 
-# --- artifact ---
+# --- Data structure to represent: artifact data ---
 
 ArtifactName = p.StrictStr
 
 
-class Artifact(p.BaseModel):
-    name: ArtifactName
+class ArtifactContent(p.BaseModel):
     type: p.StrictStr
     content: Union[p.StrictStr, p.StrictBytes]
 
@@ -245,11 +244,27 @@ class Artifact(p.BaseModel):
         return v
 
 
-# --- Model artifact dictionaries ---
+def _artefact_iterator_new(
+    spans: Spans, task_run_top_span
+) -> Iterable[Tuple[ArtifactName, ArtifactContent]]:
+    for artefact_span in (
+        spans.bound_under(task_run_top_span)
+        # -
+        .filter(["name"], "artefact")
+        # -
+        .filter(["status", "status_code"], "OK")
+    ):
+        artifact_dict = _decode_data_content_span(artefact_span)
+        yield (artifact_dict["name"], ArtifactContent(**del_key(artifact_dict, "name")))
+
+
+# --- Data structure to represent: attributes ---
 
 AttributeKey = p.StrictStr
 AttributeValues = Union[p.StrictInt, p.StrictFloat, p.StrictBool, p.StrictStr]
 AttributeMapping = Mapping[AttributeKey, AttributeValues]
+
+# --- Data structure to represent: task run summary ---
 
 
 class TaskRunSummary(p.BaseModel):
@@ -264,7 +279,7 @@ class TaskRunSummary(p.BaseModel):
 
     attributes: AttributeMapping
     logged_values: Any
-    logged_artifacts: Sequence[Artifact]
+    logged_artifacts: Dict[ArtifactName, ArtifactContent]
 
     @p.validator("span_id")
     def validate_otel_span_id(cls, v):
@@ -292,6 +307,10 @@ class PipelineSummary(p.BaseModel):
     task_runs: List[TaskRunSummary]
 
     task_dependencies: Set[Any]
+
+    def is_success(self):
+        # Did all tasks run successfully?
+        return all(task_run.is_success for task_run in self.task_runs)
 
 
 def _task_run_iterator(
@@ -321,9 +340,7 @@ def _task_run_iterator(
             # logged metadata
             attributes=task_attributes,
             logged_values=list(_get_logged_named_values(spans, task_top_span)),
-            logged_artifacts=[
-                Artifact(**a) for a in _artefact_iterator(spans, task_top_span)
-            ],
+            logged_artifacts=dict(_artefact_iterator_new(spans, task_top_span)),
         )
 
         yield task_run_summary
