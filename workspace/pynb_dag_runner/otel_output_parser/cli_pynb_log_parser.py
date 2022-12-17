@@ -11,9 +11,15 @@ from pynb_dag_runner.opentelemetry_task_span_parser import (
 from .mermaid_graphs import (
     make_mermaid_dag_inputfile,
     make_mermaid_gantt_inputfile,
-    _status_summary,
 )
 from .common_helpers.utils import ensure_dir_exist
+
+
+def _status_summary(span_dict) -> str:
+    if span_dict["status"]["status_code"] == "OK":
+        return "OK"
+    else:
+        return "FAILED"
 
 
 def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):

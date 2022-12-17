@@ -2,22 +2,11 @@ import datetime
 from typing import List, Tuple
 
 #
-from pynb_dag_runner.opentelemetry_helpers import (
-    Spans,
-    get_duration_range_us,
-    iso8601_range_to_epoch_us_range,
-)
+from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.opentelemetry_task_span_parser import (
     get_pipeline_iterators,
     parse_spans,
 )
-
-
-def _status_summary(span_dict) -> str:
-    if span_dict["status"]["status_code"] == "OK":
-        return "OK"
-    else:
-        return "FAILED"
 
 
 def render_seconds(us_range) -> str:
@@ -34,6 +23,27 @@ def render_seconds(us_range) -> str:
             .replace("0h ", "")
             .replace("00m ", "")
         )
+
+
+def make_link_to_task_run(task_run_dict) -> str:
+    # -- This is not provided during unit tests
+    if "pipeline.github.repository" in task_run_dict["attributes"]:
+        repo_owner, repo_name = task_run_dict["attributes"][
+            "pipeline.github.repository"
+        ].split("/")
+
+        host = f"https://{repo_owner}.github.io/{repo_name}"
+    else:
+        host = "."
+
+    task_id = (
+        task_run_dict["attributes"]["task.notebook"]
+        # -
+        .split("/")[-1].replace(".py", "")
+    )
+    run_span_id = task_run_dict["span_id"]
+
+    return f"{host}/#/experiments/{task_id}/runs/{run_span_id}"
 
 
 def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
@@ -153,24 +163,3 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
         ]
 
     return "\n".join(output_lines)
-
-
-def make_link_to_task_run(task_run_dict) -> str:
-    # -- This is not provided during unit tests
-    if "pipeline.github.repository" in task_run_dict["attributes"]:
-        repo_owner, repo_name = task_run_dict["attributes"][
-            "pipeline.github.repository"
-        ].split("/")
-
-        host = f"https://{repo_owner}.github.io/{repo_name}"
-    else:
-        host = "."
-
-    task_id = (
-        task_run_dict["attributes"]["task.notebook"]
-        # -
-        .split("/")[-1].replace(".py", "")
-    )
-    run_span_id = task_run_dict["span_id"]
-
-    return f"{host}/#/experiments/{task_id}/runs/{run_span_id}"
