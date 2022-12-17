@@ -258,6 +258,64 @@ def _artefact_iterator_new(
         yield (artifact_dict["name"], ArtifactContent(**del_key(artifact_dict, "name")))
 
 
+# --- Data structure to represent: logged values ---
+
+
+LoggedValueName = p.StrictStr
+
+
+class LoggedValueContent(p.BaseModel):
+    type: p.StrictStr
+    content: Any
+
+    @p.validator("type")
+    def validate_type(cls, v):
+        assert v in ["utf-8", "bytes", "float", "bool", "json", "int"]
+        return v
+
+
+def _get_logged_named_values_new(
+    spans: Spans, task_run_top_span
+) -> Iterable[Tuple[LoggedValueName, LoggedValueContent]]:
+    logged_values: List[str] = []
+
+    for logged_value_span in (
+        spans.bound_under(task_run_top_span)
+        # -
+        .filter(["name"], "named-value")
+        # -
+        .filter(["status", "status_code"], "OK")
+    ):
+        assert logged_value_span["attributes"].keys() == {
+            "name",
+            "type",
+            "encoding",
+            "content_encoded",
+        }
+
+        value_name: str = logged_value_span["attributes"]["name"]
+        value_type: str = logged_value_span["attributes"]["type"]
+
+        # Abort if same value has been logged multiple times.
+        # (case eg for logging training objective)
+        if value_name in logged_values:
+            raise ValueError(
+                f"Named value {value_name} has been logged multiple times."
+            )
+        logged_values.append(value_name)
+
+        content = SerializedData(
+            type=value_type,
+            encoding=logged_value_span["attributes"]["encoding"],
+            encoded_content=logged_value_span["attributes"]["content_encoded"],
+        ).decode()
+
+        yield (
+            LoggedValueName(value_name),
+            LoggedValueContent(type=value_type, content=content),
+        )
+
+
 # --- Data structure to represent: attributes ---
 
 AttributeKey = p.StrictStr
@@ -278,7 +336,7 @@ class TaskRunSummary(p.BaseModel):
     exceptions: List[Any]
 
     attributes: AttributeMapping
-    logged_values: Any
+    logged_values: Dict[LoggedValueName, LoggedValueContent]
     logged_artifacts: Dict[ArtifactName, ArtifactContent]
 
     @p.validator("span_id")
@@ -296,7 +354,7 @@ class TaskRunSummary(p.BaseModel):
         )
 
 
-# ---
+# --- Data structure to represent: pipeline (of multiple tasks) run summary ---
 
 
 class PipelineSummary(p.BaseModel):
@@ -328,7 +386,7 @@ def _task_run_iterator(
 
         exceptions = spans.bound_inclusive(task_top_span).exception_events()
 
-        task_run_summary = TaskRunSummary(
+        yield TaskRunSummary(
             span_id=task_top_span["context"]["span_id"],
             # timing
             start_time_iso8601=task_top_span["start_time"],
@@ -339,11 +397,9 @@ def _task_run_iterator(
             exceptions=exceptions,
             # logged metadata
             attributes=task_attributes,
-            logged_values=list(_get_logged_named_values(spans, task_top_span)),
+            logged_values=dict(_get_logged_named_values_new(spans, task_top_span)),
             logged_artifacts=dict(_artefact_iterator_new(spans, task_top_span)),
         )
-
-        yield task_run_summary
 
 
 def parse_spans(spans: Spans) -> PipelineSummary:

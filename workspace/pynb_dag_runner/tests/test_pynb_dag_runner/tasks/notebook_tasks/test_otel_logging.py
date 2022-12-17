@@ -6,10 +6,12 @@ from functools import lru_cache
 import pytest
 
 #
-from pynb_dag_runner.tasks.task_opentelemetry_logging import SerializedData
 from pynb_dag_runner.core.dag_runner import start_and_await_tasks
 from pynb_dag_runner.helpers import one
-from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
+from pynb_dag_runner.opentelemetry_task_span_parser import (
+    parse_spans,
+    LoggedValueContent,
+)
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
@@ -43,38 +45,6 @@ def spans() -> Spans:
     return rec.spans
 
 
-def test__jupytext__otel_logging_from_notebook__validate_spans(spans: Spans):
-    def check_named_value(key, value):
-        value_span = one(
-            spans.filter(["name"], "named-value")
-            #
-            .filter(["attributes", "name"], key)
-            #
-            .filter(["status", "status_code"], "OK")
-        )
-        assert (
-            SerializedData(
-                type=value_span["attributes"]["type"],
-                encoding=value_span["attributes"]["encoding"],
-                encoded_content=value_span["attributes"]["content_encoded"],
-            ).decode()
-            == value
-        )
-
-    # check values logged with general key-value logger
-    check_named_value("value_str_a", "a")
-    check_named_value("value_float_1_23", 1.23)
-    check_named_value("value_list_1_2_null", [1, 2, None])
-    check_named_value("value_dict", {"a": 123, "b": "foo"})
-    check_named_value("value_list_nested", [1, [2, None, []]])
-
-    # check values logged with typed-loggers
-    check_named_value("boolean_true", True)
-    check_named_value("int_1", 1)
-    check_named_value("float_1p23", 1.23)
-    check_named_value("string_abc", "abc")
-
-
 def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans: Spans):
     pipeline_summary = parse_spans(spans)
 
@@ -83,7 +53,7 @@ def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans:
     task_summary = one(pipeline_summary.task_runs)
     assert task_summary.is_success
 
-    # Check properties of artifact logged from the evaluated notebook
+    # Check: artifact logged from the evaluated notebook
     artifacts = task_summary.logged_artifacts
     assert artifacts.keys() == {"README.md", "class_a/binary.bin", "notebook.ipynb"}
     assert artifacts["README.md"].type == "utf-8"
@@ -94,6 +64,46 @@ def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans:
 
     assert artifacts["class_a/binary.bin"].type == "bytes"
     assert artifacts["class_a/binary.bin"].content == bytes(range(256))
+
+    # Check: logged values from notebook
+    logged_values = task_summary.logged_values
+    assert logged_values.keys() == {
+        "value_str_a",
+        "value_float_1_23",
+        "value_list_1_2_null",
+        "value_dict",
+        "value_list_nested",
+        "boolean_true",
+        "int_1",
+        "float_1p23",
+        "string_abc",
+    }
+
+    # -- logging of generic json values ---
+    assert logged_values["value_str_a"] == LoggedValueContent(type="utf-8", content="a")
+    assert logged_values["value_float_1_23"] == LoggedValueContent(
+        type="float", content=1.23
+    )
+    assert logged_values["value_list_1_2_null"] == LoggedValueContent(
+        type="json", content=[1, 2, None]
+    )
+    assert logged_values["value_dict"] == LoggedValueContent(
+        type="json", content={"a": 123, "b": "foo"}
+    )
+
+    assert logged_values["value_list_nested"] == LoggedValueContent(
+        type="json", content=[1, [2, None, []]]
+    )
+
+    # -- logging of typed values ---
+    assert logged_values["boolean_true"] == LoggedValueContent(
+        type="bool", content=True
+    )
+    assert logged_values["int_1"] == LoggedValueContent(type="int", content=1)
+    assert logged_values["float_1p23"] == LoggedValueContent(type="float", content=1.23)
+    assert logged_values["string_abc"] == LoggedValueContent(
+        type="utf-8", content="abc"
+    )
 
 
 def test__jupytext__otel_logging_from_notebook__validate_cli_tool(
