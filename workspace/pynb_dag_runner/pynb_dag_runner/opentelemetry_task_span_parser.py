@@ -273,6 +273,9 @@ class LoggedValueContent(p.BaseModel):
         assert v in ["utf-8", "bytes", "float", "bool", "json", "int"]
         return v
 
+    def as_dict(self):
+        return {"type": self.type, "value": self.content}
+
 
 def _get_logged_named_values_new(
     spans: Spans, task_run_top_span
@@ -356,6 +359,27 @@ class TaskRunSummary(p.BaseModel):
                 "Expected id to start with 0x."
             )
         return v
+
+    def as_dict(self):
+
+        return {
+            "span_id": self.span_id,
+            #
+            "start_time": self.start_time_iso8601,
+            "end_time": self.end_time_iso8601,
+            "duration_s": self.duration_s,
+            #
+            "is_success": self.is_success,
+            "exceptions": self.exceptions,
+            #
+            "attributes": self.attributes,
+            #
+            "logged_values": {k: v.as_dict() for k, v in self.logged_values.items()},
+            "logged_artifacts": [
+                {"name": str(k), "type": v.type, "size": len(v.content)}
+                for k, v in self.logged_artifacts.items()
+            ],
+        }
 
 
 # --- Data structure to represent: pipeline (of multiple tasks) run summary ---
