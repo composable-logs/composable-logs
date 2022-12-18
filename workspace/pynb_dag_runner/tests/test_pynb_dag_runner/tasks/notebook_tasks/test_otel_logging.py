@@ -123,6 +123,7 @@ def test__jupytext__otel_logging_from_notebook__validate_cli_tool(
         "pipeline.json",
         # --- one task in pipeline run ---
         "task.json",
+        "task-new.json",  # TBD
         # --- files for single run of task ---
         "run.json",
         # artifacts are written to disk
