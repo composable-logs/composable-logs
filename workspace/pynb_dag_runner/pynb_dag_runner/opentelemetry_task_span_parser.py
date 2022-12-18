@@ -243,6 +243,16 @@ class ArtifactContent(p.BaseModel):
         assert v in ["utf-8", "bytes"]
         return v
 
+    def write(self, filepath: Path):
+        if self.type == "utf-8":
+            assert isinstance(self.content, str)
+            filepath.write_text(self.content)
+        elif self.type == "bytes":
+            assert isinstance(self.content, bytes)
+            filepath.write_bytes(self.content)
+        else:
+            raise ValueError("Internal error")
+
 
 def _artefact_iterator_new(
     spans: Spans, task_run_top_span
@@ -256,6 +266,19 @@ def _artefact_iterator_new(
     ):
         artifact_dict = _decode_data_content_span(artefact_span)
         yield (artifact_dict["name"], ArtifactContent(**del_key(artifact_dict, "name")))
+
+        # Add html version for notebook.ipynb Jupyter notebooks
+        # Q: Should this be optional for local use? In particular if UI could render
+        # ipynb files.
+        if artifact_dict["name"] == "notebook.ipynb":
+            assert artifact_dict["type"] == "utf-8"
+            yield (
+                str(Path(artifact_dict["name"]).with_suffix(".html")),
+                ArtifactContent(
+                    type="utf-8",
+                    content=convert_ipynb_to_html(artifact_dict["content"]),
+                ),
+            )
 
 
 # --- Data structure to represent: logged values ---

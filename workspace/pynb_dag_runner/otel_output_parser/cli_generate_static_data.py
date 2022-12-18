@@ -16,7 +16,7 @@ from .mermaid_graphs import (
     make_mermaid_dag_inputfile,
     make_mermaid_gantt_inputfile,
 )
-from .static_builder.writers import write_attachment_sink, StaticMLFlowDataSink
+from .static_builder.writers import write_attachment_sink_old, StaticMLFlowDataSinkOld
 
 # -
 from .common_helpers.github_helpers import github_repo_artifact_zips
@@ -164,7 +164,7 @@ def entry_point():
     print("output_www_root_directory  :", args().output_www_root_directory)
 
     # if output_static_data_json is None, this sink is no-op
-    static_mlflow_data_sink = StaticMLFlowDataSink(
+    static_mlflow_data_sink = StaticMLFlowDataSinkOld(
         args().output_www_root_directory / "ui_static_data.json"
     )
 
@@ -174,7 +174,7 @@ def entry_point():
     ):
         spans = get_recorded_spans_from_zip(artifact_zip)
         for span_summary in linearize_log_events(spans):
-            write_attachment_sink(
+            write_attachment_sink_old(
                 args().output_www_root_directory / "pipeline-artifacts",
                 span_summary,
             )

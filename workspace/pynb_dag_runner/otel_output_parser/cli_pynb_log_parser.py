@@ -136,9 +136,9 @@ def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
             task_dir: str = "--".join(
                 [
                     "jupytext-notebook-task",
-                    task_run_summary.attributes["task.notebook"]
-                    .replace("/", "-")
-                    .replace(".", "-"),
+                    task_run_summary.attributes["task.notebook"]  # type: ignore
+                    .replace("/", "-")  # type: ignore
+                    .replace(".", "-"),  # type: ignore
                     task_run_summary.span_id,
                     outcome(task_run_summary.is_success),
                 ]
@@ -156,12 +156,7 @@ def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
             out_path: Path = safe_path(
                 ensure_dir_exist(out_basepath / task_dir / "artifacts" / artifact_name)
             )
-            if artifact.type == "utf-8":
-                out_path.write_text(artifact.content)
-            elif artifact.type == "bytes":
-                out_path.write_bytes(artifact.content)
-            else:
-                raise ValueError(f"Unknown encoding of artefect: {str(artifact)[:100]}")
+            artifact.write(out_path)
 
 
 # --- cli tool implementation ---

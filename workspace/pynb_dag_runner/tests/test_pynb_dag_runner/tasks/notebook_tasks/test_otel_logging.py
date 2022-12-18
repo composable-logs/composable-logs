@@ -127,6 +127,7 @@ def test__jupytext__otel_logging_from_notebook__validate_cli_tool(
         "run.json",
         # artifacts are written to disk
         "notebook.ipynb",
+        "notebook.html",
         "binary.bin",
         "README.md",
         # notebooks are converted into html
