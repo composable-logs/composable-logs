@@ -55,7 +55,12 @@ def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans:
 
     # Check: artifact logged from the evaluated notebook
     artifacts = task_summary.logged_artifacts
-    assert artifacts.keys() == {"README.md", "class_a/binary.bin", "notebook.ipynb"}
+    assert artifacts.keys() == {
+        "README.md",
+        "class_a/binary.bin",
+        "notebook.ipynb",
+        "notebook.html",
+    }
     assert artifacts["README.md"].type == "utf-8"
     assert artifacts["README.md"].content == "foobar123"
 
