@@ -76,7 +76,7 @@ def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
         assert len(task_summary.logged_values) == 0
         assert len(task_summary.logged_artifacts) == 0
 
-        assert task_summary.is_success == (not task_should_fail)
+        assert task_summary.is_success() == (not task_should_fail)
         assert task_summary.attributes == {
             "pipeline.foo": "bar",
             "task.foo": "my_test_func",

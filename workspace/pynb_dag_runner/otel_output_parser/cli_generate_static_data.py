@@ -217,9 +217,10 @@ def process(spans: Spans, www_root: Path):
         "span_id": pipeline_summary.top_span_id,
         "type": "pipeline",
         "artifacts_location": str(pipeline_artifact_relative_root),
-        "start_time_epoch_ms": 1,  # TODO
-        "end_time_epoch_ms": 2,  # TODO
+        "start_time_epoch_us": 1,  # TODO
+        "end_time_epoch_us": 2,  # TODO
         "duration_s": None,  # TODO
+        "is_success": pipeline_summary.is_success(),
         "parent_id": None,
         "attributes": pipeline_summary.attributes,
         "artifacts": list(
@@ -234,23 +235,25 @@ def process(spans: Spans, www_root: Path):
 
     for task_run_summary in pipeline_summary.task_runs:
         task_artifact_root = www_root / "artifacts" / "task" / task_run_summary.span_id
-        print("task_artifact_root", task_artifact_root)
+        print(" - task", task_artifact_root)
         yield {
             "span_id": task_run_summary.span_id,
             "type": "task",
             "artifacts_location": str(task_artifact_root),
-            "start_time": 1,  # TODO
-            "end_time": 2,  # TODO
-            "duration_s": None,  # TODO
+            "start_time_epoch_us": task_run_summary.get_start_time_epoch_us(),
+            "end_time_epoch_us": task_run_summary.get_end_time_epoch_us(),
+            "duration_s": task_run_summary.get_duration_s(),
+            "is_success": task_run_summary.is_success(),
             "parent_id": pipeline_summary.top_span_id,
             "attributes": task_run_summary.attributes,
             "artifacts": list(
                 _artifact_metadata(
                     _write_artifacts(
                         output_path=www_root / task_artifact_root,
+                        # log artifacts logged during task run.
+                        # in addition, log a json with metadata logged *during run time*
                         artifacts=disjoint_dict_union(
                             task_run_summary.logged_artifacts,
-                            # add metadata logged during run-time for reference
                             {
                                 "run-time-metadata.json": ArtifactContent(
                                     type="utf-8",

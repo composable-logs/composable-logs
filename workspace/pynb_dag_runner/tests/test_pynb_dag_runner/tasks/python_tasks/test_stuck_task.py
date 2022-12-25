@@ -43,7 +43,7 @@ def test__python_task__stuck_tasks__parse_spans(spans: Spans):
     pipeline_summary = parse_spans(spans)
 
     for task_summary in [one(pipeline_summary.task_runs)]:  # type: ignore
-        assert not task_summary.is_success
+        assert not task_summary.is_success()
         assert "timeout" in str(task_summary.exceptions).lower()
 
         assert len(task_summary.logged_artifacts) == 0

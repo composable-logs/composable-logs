@@ -31,7 +31,7 @@ def test__jupytext__ok_notebook__parse_spans(spans: Spans):
 
     # assert there is one successful task
     task_summary = one(pipeline_summary.task_runs)
-    assert task_summary.is_success
+    assert task_summary.is_success()
 
     # assert attributes are logged
     assert task_summary.attributes["task.notebook"] == NOTEBOOK_PATH

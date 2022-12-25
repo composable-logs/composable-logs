@@ -140,7 +140,7 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
 
         output_lines += [f"""    section {attributes["task.notebook"]}"""]
 
-        if task_run_summary.is_success:
+        if task_run_summary.is_success():
             description = "OK"
             modifier = ""
         else:

@@ -41,7 +41,7 @@ def test__python_task__parallel_tasks__parse_spans(spans: Spans):
 
     ranges = []
     for task_summary in pipeline_summary.task_runs:  # type: ignore
-        assert task_summary.is_success
+        assert task_summary.is_success()
         assert len(task_summary.logged_artifacts) == 0
         assert len(task_summary.logged_values) == 0
 

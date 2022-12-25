@@ -22,7 +22,11 @@ from pynb_dag_runner.opentelemetry_helpers import (
 )
 from pynb_dag_runner.notebooks_helpers import convert_ipynb_to_html
 from pynb_dag_runner.tasks.task_opentelemetry_logging import SerializedData
-from pynb_dag_runner.opentelemetry_helpers import iso8601_range_to_epoch_us_range
+from pynb_dag_runner.opentelemetry_helpers import (
+    iso8601_range_to_epoch_us_range,
+    iso8601_to_epoch_us,
+)
+from otel_output_parser.common_helpers.utils import iso8601_to_epoch_ms
 
 # -
 import pydantic as p
@@ -353,9 +357,6 @@ class TaskRunSummary(p.BaseModel):
     start_time_iso8601: p.StrictStr
     end_time_iso8601: p.StrictStr
 
-    duration_s: p.StrictFloat
-
-    is_success: p.StrictBool
     exceptions: List[Any]
 
     attributes: AttributeMapping
@@ -364,14 +365,7 @@ class TaskRunSummary(p.BaseModel):
     logged_values: Dict[LoggedValueName, LoggedValueContent]
     logged_artifacts: Dict[ArtifactName, ArtifactContent]
 
-    def get_task_timestamp_range_us_epoch(self):
-        """
-        Return task execution timestamp range (as a range expressed in unix epoch us)
-        """
-        return iso8601_range_to_epoch_us_range(
-            self.start_time_iso8601, self.end_time_iso8601
-        )
-
+    # --- input validation
     @p.validator("span_id")
     def validate_otel_span_id(cls, v):
         if not v.startswith("0x"):
@@ -381,20 +375,44 @@ class TaskRunSummary(p.BaseModel):
             )
         return v
 
+    # --- timing and task run related methods
+
+    def get_start_time_epoch_us(self) -> int:
+        return iso8601_to_epoch_us(self.start_time_iso8601)
+
+    def get_end_time_epoch_us(self) -> int:
+        return iso8601_to_epoch_us(self.end_time_iso8601)
+
+    def get_duration_s(self) -> float:
+        return (self.get_end_time_epoch_us() - self.get_start_time_epoch_us()) / 1e6
+
+    def get_task_timestamp_range_us_epoch(self):
+        """
+        Return task execution timestamp range (as a range expressed in unix epoch us)
+        """
+        return iso8601_range_to_epoch_us_range(
+            self.start_time_iso8601, self.end_time_iso8601
+        )
+
+    def is_success(self) -> bool:
+        return len(self.exceptions) == 0
+
+    # --- serialise into Python dict
     def as_dict(self):
         return {
             "span_id": self.span_id,
             #
             "start_time": self.start_time_iso8601,
             "end_time": self.end_time_iso8601,
-            "duration_s": self.duration_s,
+            "duration_s": self.get_duration_s(),
             #
-            "is_success": self.is_success,
+            "is_success": self.is_success(),
             "exceptions": self.exceptions,
             #
             "attributes": self.attributes,
             #
             "logged_values": {k: v.as_dict() for k, v in self.logged_values.items()},
+            # return only metadata about logged artifacts; not the content
             "logged_artifacts": [
                 {"name": str(k), "type": v.type, "size": len(v.content)}
                 for k, v in self.logged_artifacts.items()
@@ -418,7 +436,7 @@ class PipelineSummary(p.BaseModel):
 
     def is_success(self):
         # Did all tasks run successfully?
-        return all(task_run.is_success for task_run in self.task_runs)
+        return all(task_run.is_success() for task_run in self.task_runs)
 
     def as_dict(self):
         return {
@@ -441,17 +459,13 @@ def _task_run_iterator(
             ),
         }
 
-        exceptions = spans.bound_inclusive(task_top_span).exception_events()
-
         yield TaskRunSummary(
             span_id=task_top_span["context"]["span_id"],
             # timing
             start_time_iso8601=task_top_span["start_time"],
             end_time_iso8601=task_top_span["end_time"],
-            duration_s=get_duration_s(task_top_span),
             # was task run a success?
-            is_success=len(exceptions) == 0,
-            exceptions=exceptions,
+            exceptions=spans.bound_inclusive(task_top_span).exception_events(),
             # logged metadata
             attributes=task_attributes,
             logged_values=dict(_get_logged_named_values_new(spans, task_top_span)),

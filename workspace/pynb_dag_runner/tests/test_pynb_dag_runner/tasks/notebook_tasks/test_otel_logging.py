@@ -51,7 +51,7 @@ def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans:
     assert pipeline_summary.is_success()
 
     task_summary = one(pipeline_summary.task_runs)
-    assert task_summary.is_success
+    assert task_summary.is_success()
 
     # Check: artifact logged from the evaluated notebook
     artifacts = task_summary.logged_artifacts

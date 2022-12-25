@@ -140,7 +140,7 @@ def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
                     .replace("/", "-")  # type: ignore
                     .replace(".", "-"),  # type: ignore
                     task_run_summary.span_id,
-                    outcome(task_run_summary.is_success),
+                    outcome(task_run_summary.is_success()),
                 ]
             )
 
