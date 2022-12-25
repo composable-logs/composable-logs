@@ -13,6 +13,7 @@ from pynb_dag_runner.helpers import (
     flatten,
     compose,
     del_key,
+    to_dict,
     write_json,
     read_json,
     one,
@@ -111,6 +112,18 @@ def test_del_key():
 
     a_dict["a"] = 12345
     assert {"a": 1, "c": 3} == b_dict
+
+
+def test_to_dict():
+    test_dict = {"a": 1, "b": 2}
+
+    assert to_dict([]) == dict()
+
+    assert to_dict(test_dict.items()) == test_dict
+    assert to_dict(iter(test_dict.items())) == test_dict
+
+    with pytest.raises(Exception):
+        assert to_dict(test_dict.items() + [("a", 1)])
 
 
 # --- function helper functions ---

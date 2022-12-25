@@ -15,6 +15,8 @@ from typing import (
 
 A = TypeVar("A")
 B = TypeVar("B")
+K = TypeVar("K")
+V = TypeVar("V")
 
 # --- range helper functions ---
 
@@ -96,6 +98,9 @@ def one(xs: Iterable[A]) -> A:
     return xs_list[0]
 
 
+# --- dict manipulation helper functions ---
+
+
 def del_key(a_dict: Mapping[A, B], key: A) -> Mapping[A, B]:
     """
     Return new dictionary that is identical to `a_dict` with `key`
@@ -104,6 +109,20 @@ def del_key(a_dict: Mapping[A, B], key: A) -> Mapping[A, B]:
     Input dictionary is not modified.
     """
     return {k: v for k, v in a_dict.items() if k != key}
+
+
+def to_dict(key_value_pairs: Iterable[Tuple[K, V]]) -> Mapping[K, V]:
+    """
+    Same as Python built-in dict(key_value_pairs) but abort if same key
+    appears multiple times.
+    """
+    list_key_value_pairs = list(key_value_pairs)
+    keys = [k for k, _ in list_key_value_pairs]
+    if len(keys) != len(set(keys)):
+        raise Exception(
+            f"to_dict: trying to make dict with multiple values. Keys={keys}"
+        )
+    return dict(list_key_value_pairs)
 
 
 # --- function helper functions ---
