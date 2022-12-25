@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path
 from typing import (
     Any,
@@ -267,9 +268,6 @@ def _artefact_iterator_new(
         artifact_dict = _decode_data_content_span(artefact_span)
         yield (artifact_dict["name"], ArtifactContent(**del_key(artifact_dict, "name")))
 
-        # Add html version for notebook.ipynb Jupyter notebooks
-        # Q: Should this be optional for local use? In particular if UI could render
-        # ipynb files.
         if artifact_dict["name"] == "notebook.ipynb":
             assert artifact_dict["type"] == "utf-8"
             yield (
@@ -342,8 +340,6 @@ def _get_logged_named_values_new(
         )
 
 
-# --- Data structure to represent: attributes ---
-
 AttributeKey = p.StrictStr
 AttributeValues = Union[p.StrictInt, p.StrictFloat, p.StrictBool, p.StrictStr]
 AttributeMapping = Mapping[AttributeKey, AttributeValues]
@@ -363,6 +359,8 @@ class TaskRunSummary(p.BaseModel):
     exceptions: List[Any]
 
     attributes: AttributeMapping
+
+    # keep track of values/artifacts logged *during run time*
     logged_values: Dict[LoggedValueName, LoggedValueContent]
     logged_artifacts: Dict[ArtifactName, ArtifactContent]
 
@@ -384,7 +382,6 @@ class TaskRunSummary(p.BaseModel):
         return v
 
     def as_dict(self):
-
         return {
             "span_id": self.span_id,
             #
@@ -409,6 +406,8 @@ class TaskRunSummary(p.BaseModel):
 
 
 class PipelineSummary(p.BaseModel):
+    top_span_id: p.StrictStr
+
     # pipeline-level attributes
     attributes: AttributeMapping
 
@@ -420,6 +419,13 @@ class PipelineSummary(p.BaseModel):
     def is_success(self):
         # Did all tasks run successfully?
         return all(task_run.is_success for task_run in self.task_runs)
+
+    def as_dict(self):
+        return {
+            "top_span_id": self.top_span_id,
+            "task_dependencies": list(self.task_dependencies),
+            "attributes": self.attributes,
+        }
 
 
 def _task_run_iterator(
@@ -465,8 +471,18 @@ def parse_spans(spans: Spans) -> PipelineSummary:
     """
     pipeline_attributes = spans.get_attributes(allowed_prefixes={"pipeline."})
 
+    # TODO:
+    # - potentially top_span_id could also be passed into function as argument
+    # - or, we could determine top node dynamically from input spans, provided it is unique
+    #
+    if "pipeline.pipeline_run_id" in pipeline_attributes:
+        top_span_id = pipeline_attributes["pipeline.pipeline_run_id"]
+    else:
+        top_span_id = "NO-TOP-SPAN--TEMP" + str(uuid.uuid4())
+
     return PipelineSummary(
-        task_dependencies=set(extract_task_dependencies(spans)),
+        top_span_id=top_span_id,
+        task_dependencies=extract_task_dependencies(spans),
         attributes=pipeline_attributes,
         task_runs=list(_task_run_iterator(pipeline_attributes, spans)),
     )
