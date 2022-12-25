@@ -217,9 +217,9 @@ def process(spans: Spans, www_root: Path):
         "span_id": pipeline_summary.top_span_id,
         "type": "pipeline",
         "artifacts_location": str(pipeline_artifact_relative_root),
-        "start_time_epoch_us": 1,  # TODO
-        "end_time_epoch_us": 2,  # TODO
-        "duration_s": None,  # TODO
+        "start_time_epoch_us": pipeline_summary.get_start_time_epoch_us(),
+        "end_time_epoch_us": pipeline_summary.get_end_time_epoch_us(),
+        "duration_s": pipeline_summary.get_duration_s(),
         "is_success": pipeline_summary.is_success(),
         "parent_id": None,
         "attributes": pipeline_summary.attributes,

@@ -351,7 +351,32 @@ AttributeMapping = Mapping[AttributeKey, AttributeValues]
 # --- Data structure to represent: task run summary ---
 
 
-class TaskRunSummary(p.BaseModel):
+class StartEndIso8601Mixin:
+    # Required for this Mixin
+    # start_time_iso8601: p.StrictStr
+    # end_time_iso8601: p.StrictStr
+
+    # --- timing and task run related methods
+
+    def get_start_time_epoch_us(self) -> int:
+        return iso8601_to_epoch_us(self.start_time_iso8601)
+
+    def get_end_time_epoch_us(self) -> int:
+        return iso8601_to_epoch_us(self.end_time_iso8601)
+
+    def get_duration_s(self) -> float:
+        return (self.get_end_time_epoch_us() - self.get_start_time_epoch_us()) / 1e6
+
+    def get_task_timestamp_range_us_epoch(self):
+        """
+        Return task execution timestamp range (as a range expressed in unix epoch us)
+        """
+        return iso8601_range_to_epoch_us_range(
+            self.start_time_iso8601, self.end_time_iso8601
+        )
+
+
+class TaskRunSummary(p.BaseModel, StartEndIso8601Mixin):
     span_id: p.StrictStr
 
     start_time_iso8601: p.StrictStr
@@ -375,25 +400,7 @@ class TaskRunSummary(p.BaseModel):
             )
         return v
 
-    # --- timing and task run related methods
-
-    def get_start_time_epoch_us(self) -> int:
-        return iso8601_to_epoch_us(self.start_time_iso8601)
-
-    def get_end_time_epoch_us(self) -> int:
-        return iso8601_to_epoch_us(self.end_time_iso8601)
-
-    def get_duration_s(self) -> float:
-        return (self.get_end_time_epoch_us() - self.get_start_time_epoch_us()) / 1e6
-
-    def get_task_timestamp_range_us_epoch(self):
-        """
-        Return task execution timestamp range (as a range expressed in unix epoch us)
-        """
-        return iso8601_range_to_epoch_us_range(
-            self.start_time_iso8601, self.end_time_iso8601
-        )
-
+    # ---
     def is_success(self) -> bool:
         return len(self.exceptions) == 0
 
@@ -423,8 +430,11 @@ class TaskRunSummary(p.BaseModel):
 # --- Data structure to represent: pipeline (of multiple tasks) run summary ---
 
 
-class PipelineSummary(p.BaseModel):
+class PipelineSummary(p.BaseModel, StartEndIso8601Mixin):
     top_span_id: p.StrictStr
+
+    start_time_iso8601: p.StrictStr
+    end_time_iso8601: p.StrictStr
 
     # pipeline-level attributes
     attributes: AttributeMapping
@@ -498,5 +508,11 @@ def parse_spans(spans: Spans) -> PipelineSummary:
         top_span_id=top_span_id,
         task_dependencies=extract_task_dependencies(spans),
         attributes=pipeline_attributes,
+        # TODO:
+        # Move to have a top span for pipeline. use that for ID and time-ranges.
+        # But determine time range dynamically for now:
+        start_time_iso8601=min(span["start_time"] for span in spans),
+        end_time_iso8601=max(span["end_time"] for span in spans),
+        # --
         task_runs=list(_task_run_iterator(pipeline_attributes, spans)),
     )
