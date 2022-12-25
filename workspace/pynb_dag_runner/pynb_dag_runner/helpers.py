@@ -111,18 +111,28 @@ def del_key(a_dict: Mapping[A, B], key: A) -> Mapping[A, B]:
     return {k: v for k, v in a_dict.items() if k != key}
 
 
-def to_dict(key_value_pairs: Iterable[Tuple[K, V]]) -> Mapping[K, V]:
+def disjoint_dict_union(*dicts: Mapping[K, V]) -> Mapping[K, V]:
     """
-    Same as Python built-in dict(key_value_pairs) but abort if same key
-    appears multiple times.
+    Return the union of multiple dicts, but fail if multiple dicts contain the same key.
     """
-    list_key_value_pairs = list(key_value_pairs)
-    keys = [k for k, _ in list_key_value_pairs]
-    if len(keys) != len(set(keys)):
-        raise Exception(
-            f"to_dict: trying to make dict with multiple values. Keys={keys}"
-        )
-    return dict(list_key_value_pairs)
+    assert len(dicts) > 0
+    first_dict, *other_dicts = dicts
+
+    if len(other_dicts) == 0:
+        return first_dict
+
+    elif len(other_dicts) == 1:
+        second_dict = one(other_dicts)
+
+        if len(first_dict.keys() & second_dict.keys()) > 0:
+            raise Exception(
+                f"disjoin_dict_union: same key contained in multiple dicts. Keys for:"
+                f"first_dict = {first_dict.keys()}; second_dict = {second_dict.keys()}."
+            )
+
+        return {**first_dict, **second_dict}
+    else:
+        return disjoint_dict_union(first_dict, disjoint_dict_union(*other_dicts))
 
 
 # --- function helper functions ---

@@ -13,7 +13,7 @@ from pynb_dag_runner.helpers import (
     flatten,
     compose,
     del_key,
-    to_dict,
+    disjoint_dict_union,
     write_json,
     read_json,
     one,
@@ -114,16 +114,22 @@ def test_del_key():
     assert {"a": 1, "c": 3} == b_dict
 
 
-def test_to_dict():
-    test_dict = {"a": 1, "b": 2}
+def test_disjoint_dict_union():
+    a_dict = {"a": 1, "b": 2}
+    b_dict = {"c": 3, "d": 4}
+    c_dict = {"a": 3}
+    d_dict = {"q": 1}
 
-    assert to_dict([]) == dict()
-
-    assert to_dict(test_dict.items()) == test_dict
-    assert to_dict(iter(test_dict.items())) == test_dict
+    assert disjoint_dict_union(dict()) == dict()
+    assert disjoint_dict_union(dict(), dict()) == dict()
+    assert disjoint_dict_union(dict(), a_dict, dict()) == a_dict
+    assert disjoint_dict_union(dict(), a_dict, dict(), b_dict) == {**a_dict, **b_dict}
 
     with pytest.raises(Exception):
-        assert to_dict(test_dict.items() + [("a", 1)])
+        disjoint_dict_union(dict(), a_dict, dict(), c_dict, dict())
+
+    with pytest.raises(Exception):
+        disjoint_dict_union(dict(), a_dict, d_dict, dict(), c_dict, dict())
 
 
 # --- function helper functions ---
