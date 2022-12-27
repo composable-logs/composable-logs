@@ -179,6 +179,7 @@ def _artifact_metadata(artifacts_items):
 
 def process(spans: Spans, www_root: Path):
     pipeline_summary = parse_spans(spans)
+    print("> processing pipeline run", pipeline_summary.top_span_id)
 
     pipeline_artifact_relative_root = (
         Path("artifacts") / "pipeline" / pipeline_summary.top_span_id
@@ -287,6 +288,13 @@ def entry_point():
         zip_cache_dir=args().zip_cache_dir,
     ):
         spans = get_recorded_spans_from_zip(artifact_zip)
+        span_summary = list(linearize_log_events(spans))
+
+        print(
+            "pipeline ids:",
+            [s["id"] for s in span_summary if s["type"] == "pipeline"],
+        )
+
         for span_summary in linearize_log_events(spans):
             write_attachment_sink_old(
                 args().output_www_root_directory / "pipeline-artifacts",
@@ -310,6 +318,7 @@ def entry_point():
         for entry in process(
             spans, args().output_www_root_directory / "static-artifacts"
         ):
+
             entries.append(entry)
 
     (
