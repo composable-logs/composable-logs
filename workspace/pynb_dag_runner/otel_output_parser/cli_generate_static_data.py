@@ -179,10 +179,10 @@ def _artifact_metadata(artifacts_items):
 
 def process(spans: Spans, www_root: Path):
     pipeline_summary = parse_spans(spans)
-    print("> processing pipeline run", pipeline_summary.top_span_id)
+    print("> processing pipeline run", pipeline_summary.span_id)
 
     pipeline_artifact_relative_root = (
-        Path("artifacts") / "pipeline" / pipeline_summary.top_span_id
+        Path("artifacts") / "pipeline" / pipeline_summary.span_id
     )
 
     # The below are not real artifacts logged during pipeline execution.
@@ -215,7 +215,7 @@ def process(spans: Spans, www_root: Path):
     # Note: This dict is optimised for UI/reporting. It is slightly different from
     # the summary dict created at pipeline runtime.
     yield {
-        "span_id": pipeline_summary.top_span_id,
+        "span_id": pipeline_summary.span_id,
         "type": "pipeline",
         "artifacts_location": str(pipeline_artifact_relative_root),
         "start_time_epoch_us": pipeline_summary.get_start_time_epoch_us(),
@@ -245,7 +245,7 @@ def process(spans: Spans, www_root: Path):
             "end_time_epoch_us": task_run_summary.get_end_time_epoch_us(),
             "duration_s": task_run_summary.get_duration_s(),
             "is_success": task_run_summary.is_success(),
-            "parent_id": pipeline_summary.top_span_id,
+            "parent_id": pipeline_summary.span_id,
             "attributes": task_run_summary.attributes,
             "artifacts": list(
                 _artifact_metadata(

@@ -351,10 +351,9 @@ AttributeMapping = Mapping[AttributeKey, AttributeValues]
 # --- Data structure to represent: task run summary ---
 
 
-class StartEndIso8601Mixin:
-    # Required for this Mixin
-    # start_time_iso8601: p.StrictStr
-    # end_time_iso8601: p.StrictStr
+class StartEndIso8601Mixin(p.BaseModel):
+    start_time_iso8601: p.StrictStr
+    end_time_iso8601: p.StrictStr
 
     # --- timing and task run related methods
 
@@ -376,11 +375,8 @@ class StartEndIso8601Mixin:
         )
 
 
-class TaskRunSummary(p.BaseModel, StartEndIso8601Mixin):
+class TaskRunSummary(StartEndIso8601Mixin):
     span_id: p.StrictStr
-
-    start_time_iso8601: p.StrictStr
-    end_time_iso8601: p.StrictStr
 
     exceptions: List[Any]
 
@@ -430,11 +426,8 @@ class TaskRunSummary(p.BaseModel, StartEndIso8601Mixin):
 # --- Data structure to represent: pipeline (of multiple tasks) run summary ---
 
 
-class PipelineSummary(p.BaseModel, StartEndIso8601Mixin):
-    top_span_id: p.StrictStr
-
-    start_time_iso8601: p.StrictStr
-    end_time_iso8601: p.StrictStr
+class PipelineSummary(StartEndIso8601Mixin):
+    span_id: p.StrictStr
 
     # pipeline-level attributes
     attributes: AttributeMapping
@@ -450,7 +443,7 @@ class PipelineSummary(p.BaseModel, StartEndIso8601Mixin):
 
     def as_dict(self):
         return {
-            "top_span_id": self.top_span_id,
+            "span_id": self.span_id,
             "task_dependencies": list(self.task_dependencies),
             "attributes": self.attributes,
         }
@@ -496,7 +489,7 @@ def parse_spans(spans: Spans) -> PipelineSummary:
     pipeline_attributes = spans.get_attributes(allowed_prefixes={"pipeline."})
 
     # TODO:
-    # - potentially top_span_id could also be passed into function as argument
+    # - potentially (top) span_id could also be passed into function as argument
     # - or, we could determine top node dynamically from input spans, provided it is unique
     #
     if "pipeline.pipeline_run_id" in pipeline_attributes:
@@ -505,7 +498,7 @@ def parse_spans(spans: Spans) -> PipelineSummary:
         top_span_id = "NO-TOP-SPAN--TEMP" + str(uuid.uuid4())
 
     return PipelineSummary(
-        top_span_id=top_span_id,
+        span_id=top_span_id,
         task_dependencies=extract_task_dependencies(spans),
         attributes=pipeline_attributes,
         # TODO:
