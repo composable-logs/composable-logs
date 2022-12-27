@@ -51,11 +51,16 @@ def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans:
     assert pipeline_summary.is_success()
 
     task_summary = one(pipeline_summary.task_runs)
-    assert task_summary.is_success
+    assert task_summary.is_success()
 
     # Check: artifact logged from the evaluated notebook
     artifacts = task_summary.logged_artifacts
-    assert artifacts.keys() == {"README.md", "class_a/binary.bin", "notebook.ipynb"}
+    assert artifacts.keys() == {
+        "README.md",
+        "class_a/binary.bin",
+        "notebook.ipynb",
+        "notebook.html",
+    }
     assert artifacts["README.md"].type == "utf-8"
     assert artifacts["README.md"].content == "foobar123"
 
@@ -122,11 +127,13 @@ def test__jupytext__otel_logging_from_notebook__validate_cli_tool(
         # --- root of output directory ---
         "pipeline.json",
         # --- one task in pipeline run ---
-        "task.json",
+        # "task.json",
+        "task-new.json",  # TBD
         # --- files for single run of task ---
-        "run.json",
+        # "run.json",
         # artifacts are written to disk
         "notebook.ipynb",
+        "notebook.html",
         "binary.bin",
         "README.md",
         # notebooks are converted into html

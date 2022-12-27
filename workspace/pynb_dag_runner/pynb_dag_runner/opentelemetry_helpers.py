@@ -115,17 +115,23 @@ def is_parent_child(span_parent: SpanDict, span_child: SpanDict) -> bool:
 
 # --- span timestamp helpers ---
 
+# TODO:
+#  - delete most of the below and keep 1-2 functions for timestamp handling.
+#
+# Note: dp.parse may not correctly handle timezones correctly:
+# https://docs.python.org/3/library/datetime.html#datetime.datetime.timestamp
+
 
 def iso8601_to_epoch_s(iso8601_datetime: str) -> float:
-    # This may not correctly handle timezones correctly:
-    # https://docs.python.org/3/library/datetime.html#datetime.datetime.timestamp
     return dp.parse(iso8601_datetime).timestamp()
 
 
+def iso8601_to_epoch_us(iso8601_datetime: str) -> int:
+    return int(dp.parse(iso8601_datetime).timestamp() * 1e6)
+
+
 def iso8601_range_to_epoch_us_range(iso8601_start, iso8601_end):
-    start_epoch_us: int = int(iso8601_to_epoch_s(iso8601_start) * 1e6)
-    end_epoch_us: int = int(iso8601_to_epoch_s(iso8601_end) * 1e6)
-    return range(start_epoch_us, end_epoch_us)
+    return range(iso8601_to_epoch_us(iso8601_start), iso8601_to_epoch_us(iso8601_end))
 
 
 def get_duration_range_us(span: SpanDict):

@@ -31,7 +31,7 @@ def test__jupytext__ok_notebook__parse_spans(spans: Spans):
 
     # assert there is one successful task
     task_summary = one(pipeline_summary.task_runs)
-    assert task_summary.is_success
+    assert task_summary.is_success()
 
     # assert attributes are logged
     assert task_summary.attributes["task.notebook"] == NOTEBOOK_PATH
@@ -45,15 +45,19 @@ def test__jupytext__ok_notebook__parse_spans(spans: Spans):
     }
 
     # Check properties of artifact with the evaluated notebook
-    artifact_name, artifact = one(task_summary.logged_artifacts.items())
-    assert isinstance(artifact.content, str)
-    assert len(artifact.content) > 1000
-    assert artifact.type == "utf-8"
-    assert artifact_name == "notebook.ipynb"
+    assert task_summary.logged_artifacts.keys() == {"notebook.ipynb", "notebook.html"}
 
-    # Notebook prints:
-    #  - 1 + 12 + 123 + 1234 + 12345
-    #  - 'variable_a={P["task.variable_a"]}'
-    # Check that these evaluates:
-    assert "variable_a=task-value" in artifact.content
-    assert str(1 + 12 + 123 + 1234 + 12345) in artifact.content
+    def validate(artifact):
+        assert isinstance(artifact.content, str)
+        assert len(artifact.content) > 1000
+        assert artifact.type == "utf-8"
+
+        # Notebook prints:
+        #  - 1 + 12 + 123 + 1234 + 12345
+        #  - 'variable_a={P["task.variable_a"]}'
+        # Check that these evaluates:
+        assert "variable_a=task-value" in artifact.content
+        assert str(1 + 12 + 123 + 1234 + 12345) in artifact.content
+
+    validate(task_summary.logged_artifacts["notebook.ipynb"])
+    validate(task_summary.logged_artifacts["notebook.html"])

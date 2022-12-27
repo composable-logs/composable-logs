@@ -15,6 +15,8 @@ from typing import (
 
 A = TypeVar("A")
 B = TypeVar("B")
+K = TypeVar("K")
+V = TypeVar("V")
 
 # --- range helper functions ---
 
@@ -96,6 +98,9 @@ def one(xs: Iterable[A]) -> A:
     return xs_list[0]
 
 
+# --- dict manipulation helper functions ---
+
+
 def del_key(a_dict: Mapping[A, B], key: A) -> Mapping[A, B]:
     """
     Return new dictionary that is identical to `a_dict` with `key`
@@ -104,6 +109,30 @@ def del_key(a_dict: Mapping[A, B], key: A) -> Mapping[A, B]:
     Input dictionary is not modified.
     """
     return {k: v for k, v in a_dict.items() if k != key}
+
+
+def disjoint_dict_union(*dicts: Mapping[K, V]) -> Mapping[K, V]:
+    """
+    Return the union of multiple dicts, but fail if multiple dicts contain the same key.
+    """
+    assert len(dicts) > 0
+    first_dict, *other_dicts = dicts
+
+    if len(other_dicts) == 0:
+        return first_dict
+
+    elif len(other_dicts) == 1:
+        second_dict = one(other_dicts)
+
+        if len(first_dict.keys() & second_dict.keys()) > 0:
+            raise Exception(
+                f"disjoin_dict_union: same key contained in multiple dicts. Keys for:"
+                f"first_dict = {first_dict.keys()}; second_dict = {second_dict.keys()}."
+            )
+
+        return {**first_dict, **second_dict}
+    else:
+        return disjoint_dict_union(first_dict, disjoint_dict_union(*other_dicts))
 
 
 # --- function helper functions ---

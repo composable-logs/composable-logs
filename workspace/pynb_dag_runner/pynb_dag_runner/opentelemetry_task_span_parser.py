@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path
 from typing import (
     Any,
@@ -21,7 +22,11 @@ from pynb_dag_runner.opentelemetry_helpers import (
 )
 from pynb_dag_runner.notebooks_helpers import convert_ipynb_to_html
 from pynb_dag_runner.tasks.task_opentelemetry_logging import SerializedData
-from pynb_dag_runner.opentelemetry_helpers import iso8601_range_to_epoch_us_range
+from pynb_dag_runner.opentelemetry_helpers import (
+    iso8601_range_to_epoch_us_range,
+    iso8601_to_epoch_us,
+)
+from otel_output_parser.common_helpers.utils import iso8601_to_epoch_ms
 
 # -
 import pydantic as p
@@ -243,6 +248,16 @@ class ArtifactContent(p.BaseModel):
         assert v in ["utf-8", "bytes"]
         return v
 
+    def write(self, filepath: Path):
+        if self.type == "utf-8":
+            assert isinstance(self.content, str)
+            filepath.write_text(self.content)
+        elif self.type == "bytes":
+            assert isinstance(self.content, bytes)
+            filepath.write_bytes(self.content)
+        else:
+            raise ValueError("Internal error")
+
 
 def _artefact_iterator_new(
     spans: Spans, task_run_top_span
@@ -256,6 +271,16 @@ def _artefact_iterator_new(
     ):
         artifact_dict = _decode_data_content_span(artefact_span)
         yield (artifact_dict["name"], ArtifactContent(**del_key(artifact_dict, "name")))
+
+        if artifact_dict["name"] == "notebook.ipynb":
+            assert artifact_dict["type"] == "utf-8"
+            yield (
+                str(Path(artifact_dict["name"]).with_suffix(".html")),
+                ArtifactContent(
+                    type="utf-8",
+                    content=convert_ipynb_to_html(artifact_dict["content"]),
+                ),
+            )
 
 
 # --- Data structure to represent: logged values ---
@@ -272,6 +297,9 @@ class LoggedValueContent(p.BaseModel):
     def validate_type(cls, v):
         assert v in ["utf-8", "bytes", "float", "bool", "json", "int"]
         return v
+
+    def as_dict(self):
+        return {"type": self.type, "value": self.content}
 
 
 def _get_logged_named_values_new(
@@ -316,8 +344,6 @@ def _get_logged_named_values_new(
         )
 
 
-# --- Data structure to represent: attributes ---
-
 AttributeKey = p.StrictStr
 AttributeValues = Union[p.StrictInt, p.StrictFloat, p.StrictBool, p.StrictStr]
 AttributeMapping = Mapping[AttributeKey, AttributeValues]
@@ -325,20 +351,20 @@ AttributeMapping = Mapping[AttributeKey, AttributeValues]
 # --- Data structure to represent: task run summary ---
 
 
-class TaskRunSummary(p.BaseModel):
-    span_id: p.StrictStr
-
+class StartEndIso8601Mixin(p.BaseModel):
     start_time_iso8601: p.StrictStr
     end_time_iso8601: p.StrictStr
 
-    duration_s: p.StrictFloat
+    # --- timing and task run related methods
 
-    is_success: p.StrictBool
-    exceptions: List[Any]
+    def get_start_time_epoch_us(self) -> int:
+        return iso8601_to_epoch_us(self.start_time_iso8601)
 
-    attributes: AttributeMapping
-    logged_values: Dict[LoggedValueName, LoggedValueContent]
-    logged_artifacts: Dict[ArtifactName, ArtifactContent]
+    def get_end_time_epoch_us(self) -> int:
+        return iso8601_to_epoch_us(self.end_time_iso8601)
+
+    def get_duration_s(self) -> float:
+        return (self.get_end_time_epoch_us() - self.get_start_time_epoch_us()) / 1e6
 
     def get_task_timestamp_range_us_epoch(self):
         """
@@ -348,6 +374,19 @@ class TaskRunSummary(p.BaseModel):
             self.start_time_iso8601, self.end_time_iso8601
         )
 
+
+class TaskRunSummary(StartEndIso8601Mixin):
+    span_id: p.StrictStr
+
+    exceptions: List[Any]
+
+    attributes: AttributeMapping
+
+    # keep track of values/artifacts logged *during run time*
+    logged_values: Dict[LoggedValueName, LoggedValueContent]
+    logged_artifacts: Dict[ArtifactName, ArtifactContent]
+
+    # --- input validation
     @p.validator("span_id")
     def validate_otel_span_id(cls, v):
         if not v.startswith("0x"):
@@ -357,11 +396,39 @@ class TaskRunSummary(p.BaseModel):
             )
         return v
 
+    # ---
+    def is_success(self) -> bool:
+        return len(self.exceptions) == 0
+
+    # --- serialise into Python dict
+    def as_dict(self):
+        return {
+            "span_id": self.span_id,
+            #
+            "start_time": self.start_time_iso8601,
+            "end_time": self.end_time_iso8601,
+            "duration_s": self.get_duration_s(),
+            #
+            "is_success": self.is_success(),
+            "exceptions": self.exceptions,
+            #
+            "attributes": self.attributes,
+            #
+            "logged_values": {k: v.as_dict() for k, v in self.logged_values.items()},
+            # return only metadata about logged artifacts; not the content
+            "logged_artifacts": [
+                {"name": str(k), "type": v.type, "size": len(v.content)}
+                for k, v in self.logged_artifacts.items()
+            ],
+        }
+
 
 # --- Data structure to represent: pipeline (of multiple tasks) run summary ---
 
 
-class PipelineSummary(p.BaseModel):
+class PipelineSummary(StartEndIso8601Mixin):
+    span_id: p.StrictStr
+
     # pipeline-level attributes
     attributes: AttributeMapping
 
@@ -372,7 +439,14 @@ class PipelineSummary(p.BaseModel):
 
     def is_success(self):
         # Did all tasks run successfully?
-        return all(task_run.is_success for task_run in self.task_runs)
+        return all(task_run.is_success() for task_run in self.task_runs)
+
+    def as_dict(self):
+        return {
+            "span_id": self.span_id,
+            "task_dependencies": list(self.task_dependencies),
+            "attributes": self.attributes,
+        }
 
 
 def _task_run_iterator(
@@ -388,17 +462,13 @@ def _task_run_iterator(
             ),
         }
 
-        exceptions = spans.bound_inclusive(task_top_span).exception_events()
-
         yield TaskRunSummary(
             span_id=task_top_span["context"]["span_id"],
             # timing
             start_time_iso8601=task_top_span["start_time"],
             end_time_iso8601=task_top_span["end_time"],
-            duration_s=get_duration_s(task_top_span),
             # was task run a success?
-            is_success=len(exceptions) == 0,
-            exceptions=exceptions,
+            exceptions=spans.bound_inclusive(task_top_span).exception_events(),
             # logged metadata
             attributes=task_attributes,
             logged_values=dict(_get_logged_named_values_new(spans, task_top_span)),
@@ -418,8 +488,24 @@ def parse_spans(spans: Spans) -> PipelineSummary:
     """
     pipeline_attributes = spans.get_attributes(allowed_prefixes={"pipeline."})
 
+    # TODO:
+    # - potentially (top) span_id could also be passed into function as argument
+    # - or, we could determine top node dynamically from input spans, provided it is unique
+    #
+    if "pipeline.pipeline_run_id" in pipeline_attributes:
+        top_span_id = pipeline_attributes["pipeline.pipeline_run_id"]
+    else:
+        top_span_id = "NO-TOP-SPAN--TEMP" + str(uuid.uuid4())
+
     return PipelineSummary(
-        task_dependencies=set(extract_task_dependencies(spans)),
+        span_id=top_span_id,
+        task_dependencies=extract_task_dependencies(spans),
         attributes=pipeline_attributes,
+        # TODO:
+        # Move to have a top span for pipeline. use that for ID and time-ranges.
+        # But determine time range dynamically for now:
+        start_time_iso8601=min(span["start_time"] for span in spans),
+        end_time_iso8601=max(span["end_time"] for span in spans),
+        # --
         task_runs=list(_task_run_iterator(pipeline_attributes, spans)),
     )

@@ -17,7 +17,7 @@ from otel_output_parser.common_helpers.graph import Graph
 # --- sinks for processing {pipeline, task, run} summaries ----
 
 
-class StaticMLFlowDataSink:
+class StaticMLFlowDataSinkOld:
     """
     Stateful sink for outputting ML Flow static data
     """
@@ -117,7 +117,7 @@ class StaticMLFlowDataSink:
         )
 
 
-def write_attachment_sink(output_dir: Optional[Path], summary):
+def write_attachment_sink_old(output_dir: Optional[Path], summary):
     """
     Stateless sink: write attachments in a {pipeline, task, run}-summary to
     output directory.

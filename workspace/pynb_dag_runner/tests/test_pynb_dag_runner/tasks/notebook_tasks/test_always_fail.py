@@ -36,7 +36,7 @@ def test__jupytext__always_fail__parse_spans(spans: Spans):
     task_summary = one(pipeline_summary.task_runs)
 
     # assert that exception is logged
-    assert not task_summary.is_success
+    assert not task_summary.is_success()
     assert len(task_summary.exceptions) == 2
     assert "This notebook always fails" in str(task_summary.exceptions)
 
