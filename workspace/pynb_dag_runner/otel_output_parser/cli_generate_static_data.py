@@ -214,8 +214,8 @@ def process(spans: Spans, www_root: Path):
         ),
     }
 
-    # Note: This dict is optimised for UI/reporting. It is slightly different from
-    # the summary dict created at pipeline runtime.
+    # TODO: The below dict:s are optimised for UI/reporting. They are slightly
+    # different from the summary dict created at pipeline runtime.
     yield {
         "parent_span_id": None,
         "span_id": pipeline_summary.span_id,
@@ -223,7 +223,7 @@ def process(spans: Spans, www_root: Path):
         **dict_prefix_keys("timing_", pipeline_summary.timing.as_dict()),
         "is_success": pipeline_summary.is_success(),
         "attributes": pipeline_summary.attributes,
-        "artifacts": list(
+        "artifacts": (
             _artifact_metadata(
                 _write_artifacts(
                     output_path=www_root / pipeline_artifact_relative_root,
