@@ -8,7 +8,7 @@ from argparse import ArgumentParser
 
 # -
 from pynb_dag_runner import version_string
-from pynb_dag_runner.helpers import disjoint_dict_union
+from pynb_dag_runner.helpers import dict_disjoint_union, dict_prefix_keys
 from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.opentelemetry_task_span_parser import (
     get_pipeline_iterators,
@@ -217,14 +217,11 @@ def process(spans: Spans, www_root: Path):
     # Note: This dict is optimised for UI/reporting. It is slightly different from
     # the summary dict created at pipeline runtime.
     yield {
+        "parent_span_id": None,
         "span_id": pipeline_summary.span_id,
         "type": "pipeline",
-        "artifacts_location": str(pipeline_artifact_relative_root),
-        "start_time_epoch_us": pipeline_summary.get_start_time_epoch_us(),
-        "end_time_epoch_us": pipeline_summary.get_end_time_epoch_us(),
-        "duration_s": pipeline_summary.get_duration_s(),
+        **dict_prefix_keys("timing_", pipeline_summary.timing.as_dict()),
         "is_success": pipeline_summary.is_success(),
-        "parent_id": None,
         "attributes": pipeline_summary.attributes,
         "artifacts": list(
             _artifact_metadata(
@@ -242,23 +239,24 @@ def process(spans: Spans, www_root: Path):
         )
         print(" - task", task_artifact_relative_root)
         yield {
+            "parent_span_id": pipeline_summary.span_id,
             "span_id": task_run_summary.span_id,
             "type": "task",
             "task_id": task_run_summary.task_id,
-            "parent_span_id": pipeline_summary.span_id,
-            "artifacts_location": str(task_artifact_relative_root),
-            "start_time_epoch_us": task_run_summary.timing.get_start_time_epoch_us(),
-            "end_time_epoch_us": task_run_summary.timing.get_end_time_epoch_us(),
-            "duration_s": task_run_summary.timing.get_duration_s(),
+            **dict_prefix_keys("timing_", task_run_summary.timing.as_dict()),
             "is_success": task_run_summary.is_success(),
+            # List of exceptions are not included in the reporting JSON.
+            # TODO: write to an artifact for inspection.
             "attributes": task_run_summary.attributes,
-            "logged_artifacts": (
+            # note: In addition to "logged_artifacts" the below also include metadata
+            # for additional artifacts generated for reporting (like mermaid diagrams).
+            "artifacts": (
                 _artifact_metadata(
                     _write_artifacts(
                         output_path=www_root / task_artifact_relative_root,
                         # log artifacts logged during task run.
                         # in addition, log a json with metadata logged *during run time*
-                        artifacts=disjoint_dict_union(
+                        artifacts=dict_disjoint_union(
                             task_run_summary.logged_artifacts,
                             {
                                 "run-time-metadata.json": ArtifactContent(

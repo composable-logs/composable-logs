@@ -111,7 +111,15 @@ def del_key(a_dict: Mapping[A, B], key: A) -> Mapping[A, B]:
     return {k: v for k, v in a_dict.items() if k != key}
 
 
-def disjoint_dict_union(*dicts: Mapping[K, V]) -> Mapping[K, V]:
+def dict_prefix_keys(prefix: str, a_dict: Mapping[str, V]) -> Mapping[str, V]:
+    """
+    Return new dictionary Dict[str, V] that is identical to `a_dict` but where
+    all keys have prefixed with a string.
+    """
+    return {prefix + k: v for k, v in a_dict.items()}
+
+
+def dict_disjoint_union(*dicts: Mapping[K, V]) -> Mapping[K, V]:
     """
     Return the union of multiple dicts, but fail if multiple dicts contain the same key.
     """
@@ -132,7 +140,7 @@ def disjoint_dict_union(*dicts: Mapping[K, V]) -> Mapping[K, V]:
 
         return {**first_dict, **second_dict}
     else:
-        return disjoint_dict_union(first_dict, disjoint_dict_union(*other_dicts))
+        return dict_disjoint_union(first_dict, dict_disjoint_union(*other_dicts))
 
 
 # --- function helper functions ---
