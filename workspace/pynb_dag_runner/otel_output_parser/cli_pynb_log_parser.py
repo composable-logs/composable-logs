@@ -2,6 +2,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 
 #
+from pynb_dag_runner import version_string
 from pynb_dag_runner.helpers import read_json, write_json
 from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.opentelemetry_task_span_parser import (
@@ -192,7 +193,7 @@ def args():
 
 
 def entry_point():
-    print("-- pynb_dag_runner: log parser cli --")
+    print(f"--- pynb_log_parser cli {version_string()} ---")
 
     spans: Spans = Spans(read_json(args().input_span_file))
     print(f"Number of spans loaded {len(spans)}")

@@ -7,6 +7,7 @@ from functools import lru_cache
 from argparse import ArgumentParser
 
 # -
+from pynb_dag_runner import version_string
 from pynb_dag_runner.helpers import disjoint_dict_union
 from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.opentelemetry_task_span_parser import (
@@ -169,12 +170,13 @@ def _write_artifacts(output_path: Path, artifacts):
 
 
 def _artifact_metadata(artifacts_items):
-    for artifact_name, artifact_content in artifacts_items:
-        yield {
-            "name": artifact_name,
+    return {
+        artifact_name: {
             "type": artifact_content.type,
             "size": len(artifact_content.content),
         }
+        for artifact_name, artifact_content in artifacts_items
+    }
 
 
 def process(spans: Spans, www_root: Path):
@@ -235,22 +237,24 @@ def process(spans: Spans, www_root: Path):
     }
 
     for task_run_summary in pipeline_summary.task_runs:
-        task_artifact_root = www_root / "artifacts" / "task" / task_run_summary.span_id
-        print(" - task", task_artifact_root)
+        task_artifact_relative_root = (
+            Path("artifacts") / "task" / task_run_summary.span_id
+        )
+        print(" - task", task_artifact_relative_root)
         yield {
             "span_id": task_run_summary.span_id,
             "type": "task",
-            "artifacts_location": str(task_artifact_root),
+            "artifacts_location": str(task_artifact_relative_root),
             "start_time_epoch_us": task_run_summary.get_start_time_epoch_us(),
             "end_time_epoch_us": task_run_summary.get_end_time_epoch_us(),
             "duration_s": task_run_summary.get_duration_s(),
             "is_success": task_run_summary.is_success(),
             "parent_id": pipeline_summary.span_id,
             "attributes": task_run_summary.attributes,
-            "artifacts": list(
+            "logged_artifacts": (
                 _artifact_metadata(
                     _write_artifacts(
-                        output_path=www_root / task_artifact_root,
+                        output_path=www_root / task_artifact_relative_root,
                         # log artifacts logged during task run.
                         # in addition, log a json with metadata logged *during run time*
                         artifacts=disjoint_dict_union(
@@ -267,11 +271,14 @@ def process(spans: Spans, www_root: Path):
                     )
                 )
             ),
+            "logged_values": {
+                k: v.as_dict() for k, v in task_run_summary.logged_values.items()
+            },
         }
 
 
 def entry_point():
-    print("--- generate_static_data ---")
+    print(f"--- generate_static_data cli {version_string()} ---")
     print("github_repository          :", args().github_repository)
     print("zip_cache_dir              :", args().zip_cache_dir)
     print("output_www_root_directory  :", args().output_www_root_directory)
