@@ -488,7 +488,9 @@ def _task_run_iterator(
             span_id=task_top_span["context"]["span_id"],
             parent_span_id=top_span_id,
             # TODO: task_id should be provided when creating a task
-            task_id=task_attributes["task.notebook"].replace(".py", "").split("/")[-1],
+            task_id=task_attributes.get("task.notebook", "id/not-available.py")
+            .replace(".py", "")
+            .split("/")[-1],
             # timing
             start_time_iso8601=task_top_span["start_time"],
             end_time_iso8601=task_top_span["end_time"],
