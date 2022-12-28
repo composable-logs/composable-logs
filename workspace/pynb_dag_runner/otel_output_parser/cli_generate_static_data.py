@@ -280,32 +280,32 @@ def entry_point():
 
     # # --- old parser : to be deleted after move to new span parser ---
 
-    # # if output_static_data_json is None, this sink is no-op
-    # static_mlflow_data_sink = StaticMLFlowDataSinkOld(
-    #     args().output_www_root_directory / "ui_static_data.json"
-    # )
+    # if output_static_data_json is None, this sink is no-op
+    static_mlflow_data_sink = StaticMLFlowDataSinkOld(
+        args().output_www_root_directory / "ui_static_data.json"
+    )
 
-    # for artifact_zip in github_repo_artifact_zips(
-    #     github_repository=args().github_repository,
-    #     zip_cache_dir=args().zip_cache_dir,
-    # ):
-    #     spans = get_recorded_spans_from_zip(artifact_zip)
-    #     span_summary = list(linearize_log_events(spans))
+    for artifact_zip in github_repo_artifact_zips(
+        github_repository=args().github_repository,
+        zip_cache_dir=args().zip_cache_dir,
+    ):
+        spans = get_recorded_spans_from_zip(artifact_zip)
+        span_summary = list(linearize_log_events(spans))
 
-    #     print(
-    #         "pipeline ids:",
-    #         [s["id"] for s in span_summary if s["type"] == "pipeline"],
-    #     )
+        print(
+            "pipeline ids:",
+            [s["id"] for s in span_summary if s["type"] == "pipeline"],
+        )
 
-    #     for span_summary in linearize_log_events(spans):
-    #         write_attachment_sink_old(
-    #             args().output_www_root_directory / "pipeline-artifacts",
-    #             span_summary,
-    #         )
-    #         static_mlflow_data_sink.push(span_summary)
+        for span_summary in linearize_log_events(spans):
+            write_attachment_sink_old(
+                args().output_www_root_directory / "pipeline-artifacts",
+                span_summary,
+            )
+            static_mlflow_data_sink.push(span_summary)
 
-    # static_mlflow_data_sink.close()
-    # # ---- end of old parser --- to be deleted ---
+    static_mlflow_data_sink.close()
+    # ---- end of old parser --- to be deleted ---
 
     # --- new span parser ---
 
