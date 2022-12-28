@@ -153,9 +153,9 @@ def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
             task_run_summary.as_dict(),
         )
 
-        for artifact_name, artifact in task_run_summary.logged_artifacts.items():
+        for artifact in task_run_summary.logged_artifacts:
             out_path: Path = safe_path(
-                ensure_dir_exist(out_basepath / task_dir / "artifacts" / artifact_name)
+                ensure_dir_exist(out_basepath / task_dir / "artifacts" / artifact.name)
             )
             artifact.write(out_path)
 

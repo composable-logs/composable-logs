@@ -119,30 +119,6 @@ def dict_prefix_keys(prefix: str, a_dict: Mapping[str, V]) -> Mapping[str, V]:
     return {prefix + k: v for k, v in a_dict.items()}
 
 
-def dict_disjoint_union(*dicts: Mapping[K, V]) -> Mapping[K, V]:
-    """
-    Return the union of multiple dicts, but fail if multiple dicts contain the same key.
-    """
-    assert len(dicts) > 0
-    first_dict, *other_dicts = dicts
-
-    if len(other_dicts) == 0:
-        return first_dict
-
-    elif len(other_dicts) == 1:
-        second_dict = one(other_dicts)
-
-        if len(first_dict.keys() & second_dict.keys()) > 0:
-            raise Exception(
-                f"disjoin_dict_union: same key contained in multiple dicts. Keys for:"
-                f"first_dict = {first_dict.keys()}; second_dict = {second_dict.keys()}."
-            )
-
-        return {**first_dict, **second_dict}
-    else:
-        return dict_disjoint_union(first_dict, dict_disjoint_union(*other_dicts))
-
-
 # --- function helper functions ---
 
 

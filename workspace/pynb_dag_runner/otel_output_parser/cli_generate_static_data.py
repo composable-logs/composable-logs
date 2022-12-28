@@ -8,7 +8,7 @@ from argparse import ArgumentParser
 
 # -
 from pynb_dag_runner import version_string
-from pynb_dag_runner.helpers import dict_disjoint_union, dict_prefix_keys
+from pynb_dag_runner.helpers import dict_prefix_keys
 from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.opentelemetry_task_span_parser import (
     get_pipeline_iterators,
@@ -164,19 +164,10 @@ def linearize_log_events(spans: Spans) -> Iterable[Any]:
 
 
 def _write_artifacts(output_path: Path, artifacts):
-    for artifact_name, artifact_content in artifacts.items():
-        artifact_content.write(ensure_dir_exist(output_path / artifact_name))
-        yield artifact_name, artifact_content
+    for artifact in artifacts:
+        artifact.write(ensure_dir_exist(output_path / artifact.name))
 
-
-def _artifact_metadata(artifacts_items):
-    return {
-        artifact_name: {
-            "type": artifact_content.type,
-            "size": len(artifact_content.content),
-        }
-        for artifact_name, artifact_content in artifacts_items
-    }
+    return artifacts
 
 
 def process(spans: Spans, www_root: Path):
@@ -188,6 +179,8 @@ def process(spans: Spans, www_root: Path):
     )
 
     # The below are not real artifacts logged during pipeline execution.
+    # Normal artifacts (and logged values) are only logged on per-task level
+    # (and not on pipeline-level).
     #
     # Rather, these are assets generated for reporting/visualisation.
     #
@@ -195,24 +188,28 @@ def process(spans: Spans, www_root: Path):
     # can be generated dynamically and updated independently without having
     # to rerun the pipeline.
     #
-    reporting_artifacts = {
-        "dag.mmd": ArtifactContent(
+    reporting_artifacts = [
+        ArtifactContent(
+            name="dag.mmd",
             type="utf-8",
             content=make_mermaid_dag_inputfile(spans, generate_links=True),
         ),
-        "dag-nolinks.mmd": ArtifactContent(
+        ArtifactContent(
+            name="dag-nolinks.mmd",
             type="utf-8",
             content=make_mermaid_dag_inputfile(spans, generate_links=False),
         ),
-        "gantt.mmd": ArtifactContent(
+        ArtifactContent(
+            name="gantt.mmd",
             type="utf-8",
             content=make_mermaid_gantt_inputfile(spans),
         ),
-        "run-time-metadata.json": ArtifactContent(
+        ArtifactContent(
+            name="run-time-metadata.json",
             type="utf-8",
             content=json.dumps(pipeline_summary.as_dict(), indent=2),
         ),
-    }
+    ]
 
     # TODO: The below dict:s are optimised for UI/reporting. They are slightly
     # different from the summary dict created at pipeline runtime.
@@ -223,14 +220,13 @@ def process(spans: Spans, www_root: Path):
         **dict_prefix_keys("timing_", pipeline_summary.timing.as_dict()),
         "is_success": pipeline_summary.is_success(),
         "attributes": pipeline_summary.attributes,
-        "artifacts": (
-            _artifact_metadata(
-                _write_artifacts(
-                    output_path=www_root / pipeline_artifact_relative_root,
-                    artifacts=reporting_artifacts,
-                )
+        "artifacts": [
+            artifact.metadata_as_dict()
+            for artifact in _write_artifacts(
+                output_path=www_root / pipeline_artifact_relative_root,
+                artifacts=reporting_artifacts,
             )
-        ),
+        ],
     }
 
     for task_run_summary in pipeline_summary.task_runs:
@@ -250,26 +246,26 @@ def process(spans: Spans, www_root: Path):
             "attributes": task_run_summary.attributes,
             # note: In addition to "logged_artifacts" the below also include metadata
             # for additional artifacts generated for reporting (like mermaid diagrams).
-            "artifacts": (
-                _artifact_metadata(
-                    _write_artifacts(
-                        output_path=www_root / task_artifact_relative_root,
-                        # log artifacts logged during task run.
-                        # in addition, log a json with metadata logged *during run time*
-                        artifacts=dict_disjoint_union(
-                            task_run_summary.logged_artifacts,
-                            {
-                                "run-time-metadata.json": ArtifactContent(
-                                    type="utf-8",
-                                    content=json.dumps(
-                                        task_run_summary.as_dict(), indent=2
-                                    ),
-                                )
-                            },
-                        ),
-                    )
+            "artifacts": [
+                artifact.metadata_as_dict()
+                for artifact in _write_artifacts(
+                    output_path=www_root / task_artifact_relative_root,
+                    artifacts=(
+                        task_run_summary.logged_artifacts
+                        # log artifacts logged during task run. in addition, log
+                        # a json with metadata logged *during run time*
+                        + [
+                            ArtifactContent(
+                                name="run-time-metadata.json",
+                                type="utf-8",
+                                content=json.dumps(
+                                    task_run_summary.as_dict(), indent=2
+                                ),
+                            )
+                        ]
+                    ),
                 )
-            ),
+            ],
             "logged_values": {
                 k: v.as_dict() for k, v in task_run_summary.logged_values.items()
             },

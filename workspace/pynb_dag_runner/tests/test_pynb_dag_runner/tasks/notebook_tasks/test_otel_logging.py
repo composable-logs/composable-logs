@@ -55,20 +55,28 @@ def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans:
 
     # Check: artifact logged from the evaluated notebook
     artifacts = task_summary.logged_artifacts
-    assert artifacts.keys() == {
+
+    assert set(artifact.name for artifact in artifacts) == {
         "README.md",
         "class_a/binary.bin",
         "notebook.ipynb",
         "notebook.html",
     }
-    assert artifacts["README.md"].type == "utf-8"
-    assert artifacts["README.md"].content == "foobar123"
 
-    assert artifacts["notebook.ipynb"].type == "utf-8"
-    assert len(artifacts["notebook.ipynb"].content) > 1000
+    def lookup_artifact(artifact_name):
+        return [one(x for x in artifacts if x.name == artifact_name)]
 
-    assert artifacts["class_a/binary.bin"].type == "bytes"
-    assert artifacts["class_a/binary.bin"].content == bytes(range(256))
+    for artifact in lookup_artifact("README.md"):
+        assert artifact.type == "utf-8"
+        assert artifact.content == "foobar123"
+
+    for artifact in lookup_artifact("notebook.ipynb"):
+        assert artifact.type == "utf-8"
+        assert len(artifact.content) > 1000
+
+    for artifact in lookup_artifact("class_a/binary.bin"):
+        assert artifact.type == "bytes"
+        assert artifact.content == bytes(range(256))
 
     # Check: logged values from notebook
     logged_values = task_summary.logged_values

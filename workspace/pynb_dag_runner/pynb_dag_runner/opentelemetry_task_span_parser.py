@@ -13,7 +13,7 @@ from typing import (
 )
 
 #
-from pynb_dag_runner.helpers import del_key
+from pynb_dag_runner.helpers import del_key, dict_prefix_keys
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanDict,
@@ -26,7 +26,6 @@ from pynb_dag_runner.opentelemetry_helpers import (
     iso8601_range_to_epoch_us_range,
     iso8601_to_epoch_us,
 )
-from otel_output_parser.common_helpers.utils import iso8601_to_epoch_ms
 
 # -
 import pydantic as p
@@ -240,8 +239,16 @@ ArtifactName = p.StrictStr
 
 
 class ArtifactContent(p.BaseModel):
+    name: p.StrictStr
     type: p.StrictStr
     content: Union[p.StrictStr, p.StrictBytes]
+
+    def metadata_as_dict(self):
+        return {
+            "name": str(self.name),
+            "type": str(self.type),
+            "length": len(self.content),
+        }
 
     @p.validator("type")
     def validate_type(cls, v):
@@ -261,7 +268,7 @@ class ArtifactContent(p.BaseModel):
 
 def _artefact_iterator_new(
     spans: Spans, task_run_top_span
-) -> Iterable[Tuple[ArtifactName, ArtifactContent]]:
+) -> Iterable[ArtifactContent]:
     for artefact_span in (
         spans.bound_under(task_run_top_span)
         # -
@@ -270,16 +277,17 @@ def _artefact_iterator_new(
         .filter(["status", "status_code"], "OK")
     ):
         artifact_dict = _decode_data_content_span(artefact_span)
-        yield (artifact_dict["name"], ArtifactContent(**del_key(artifact_dict, "name")))
+        yield ArtifactContent(
+            name=artifact_dict["name"],
+            **del_key(artifact_dict, "name"),
+        )
 
         if artifact_dict["name"] == "notebook.ipynb":
             assert artifact_dict["type"] == "utf-8"
-            yield (
-                str(Path(artifact_dict["name"]).with_suffix(".html")),
-                ArtifactContent(
-                    type="utf-8",
-                    content=convert_ipynb_to_html(artifact_dict["content"]),
-                ),
+            yield ArtifactContent(
+                name=str(Path(artifact_dict["name"]).with_suffix(".html")),
+                type="utf-8",
+                content=convert_ipynb_to_html(artifact_dict["content"]),
             )
 
 
@@ -325,7 +333,7 @@ def _get_logged_named_values_new(
         value_type: str = logged_value_span["attributes"]["type"]
 
         # Abort if same value has been logged multiple times.
-        # (case eg for logging training objective)
+        # (case eg for logging cost functions, not supported (yet))
         if value_name in logged_values:
             raise ValueError(
                 f"Named value {value_name} has been logged multiple times."
@@ -405,7 +413,7 @@ class TaskRunSummary(p.BaseModel):
 
     # keep track of values/artifacts logged *during run time*
     logged_values: Dict[LoggedValueName, LoggedValueContent]
-    logged_artifacts: Dict[ArtifactName, ArtifactContent]
+    logged_artifacts: List[ArtifactContent]
 
     # --- input validation
     @p.validator("span_id")
@@ -427,7 +435,7 @@ class TaskRunSummary(p.BaseModel):
             "span_id": self.span_id,
             "parent_span_id": self.parent_span_id,
             "task_id": self.task_id,
-            "timing": self.timing.as_dict(),
+            **dict_prefix_keys("timing_", self.timing.as_dict()),
             #
             "is_success": self.is_success(),
             "exceptions": self.exceptions,
@@ -435,11 +443,9 @@ class TaskRunSummary(p.BaseModel):
             "attributes": self.attributes,
             #
             "logged_values": {k: v.as_dict() for k, v in self.logged_values.items()},
-            # return only metadata about logged artifacts; not the content
-            "logged_artifacts": {
-                str(k): {"type": v.type, "size": len(v.content)}
-                for k, v in self.logged_artifacts.items()
-            },
+            "logged_artifacts": [
+                artifact.metadata_as_dict() for artifact in self.logged_artifacts
+            ],
         }
 
 
@@ -466,6 +472,7 @@ class PipelineSummary(p.BaseModel):
     def as_dict(self):
         return {
             "span_id": self.span_id,
+            **dict_prefix_keys("timing_", self.timing.as_dict()),
             "task_dependencies": list(self.task_dependencies),
             "attributes": self.attributes,
         }
@@ -491,9 +498,6 @@ def _task_run_iterator(
             task_id=task_attributes.get("task.notebook", "id/not-available.py")
             .replace(".py", "")
             .split("/")[-1],
-            # timing
-            start_time_iso8601=task_top_span["start_time"],
-            end_time_iso8601=task_top_span["end_time"],
             timing=Timing(
                 start_time_iso8601=task_top_span["start_time"],
                 end_time_iso8601=task_top_span["end_time"],
@@ -503,7 +507,7 @@ def _task_run_iterator(
             # input parameters + logged data
             attributes=task_attributes,
             logged_values=dict(_get_logged_named_values_new(spans, task_top_span)),
-            logged_artifacts=dict(_artefact_iterator_new(spans, task_top_span)),
+            logged_artifacts=list(_artefact_iterator_new(spans, task_top_span)),
         )
 
 
