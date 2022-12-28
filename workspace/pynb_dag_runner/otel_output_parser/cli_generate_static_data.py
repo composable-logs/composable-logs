@@ -244,12 +244,13 @@ def process(spans: Spans, www_root: Path):
         yield {
             "span_id": task_run_summary.span_id,
             "type": "task",
+            "task_id": task_run_summary.task_id,
+            "parent_span_id": pipeline_summary.span_id,
             "artifacts_location": str(task_artifact_relative_root),
-            "start_time_epoch_us": task_run_summary.get_start_time_epoch_us(),
-            "end_time_epoch_us": task_run_summary.get_end_time_epoch_us(),
-            "duration_s": task_run_summary.get_duration_s(),
+            "start_time_epoch_us": task_run_summary.timing.get_start_time_epoch_us(),
+            "end_time_epoch_us": task_run_summary.timing.get_end_time_epoch_us(),
+            "duration_s": task_run_summary.timing.get_duration_s(),
             "is_success": task_run_summary.is_success(),
-            "parent_id": pipeline_summary.span_id,
             "attributes": task_run_summary.attributes,
             "logged_artifacts": (
                 _artifact_metadata(
@@ -283,34 +284,34 @@ def entry_point():
     print("zip_cache_dir              :", args().zip_cache_dir)
     print("output_www_root_directory  :", args().output_www_root_directory)
 
-    # --- old parser : to be deleted after move to new span parser ---
+    # # --- old parser : to be deleted after move to new span parser ---
 
-    # if output_static_data_json is None, this sink is no-op
-    static_mlflow_data_sink = StaticMLFlowDataSinkOld(
-        args().output_www_root_directory / "ui_static_data.json"
-    )
+    # # if output_static_data_json is None, this sink is no-op
+    # static_mlflow_data_sink = StaticMLFlowDataSinkOld(
+    #     args().output_www_root_directory / "ui_static_data.json"
+    # )
 
-    for artifact_zip in github_repo_artifact_zips(
-        github_repository=args().github_repository,
-        zip_cache_dir=args().zip_cache_dir,
-    ):
-        spans = get_recorded_spans_from_zip(artifact_zip)
-        span_summary = list(linearize_log_events(spans))
+    # for artifact_zip in github_repo_artifact_zips(
+    #     github_repository=args().github_repository,
+    #     zip_cache_dir=args().zip_cache_dir,
+    # ):
+    #     spans = get_recorded_spans_from_zip(artifact_zip)
+    #     span_summary = list(linearize_log_events(spans))
 
-        print(
-            "pipeline ids:",
-            [s["id"] for s in span_summary if s["type"] == "pipeline"],
-        )
+    #     print(
+    #         "pipeline ids:",
+    #         [s["id"] for s in span_summary if s["type"] == "pipeline"],
+    #     )
 
-        for span_summary in linearize_log_events(spans):
-            write_attachment_sink_old(
-                args().output_www_root_directory / "pipeline-artifacts",
-                span_summary,
-            )
-            static_mlflow_data_sink.push(span_summary)
+    #     for span_summary in linearize_log_events(spans):
+    #         write_attachment_sink_old(
+    #             args().output_www_root_directory / "pipeline-artifacts",
+    #             span_summary,
+    #         )
+    #         static_mlflow_data_sink.push(span_summary)
 
-    static_mlflow_data_sink.close()
-    # ---- end of old parser --- to be deleted ---
+    # static_mlflow_data_sink.close()
+    # # ---- end of old parser --- to be deleted ---
 
     # --- new span parser ---
 
@@ -319,8 +320,8 @@ def entry_point():
         github_repository=args().github_repository,
         zip_cache_dir=args().zip_cache_dir,
     ):
-        print(f"--- Processing new zip with {len(spans)} spans ...")
         spans = get_recorded_spans_from_zip(artifact_zip)
+        print(f"--- Processing new zip with {len(spans)} spans ...")
 
         for entry in process(
             spans, args().output_www_root_directory / "static-artifacts"

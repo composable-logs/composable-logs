@@ -147,7 +147,7 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
             description = "FAILED"
             modifier = "crit"
 
-        us_range = task_run_summary.get_task_timestamp_range_us_epoch()
+        us_range = task_run_summary.timing.get_task_timestamp_range_us_epoch()
         output_lines += [
             ", ".join(
                 [
