@@ -7,7 +7,8 @@ from functools import lru_cache
 from argparse import ArgumentParser
 
 # -
-from pynb_dag_runner.helpers import disjoint_dict_union
+from pynb_dag_runner import version_string
+from pynb_dag_runner.helpers import dict_prefix_keys
 from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.opentelemetry_task_span_parser import (
     get_pipeline_iterators,
@@ -163,18 +164,10 @@ def linearize_log_events(spans: Spans) -> Iterable[Any]:
 
 
 def _write_artifacts(output_path: Path, artifacts):
-    for artifact_name, artifact_content in artifacts.items():
-        artifact_content.write(ensure_dir_exist(output_path / artifact_name))
-        yield artifact_name, artifact_content
+    for artifact in artifacts:
+        artifact.write(ensure_dir_exist(output_path / artifact.name))
 
-
-def _artifact_metadata(artifacts_items):
-    for artifact_name, artifact_content in artifacts_items:
-        yield {
-            "name": artifact_name,
-            "type": artifact_content.type,
-            "size": len(artifact_content.content),
-        }
+    return artifacts
 
 
 def process(spans: Spans, www_root: Path):
@@ -186,6 +179,8 @@ def process(spans: Spans, www_root: Path):
     )
 
     # The below are not real artifacts logged during pipeline execution.
+    # Normal artifacts (and logged values) are only logged on per-task level
+    # (and not on pipeline-level).
     #
     # Rather, these are assets generated for reporting/visualisation.
     #
@@ -193,90 +188,97 @@ def process(spans: Spans, www_root: Path):
     # can be generated dynamically and updated independently without having
     # to rerun the pipeline.
     #
-    reporting_artifacts = {
-        "dag.mmd": ArtifactContent(
+    reporting_artifacts = [
+        ArtifactContent(
+            name="dag.mmd",
             type="utf-8",
             content=make_mermaid_dag_inputfile(spans, generate_links=True),
         ),
-        "dag-nolinks.mmd": ArtifactContent(
+        ArtifactContent(
+            name="dag-nolinks.mmd",
             type="utf-8",
             content=make_mermaid_dag_inputfile(spans, generate_links=False),
         ),
-        "gantt.mmd": ArtifactContent(
+        ArtifactContent(
+            name="gantt.mmd",
             type="utf-8",
             content=make_mermaid_gantt_inputfile(spans),
         ),
-        "run-time-metadata.json": ArtifactContent(
+        ArtifactContent(
+            name="run-time-metadata.json",
             type="utf-8",
             content=json.dumps(pipeline_summary.as_dict(), indent=2),
         ),
-    }
+    ]
 
-    # Note: This dict is optimised for UI/reporting. It is slightly different from
-    # the summary dict created at pipeline runtime.
+    # TODO: The below dict:s are optimised for UI/reporting. They are slightly
+    # different from the summary dict created at pipeline runtime.
     yield {
+        "parent_span_id": None,
         "span_id": pipeline_summary.span_id,
         "type": "pipeline",
-        "artifacts_location": str(pipeline_artifact_relative_root),
-        "start_time_epoch_us": pipeline_summary.get_start_time_epoch_us(),
-        "end_time_epoch_us": pipeline_summary.get_end_time_epoch_us(),
-        "duration_s": pipeline_summary.get_duration_s(),
+        **dict_prefix_keys("timing_", pipeline_summary.timing.as_dict()),
         "is_success": pipeline_summary.is_success(),
-        "parent_id": None,
         "attributes": pipeline_summary.attributes,
-        "artifacts": list(
-            _artifact_metadata(
-                _write_artifacts(
-                    output_path=www_root / pipeline_artifact_relative_root,
-                    artifacts=reporting_artifacts,
-                )
+        "artifacts": [
+            artifact.metadata_as_dict()
+            for artifact in _write_artifacts(
+                output_path=www_root / pipeline_artifact_relative_root,
+                artifacts=reporting_artifacts,
             )
-        ),
+        ],
     }
 
     for task_run_summary in pipeline_summary.task_runs:
-        task_artifact_root = www_root / "artifacts" / "task" / task_run_summary.span_id
-        print(" - task", task_artifact_root)
+        task_artifact_relative_root = (
+            Path("artifacts") / "task" / task_run_summary.span_id
+        )
+        print(" - task", task_artifact_relative_root)
         yield {
+            "parent_span_id": pipeline_summary.span_id,
             "span_id": task_run_summary.span_id,
             "type": "task",
-            "artifacts_location": str(task_artifact_root),
-            "start_time_epoch_us": task_run_summary.get_start_time_epoch_us(),
-            "end_time_epoch_us": task_run_summary.get_end_time_epoch_us(),
-            "duration_s": task_run_summary.get_duration_s(),
+            "task_id": task_run_summary.task_id,
+            **dict_prefix_keys("timing_", task_run_summary.timing.as_dict()),
             "is_success": task_run_summary.is_success(),
-            "parent_id": pipeline_summary.span_id,
+            # List of exceptions are not included in the reporting JSON.
+            # TODO: write to an artifact for inspection.
             "attributes": task_run_summary.attributes,
-            "artifacts": list(
-                _artifact_metadata(
-                    _write_artifacts(
-                        output_path=www_root / task_artifact_root,
-                        # log artifacts logged during task run.
-                        # in addition, log a json with metadata logged *during run time*
-                        artifacts=disjoint_dict_union(
-                            task_run_summary.logged_artifacts,
-                            {
-                                "run-time-metadata.json": ArtifactContent(
-                                    type="utf-8",
-                                    content=json.dumps(
-                                        task_run_summary.as_dict(), indent=2
-                                    ),
-                                )
-                            },
-                        ),
-                    )
+            # note: In addition to "logged_artifacts" the below also include metadata
+            # for additional artifacts generated for reporting (like mermaid diagrams).
+            "artifacts": [
+                artifact.metadata_as_dict()
+                for artifact in _write_artifacts(
+                    output_path=www_root / task_artifact_relative_root,
+                    artifacts=(
+                        task_run_summary.logged_artifacts
+                        # log artifacts logged during task run. in addition, log
+                        # a json with metadata logged *during run time*
+                        + [
+                            ArtifactContent(
+                                name="run-time-metadata.json",
+                                type="utf-8",
+                                content=json.dumps(
+                                    task_run_summary.as_dict(), indent=2
+                                ),
+                            )
+                        ]
+                    ),
                 )
-            ),
+            ],
+            "logged_values": {
+                k: v.as_dict() for k, v in task_run_summary.logged_values.items()
+            },
         }
 
 
 def entry_point():
-    print("--- generate_static_data ---")
+    print(f"--- generate_static_data cli {version_string()} ---")
     print("github_repository          :", args().github_repository)
     print("zip_cache_dir              :", args().zip_cache_dir)
     print("output_www_root_directory  :", args().output_www_root_directory)
 
-    # --- old parser : to be deleted after move to new span parser ---
+    # # --- old parser : to be deleted after move to new span parser ---
 
     # if output_static_data_json is None, this sink is no-op
     static_mlflow_data_sink = StaticMLFlowDataSinkOld(
@@ -312,13 +314,10 @@ def entry_point():
         github_repository=args().github_repository,
         zip_cache_dir=args().zip_cache_dir,
     ):
-        print(f"--- Processing new zip with {len(spans)} spans ...")
         spans = get_recorded_spans_from_zip(artifact_zip)
+        print(f"--- Processing new zip with {len(spans)} spans ...")
 
-        for entry in process(
-            spans, args().output_www_root_directory / "static-artifacts"
-        ):
-
+        for entry in process(spans, args().output_www_root_directory):
             entries.append(entry)
 
     (

@@ -2,6 +2,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 
 #
+from pynb_dag_runner import version_string
 from pynb_dag_runner.helpers import read_json, write_json
 from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.opentelemetry_task_span_parser import (
@@ -152,9 +153,9 @@ def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
             task_run_summary.as_dict(),
         )
 
-        for artifact_name, artifact in task_run_summary.logged_artifacts.items():
+        for artifact in task_run_summary.logged_artifacts:
             out_path: Path = safe_path(
-                ensure_dir_exist(out_basepath / task_dir / "artifacts" / artifact_name)
+                ensure_dir_exist(out_basepath / task_dir / "artifacts" / artifact.name)
             )
             artifact.write(out_path)
 
@@ -192,7 +193,7 @@ def args():
 
 
 def entry_point():
-    print("-- pynb_dag_runner: log parser cli --")
+    print(f"--- pynb_log_parser cli {version_string()} ---")
 
     spans: Spans = Spans(read_json(args().input_span_file))
     print(f"Number of spans loaded {len(spans)}")

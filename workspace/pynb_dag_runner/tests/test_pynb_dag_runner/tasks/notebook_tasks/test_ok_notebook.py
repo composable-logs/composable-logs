@@ -45,7 +45,10 @@ def test__jupytext__ok_notebook__parse_spans(spans: Spans):
     }
 
     # Check properties of artifact with the evaluated notebook
-    assert task_summary.logged_artifacts.keys() == {"notebook.ipynb", "notebook.html"}
+    assert set([a.name for a in task_summary.logged_artifacts]) == {
+        "notebook.ipynb",
+        "notebook.html",
+    }
 
     def validate(artifact):
         assert isinstance(artifact.content, str)
@@ -59,5 +62,5 @@ def test__jupytext__ok_notebook__parse_spans(spans: Spans):
         assert "variable_a=task-value" in artifact.content
         assert str(1 + 12 + 123 + 1234 + 12345) in artifact.content
 
-    validate(task_summary.logged_artifacts["notebook.ipynb"])
-    validate(task_summary.logged_artifacts["notebook.html"])
+    for name in ["notebook.ipynb", "notebook.html"]:
+        validate(one(a for a in task_summary.logged_artifacts if a.name == name))
