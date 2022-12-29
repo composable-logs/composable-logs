@@ -6,8 +6,8 @@ from pynb_dag_runner import version_string
 from pynb_dag_runner.helpers import read_json, write_json
 from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.opentelemetry_task_span_parser import (
-    get_pipeline_iterators,
-    add_html_notebook_artefacts,
+    # get_pipeline_iterators,
+    # add_html_notebook_artefacts,
     parse_spans,
 )
 from .mermaid_graphs import (
@@ -30,80 +30,6 @@ def safe_path(filepath: Path):
     return filepath
 
 
-def write_spans_to_output_directory_structure_old(spans: Spans, out_basepath: Path):
-    """
-    !!! deprecated using old span parser; to be deleted !!!
-
-    Write out tasks/runs/artefacts found in spans into a directory structure for
-    inspection using a file browser.
-
-    Any notebooks logged are written to the directory structure both in
-    ipynb and html formats.
-    """
-    print(" - Writing tasks in spans to ", out_basepath)
-
-    pipeline_dict, task_it = get_pipeline_iterators(spans)
-
-    # -- write json with pipeline-specific data --
-    write_json(safe_path(out_basepath / "pipeline-old.json"), pipeline_dict)
-
-    for task_dict, task_retry_it in task_it:
-        # -- write json with task-specific data --
-        if task_dict["attributes"]["task.task_type"] == "jupytext":
-            task_dir: str = "--".join(
-                [
-                    "jupytext-notebook-task",
-                    task_dict["attributes"]["task.notebook"]
-                    .replace("/", "-")
-                    .replace(".", "-"),
-                    task_dict["span_id"],
-                    _status_summary(task_dict),
-                ]
-            )
-
-        else:
-            raise Exception(f"Unknown task type for {task_dict}")
-
-        write_json(safe_path(out_basepath / task_dir / "task-old.json"), task_dict)
-
-        print("*** task: ", task_dict)
-
-        for task_run_dict, task_run_artefacts in task_retry_it:
-            # -- write json with run-specific data --
-            run_dir: str = "--".join(
-                [
-                    f"run={task_run_dict['attributes']['run.retry_nr']}",
-                    task_run_dict["span_id"],
-                    _status_summary(task_run_dict),
-                ]
-            )
-
-            write_json(
-                safe_path(out_basepath / task_dir / run_dir / "run-old.json"),
-                task_run_dict,
-            )
-
-            print("     *** run: ", task_run_dict)
-            for artefact_dict in add_html_notebook_artefacts(task_run_artefacts):
-                # -- write artefact logged to run --
-                artefact_name: str = artefact_dict["name"]
-                artefact_type: str = artefact_dict["type"]
-                artefact_content: str = artefact_dict["content"]
-
-                print(f"         *** artefact: {artefact_name} ({artefact_type})")
-
-                out_path: Path = out_basepath / task_dir / run_dir / artefact_name
-                if artefact_type == "utf-8":
-                    safe_path(out_path).write_text(artefact_content)
-                elif artefact_type == "bytes":
-                    out_path.parent.mkdir(parents=True, exist_ok=True)
-                    safe_path(out_path).write_bytes(artefact_content)
-                else:
-                    raise ValueError(
-                        f"Unknown encoding of artefect: {str(artefact_dict)[:2000]}"
-                    )
-
-
 def outcome(is_success: bool) -> str:
     if is_success:
         return "OK"
@@ -124,11 +50,7 @@ def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
     pipeline_summary = parse_spans(spans)
 
     write_json(
-        safe_path(out_basepath / "pipeline.json"),
-        {
-            "task_dependencies": list(pipeline_summary.task_dependencies),
-            "attributes": pipeline_summary.attributes,
-        },
+        safe_path(out_basepath / "run-time-metadata.json"), pipeline_summary.as_dict()
     )
 
     for task_run_summary in pipeline_summary.task_runs:
@@ -149,7 +71,7 @@ def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
             raise Exception(f"Unknown task type for {task_run_summary.attributes}")
 
         write_json(
-            safe_path(out_basepath / task_dir / "task-new.json"),
+            safe_path(out_basepath / task_dir / "run-time-metadata.json"),
             task_run_summary.as_dict(),
         )
 
@@ -200,7 +122,6 @@ def entry_point():
 
     if args().output_directory is not None:
         write_spans_to_output_directory_structure(spans, args().output_directory)
-        write_spans_to_output_directory_structure_old(spans, args().output_directory)
 
     if args().output_filepath_mermaid_gantt is not None:
         (
