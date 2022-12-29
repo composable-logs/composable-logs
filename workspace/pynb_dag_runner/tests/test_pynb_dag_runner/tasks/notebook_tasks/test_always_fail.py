@@ -21,7 +21,6 @@ def spans() -> Spans:
     with SpanRecorder() as rec:
         jupytext_task = make_test_nb_task(
             nb_name="notebook_always_fail.py",
-            max_nr_retries=1,
             parameters=TEST_TASK_PARAMETERS,
         )
         _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
@@ -46,7 +45,6 @@ def test__jupytext__always_fail__parse_spans(spans: Spans):
 
     assert del_key(task_summary.attributes, "task.notebook") == {
         **TEST_TASK_PARAMETERS,
-        "task.max_nr_retries": 1,
         "task.num_cpus": 1,
         "task.task_type": "jupytext",
         "task.timeout_s": 10.0,

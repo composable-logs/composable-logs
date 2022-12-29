@@ -80,7 +80,6 @@ def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
         assert task_summary.attributes == {
             "pipeline.foo": "bar",
             "task.foo": "my_test_func",
-            "task.max_nr_retries": 1,
             "task.num_cpus": 1,
             "task.task_type": "Python",
         }

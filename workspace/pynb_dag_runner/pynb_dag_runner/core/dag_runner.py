@@ -19,11 +19,7 @@ from opentelemetry.trace import StatusCode, Status  # type: ignore
 #
 from pynb_dag_runner.helpers import pairs, Try
 from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
-from pynb_dag_runner.ray_helpers import (
-    RayMypy,
-    try_f_with_timeout_guard,
-    retry_wrapper_ot,
-)
+from pynb_dag_runner.ray_helpers import RayMypy, try_f_with_timeout_guard
 from pynb_dag_runner.ray_mypy_helpers import RemoteGetFunction, RemoteSetFunction
 from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid, AttributesDict
 
@@ -228,7 +224,6 @@ def _task_from_remote_f(
 def task_from_python_function(
     f: Callable[[U], B],
     num_cpus: int = 1,
-    max_nr_retries: int = 1,
     timeout_s: Optional[float] = None,
     attributes: AttributesDict = {},
     task_type: str = "Python",
@@ -237,20 +232,11 @@ def task_from_python_function(
     Lift a Python function f (U -> B) into a Task.
     """
 
-    # Added 12/2022: remove support for task retries
-    assert max_nr_retries == 1
-
     try_f_remote: Callable[[U], Awaitable[Try[B]]] = try_f_with_timeout_guard(
         f=f, timeout_s=timeout_s, num_cpus=num_cpus
     )
 
-    try_f_remote_wrapped: Callable[[U], Awaitable[Try[B]]] = retry_wrapper_ot(
-        try_f_remote, max_nr_retries=max_nr_retries
-    )
-
-    return _task_from_remote_f(
-        try_f_remote_wrapped, attributes=attributes, task_type=task_type
-    )
+    return _task_from_remote_f(try_f_remote, attributes=attributes, task_type=task_type)
 
 
 def _cb_compose_tasks(

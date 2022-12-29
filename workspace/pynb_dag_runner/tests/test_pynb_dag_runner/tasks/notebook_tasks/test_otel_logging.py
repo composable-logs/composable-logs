@@ -34,7 +34,6 @@ def spans() -> Spans:
     with SpanRecorder() as rec:
         jupytext_task = make_test_nb_task(
             nb_name="notebook_otel_logging.py",
-            max_nr_retries=1,
             parameters={
                 "task.variable_a": "task-value",
                 "pipeline.pipeline_run_id": "12345",
