@@ -9,7 +9,6 @@ import pytest, ray
 from pynb_dag_runner.helpers import A, one, Try
 from pynb_dag_runner.ray_helpers import (
     try_f_with_timeout_guard,
-    retry_wrapper_ot,
     Future,
 )
 from pynb_dag_runner.opentelemetry_helpers import (
@@ -220,131 +219,6 @@ async def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
     else:
         assert state_has_flipped
         assert result == Try(123, None)
-
-
-### ---- tests for retry_wrapper ----
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "outcome",
-    [Try(value="success", error=None), Try(value=None, error=ValueError("fail"))],
-)
-async def test_retry_wrapper_with_constant_outcome(outcome):
-    async def f(arg):
-        assert arg == 100
-        return outcome
-
-    assert (
-        await f(100) == await retry_wrapper_ot(f=f, max_nr_retries=10)(100) == outcome
-    )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("dummy_repeat", range(5))
-async def test_retry_wrapper_with_random_outcome(dummy_repeat):
-    try_success = Try(value="success", error=None)
-    try_fail = Try(value=None, error=ValueError("fail"))
-
-    async def f(arg):
-        assert arg == 100
-        if random.random() < 0.25:
-            return try_success
-        return try_fail
-
-    assert await retry_wrapper_ot(f=f, max_nr_retries=1000)(100) == try_success
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "args",
-    [
-        {
-            "N_failures": 0,
-            "N_expected_calls": 1,
-            "N_max_retries": 10,
-            "should_finally_succeed": True,
-        },
-        {
-            "N_failures": 2,
-            "N_expected_calls": 3,
-            "N_max_retries": 10,
-            "should_finally_succeed": True,
-        },
-        {
-            "N_failures": 10,
-            "N_expected_calls": 10,
-            "N_max_retries": 10,
-            "should_finally_succeed": False,
-        },
-    ],
-)
-async def test_retry_wrapper_ot(args):
-    N_failures: int = args["N_failures"]
-    N_max_retries: int = args["N_max_retries"]
-    N_expected_calls: int = args["N_expected_calls"]
-    should_finally_succeed: bool = args["should_finally_succeed"]
-
-    state = StateActor.remote()
-
-    # Defined function that fails first N_failures calls, then succeed.
-    #
-    # Outcomes:
-    try_success = Try(value="success", error=None)
-    try_fail = Try(value=None, error=ValueError("fail"))
-
-    async def f(arg):
-        assert arg == 100
-
-        nr_calls_completed: int = len(await state.get.remote())
-        await state.add.remote(otel.baggage.get_all())
-
-        if nr_calls_completed >= N_failures:
-            return try_success
-        return try_fail
-
-    async def get_test_spans():
-        with SpanRecorder() as rec:
-            f_retry = retry_wrapper_ot(f=f, max_nr_retries=N_max_retries)
-
-            f_retry_eval = await Future.lift_async(f_retry)(100)
-            if should_finally_succeed:
-                assert f_retry_eval == try_success
-            else:
-                assert f_retry_eval == try_fail
-
-            baggage_list = await state.get.remote()
-            assert baggage_list == [
-                {"task.max_nr_retries": N_max_retries, "run.retry_nr": k}
-                for k in range(N_expected_calls)
-            ]
-
-        return rec.spans
-
-    def validate_spans(spans: Spans):
-        retry_span: SpanDict = one(spans.filter(["name"], "retry-wrapper"))
-        assert (
-            read_key(retry_span, ["attributes", "task.max_nr_retries"]) == N_max_retries
-        )
-
-        retry_call_spans: Spans = spans.filter(["name"], "retry-call")
-        assert len(retry_call_spans) == N_expected_calls
-
-        for retry_call_span in retry_call_spans:
-            assert read_key(retry_call_span, ["attributes", "run.retry_nr"]) in range(
-                N_expected_calls
-            )
-            spans.contains_path(retry_span, retry_call_span)
-
-        if should_finally_succeed:
-            assert read_key(retry_span, ["status", "status_code"]) == "OK"
-        else:
-            assert retry_span["status"] == {
-                "description": f"Function called retried {N_max_retries} times; all failed!",
-                "status_code": "ERROR",
-            }
-
-    validate_spans(await get_test_spans())
 
 
 ### ---- test Try implementation ----
