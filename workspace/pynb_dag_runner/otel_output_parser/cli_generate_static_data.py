@@ -317,10 +317,7 @@ def entry_point():
         spans = get_recorded_spans_from_zip(artifact_zip)
         print(f"--- Processing new zip with {len(spans)} spans ...")
 
-        for entry in process(
-            spans, args().output_www_root_directory / "static-artifacts"
-        ):
-
+        for entry in process(spans, args().output_www_root_directory):
             entries.append(entry)
 
     (
