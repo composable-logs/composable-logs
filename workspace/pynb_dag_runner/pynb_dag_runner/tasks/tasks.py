@@ -39,13 +39,9 @@ def make_jupytext_task_ot(
     notebook: JupytextNotebook,
     tmp_dir: Path,
     timeout_s: float = None,
-    max_nr_retries: int = 1,
     num_cpus: int = 1,
     parameters: AttributesDict = {},
 ):
-    # added 12/2022: remove support for task retries
-    assert max_nr_retries == 1
-
     # Determine task run-attributes (except baggage which can only be determined at
     # run time).
     run_attributes: AttributesDict = {
@@ -86,7 +82,6 @@ def make_jupytext_task_ot(
     return task_from_python_function(
         f=run_notebook,
         num_cpus=num_cpus,
-        max_nr_retries=max_nr_retries,
         timeout_s=timeout_s,
         attributes=run_attributes,
         task_type="jupytext",

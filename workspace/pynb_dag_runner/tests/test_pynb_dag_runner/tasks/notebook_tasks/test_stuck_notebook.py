@@ -23,7 +23,6 @@ def spans() -> Spans:
     with SpanRecorder() as rec:
         jupytext_task = make_test_nb_task(
             nb_name="notebook_stuck.py",
-            max_nr_retries=1,
             timeout_s=10.0,
             parameters={},
         )
