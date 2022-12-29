@@ -6,7 +6,6 @@ from typing import (
     Iterable,
     List,
     Mapping,
-    MutableMapping,
     Union,
     Set,
     Tuple,
@@ -53,16 +52,6 @@ RunDict = Mapping[str, Any]
 ArtifactDict = Mapping[str, Any]  # {name, type, content} in decoded form
 
 
-def _key_span_details(span):
-    return {
-        "span_id": span["context"]["span_id"],
-        "start_time": span["start_time"],
-        "end_time": span["end_time"],
-        "duration_s": get_duration_s(span),
-        "status": span["status"],
-    }
-
-
 def _decode_data_content_span(span: SpanDict):
     serialized_data = SerializedData(
         type=span["attributes"]["type"],
@@ -75,20 +64,6 @@ def _decode_data_content_span(span: SpanDict):
         "type": serialized_data.type,
         "content": serialized_data.decode(),
     }
-
-
-def _artefact_iterator(spans: Spans, task_run_top_span) -> List[ArtifactDict]:
-    result = []
-    for artefact_span in (
-        spans.bound_under(task_run_top_span)
-        # -
-        .filter(["name"], "artefact")
-        # -
-        .filter(["status", "status_code"], "OK")
-    ):
-        result.append(_decode_data_content_span(artefact_span))
-
-    return result
 
 
 def add_html_notebook_artefacts(
@@ -123,116 +98,6 @@ def add_html_notebook_artefacts(
     return result
 
 
-def _get_logged_named_values(spans: Spans, task_run_top_span) -> Mapping[str, Any]:
-    result: MutableMapping[str, Any] = {}
-
-    for artefact_span in (
-        spans.bound_under(task_run_top_span)
-        # -
-        .filter(["name"], "named-value")
-        # -
-        .filter(["status", "status_code"], "OK")
-    ):
-        assert artefact_span["attributes"].keys() == {
-            "name",
-            "type",
-            "encoding",
-            "content_encoded",
-        }
-
-        name: str = artefact_span["attributes"]["name"]
-
-        if name in result:
-            raise ValueError(f"Named value {name} has been logged multiple times.")
-
-        serialized_data = SerializedData(
-            type=artefact_span["attributes"]["type"],
-            encoding=artefact_span["attributes"]["encoding"],
-            encoded_content=artefact_span["attributes"]["content_encoded"],
-        )
-
-        result[name] = {"value": serialized_data.decode(), "type": serialized_data.type}
-
-    return result
-
-
-def _run_iterator(
-    task_attributes: Mapping[str, Any], spans: Spans, task_top_span
-) -> Iterable[Tuple[RunDict, Iterable[ArtifactDict]]]:
-    # --- deprecated ---
-    for task_run_top_span in (
-        spans.bound_under(task_top_span)
-        .filter(["name"], "retry-call")
-        .sort_by_start_time()  # TODO: sort by run.retry_nr instead
-    ):
-        # get all run attributes including attributes inherited from parent task
-        # and pipeline.
-        run_dict = {
-            **_key_span_details(task_run_top_span),
-            "attributes": {
-                **task_attributes,
-                **(
-                    spans.bound_inclusive(task_run_top_span)
-                    #
-                    .get_attributes(allowed_prefixes={"run."})
-                ),
-            },
-            "logged_values": _get_logged_named_values(spans, task_run_top_span),
-        }
-        yield run_dict, _artefact_iterator(spans, task_run_top_span)
-
-    return iter([])
-
-
-def _task_iterator(
-    pipeline_attributes: Mapping[str, Any], spans: Spans
-) -> Iterable[Tuple[TaskDict, Iterable[Tuple[RunDict, Iterable[ArtifactDict]]]],]:
-    # --- deprecated ---
-    for task_top_span in spans.filter(["name"], "execute-task").sort_by_start_time():
-        # get all task attributes including attributes inherited from pipeline
-        task_attributes: Dict[str, Any] = {
-            **pipeline_attributes,
-            **(
-                spans.bound_inclusive(task_top_span)
-                # --
-                .get_attributes(allowed_prefixes={"task."})
-            ),
-        }
-        task_dict = {
-            **_key_span_details(task_top_span),
-            "attributes": task_attributes,
-        }
-
-        yield task_dict, _run_iterator(task_attributes, spans, task_top_span)
-
-    return iter([])
-
-
-# Deprecated: move to get_pipeline_task_artifact_iterators
-def get_pipeline_iterators(
-    spans: Spans,
-) -> Tuple[
-    PipelineDict,
-    Iterable[Tuple[TaskDict, Iterable[Tuple[RunDict, Iterable[ArtifactDict]]]]],
-]:
-    """
-    Top level function that returns dict with pipeline scoped data and nested
-    iterators for looping through tasks, runs, and artefacts logged to runs.
-
-    Input is all OpenTelemetry spans logged for one pipeline run.
-    """
-    pipeline_attributes = spans.get_attributes(allowed_prefixes={"pipeline."})
-
-    pipeline_dict = {
-        "task_dependencies": list(extract_task_dependencies(spans)),
-        "attributes": pipeline_attributes,
-    }
-
-    return pipeline_dict, _task_iterator(pipeline_attributes, spans)
-
-
-# --- new stuff below ---
-
 # --- Data structure to represent: artifact data ---
 
 ArtifactName = p.StrictStr
@@ -266,9 +131,7 @@ class ArtifactContent(p.BaseModel):
             raise ValueError("Internal error")
 
 
-def _artefact_iterator_new(
-    spans: Spans, task_run_top_span
-) -> Iterable[ArtifactContent]:
+def _artefact_iterator(spans: Spans, task_run_top_span) -> Iterable[ArtifactContent]:
     for artefact_span in (
         spans.bound_under(task_run_top_span)
         # -
@@ -310,7 +173,7 @@ class LoggedValueContent(p.BaseModel):
         return {"type": self.type, "value": self.content}
 
 
-def _get_logged_named_values_new(
+def _get_logged_named_values(
     spans: Spans, task_run_top_span
 ) -> Iterable[Tuple[LoggedValueName, LoggedValueContent]]:
     logged_values: List[str] = []
@@ -495,9 +358,13 @@ def _task_run_iterator(
             span_id=task_top_span["context"]["span_id"],
             parent_span_id=top_span_id,
             # TODO: task_id should be provided when creating a task
-            task_id=task_attributes.get("task.notebook", "id/not-available.py")
-            .replace(".py", "")
-            .split("/")[-1],
+            task_id=(
+                task_attributes
+                # -
+                .get("task.notebook", "id/not-available.py")
+                .replace(".py", "")
+                .split("/")[-1]
+            ),
             timing=Timing(
                 start_time_iso8601=task_top_span["start_time"],
                 end_time_iso8601=task_top_span["end_time"],
@@ -506,8 +373,8 @@ def _task_run_iterator(
             exceptions=spans.bound_inclusive(task_top_span).exception_events(),
             # input parameters + logged data
             attributes=task_attributes,
-            logged_values=dict(_get_logged_named_values_new(spans, task_top_span)),
-            logged_artifacts=list(_artefact_iterator_new(spans, task_top_span)),
+            logged_values=dict(_get_logged_named_values(spans, task_top_span)),
+            logged_artifacts=list(_artefact_iterator(spans, task_top_span)),
         )
 
 
