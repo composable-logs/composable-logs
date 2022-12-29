@@ -131,14 +131,14 @@ def test__jupytext__otel_logging_from_notebook__validate_cli_tool(
     files = glob.glob(f"{tmp_path}/**/*", recursive=True)
     filenames = [Path(f).name for f in files if Path(f).is_file()]
 
+    # "run-time-metadata.json" is written twice
+    assert len(set(filenames)) == len(filenames) - 1
+
     assert set(filenames) == {
-        # --- root of output directory ---
-        "pipeline.json",
         # --- one task in pipeline run ---
-        # "task.json",
-        "task-new.json",  # TBD
+        "run-time-metadata.json",
         # --- files for single run of task ---
-        # "run.json",
+        "run-time-metadata.json",  # same as above, not ideal
         # artifacts are written to disk
         "notebook.ipynb",
         "notebook.html",
