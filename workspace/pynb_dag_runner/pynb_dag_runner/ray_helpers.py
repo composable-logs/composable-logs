@@ -1,5 +1,5 @@
-import asyncio, random
-from typing import Any, TypeVar, Callable, List, Optional, Awaitable
+import asyncio
+from typing import TypeVar, Callable, Optional, Awaitable
 
 #
 import ray
@@ -13,24 +13,6 @@ from pynb_dag_runner.opentelemetry_helpers import otel_add_baggage
 A = TypeVar("A")
 B = TypeVar("B")
 C = TypeVar("C")
-
-
-class RayMypy:
-    """
-    Dummy class to avoid generate missing .remote attribute error on constructor calls
-    like:
-
-      SubClass.remote(<class SubClass constructor arguments>)
-
-    Ray will warn about this existing before overwriting this at runtime, so this code
-    is never run, but makes type checking better.
-    """
-
-    @classmethod
-    def remote(cls, *args, **kwargs):
-        if random.random() < 0.5:
-            raise Exception("This should never run")
-        return cls(*args, **kwargs)
 
 
 class Future(Awaitable[A]):
