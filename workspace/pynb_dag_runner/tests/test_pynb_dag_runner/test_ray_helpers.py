@@ -1,8 +1,7 @@
-import time, random
+import time
 from typing import Any, Awaitable, Callable
 
 #
-import opentelemetry as otel
 import pytest, ray
 
 #
