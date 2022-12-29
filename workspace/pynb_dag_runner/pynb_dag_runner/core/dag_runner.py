@@ -19,7 +19,7 @@ from opentelemetry.trace import StatusCode, Status  # type: ignore
 #
 from pynb_dag_runner.helpers import pairs, Try
 from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
-from pynb_dag_runner.ray_helpers import RayMypy, try_f_with_timeout_guard
+from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
 from pynb_dag_runner.ray_mypy_helpers import RemoteGetFunction, RemoteSetFunction
 from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid, AttributesDict
 
@@ -76,7 +76,7 @@ class RemoteTaskP(Protocol[X, Y]):
 
 
 @ray.remote(num_cpus=0)
-class GenTask_OT(Generic[U, A, B], RayMypy):
+class GenTask_OT(Generic[U, A, B]):
     """
     Represent a task that a can be run once
     """
@@ -214,11 +214,11 @@ def _task_from_remote_f(
     if "task_type" in attributes:
         raise ValueError("task_type key should not be included in tags")
 
-    return GenTask_OT.remote(
-        f_remote=untry_f,
-        combiner=_combiner,
-        attributes={**attributes, "task.task_type": task_type},
-    )
+    return GenTask_OT.remote(  # type: ignore
+        f_remote=untry_f,  # type: ignore
+        combiner=_combiner,  # type: ignore
+        attributes={**attributes, "task.task_type": task_type},  # type: ignore
+    )  # type: ignore
 
 
 def task_from_python_function(
