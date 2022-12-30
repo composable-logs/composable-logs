@@ -49,10 +49,6 @@ def test_future_map():
     assert ray.get(Future.map(future, lambda x: x + 1)) == 124
 
 
-def test_future_lift():
-    assert ray.get(Future.lift(lambda x: x + 1)(Future.value(1))) == 2
-
-
 def test_future_async_lift():
     async def f(x):
         return x + 1

@@ -66,10 +66,6 @@ class Future(Awaitable[A]):
 
         return wrapped_f.remote
 
-    @staticmethod
-    def lift(f: Callable[[B], C]) -> Callable[[Awaitable[B]], Awaitable[C]]:
-        return lambda future: Future.map(future, f)
-
 
 def _try_eval_f_async_wrapper(
     f: Callable[[A], B],
