@@ -61,15 +61,15 @@ def disable_test_make_task_from_function_or_remote_function(task_fail: bool):
         # check exceptions
         task_span = get_span_for_task("g")
         if task_fail:
-            assert task_span["status"] == {
-                "status_code": "ERROR",
-                "description": "Remote function call failed",
-            }
+            assert task_span["status"] == {  # type: ignore
+                "status_code": "ERROR",  # type: ignore
+                "description": "Remote function call failed",  # type: ignore
+            }  # type: ignore
             exception = one(get_span_exceptions(task_span))["attributes"]
             assert exception["exception.type"] == "Exception"
             assert "kaboom!" in exception["exception.message"]
         else:
             assert len(spans.bound_inclusive(task_span).exception_events()) == 0
-            assert task_span["status"] == {"status_code": "OK"}
+            assert task_span["status"] == {"status_code": "OK"}  # type: ignore
 
     validate_spans(get_test_spans())

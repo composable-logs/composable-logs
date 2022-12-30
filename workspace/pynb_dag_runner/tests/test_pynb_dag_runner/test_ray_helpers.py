@@ -6,10 +6,7 @@ import pytest, ray
 
 #
 from pynb_dag_runner.helpers import A, one, Try
-from pynb_dag_runner.ray_helpers import (
-    try_f_with_timeout_guard,
-    Future,
-)
+from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
 from pynb_dag_runner.opentelemetry_helpers import (
     SpanDict,
     read_key,
@@ -28,44 +25,6 @@ class StateActor:
 
     def get(self):
         return self._state
-
-
-### Test Future static functions
-
-
-def test_future_value():
-    assert ray.get(Future.value(42)) == 42
-
-
-def test_future_map():
-    @ray.remote(num_cpus=0)
-    def f() -> int:
-        return 123
-
-    # example of a future having Future[int] type, but type checker does not notice
-    # any problem with the below code.
-    future: Future[bool] = f.remote()
-
-    assert ray.get(Future.map(future, lambda x: x + 1)) == 124
-
-
-def test_future_async_lift():
-    async def f(x):
-        return x + 1
-
-    assert ray.get(Future.lift_async(f)(ray.put(1))) == 2
-
-
-@pytest.mark.asyncio
-async def test_future_async_lift_w_exception():
-    async def f(_):
-        raise Exception("boom!")
-
-    with pytest.raises(Exception):
-        await Future.lift_async(f)("dummy arg to f")
-
-    with pytest.raises(Exception):
-        ray.get(Future.lift_async(f)("dummy arg to f"))
 
 
 ### --- tests for try_f_with_timeout_guard wrapper ---
@@ -151,10 +110,11 @@ async def test_timeout_w_timeout_cancel():
     async def get_test_spans():
         with SpanRecorder() as rec:
 
-            def f(_: Any) -> None:
+            def f(_: str) -> int:
                 time.sleep(1e6)
+                return 123
 
-            f_timeout: Callable[[int], Awaitable[Try[int]]] = try_f_with_timeout_guard(
+            f_timeout: Callable[[str], Awaitable[Try[int]]] = try_f_with_timeout_guard(
                 f, timeout_s=0.5, num_cpus=1
             )
 
@@ -185,7 +145,7 @@ async def test_timeout_w_timeout_cancel():
 @pytest.mark.parametrize("dummy_loop_parameter", range(1))
 @pytest.mark.parametrize("task_timeout_s", [0.001, 10.0])
 async def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
-    state_actor = StateActor.remote()
+    state_actor = StateActor.remote()  # type: ignore
 
     task_duration_s = 0.2
 

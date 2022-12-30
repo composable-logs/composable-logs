@@ -1,5 +1,6 @@
 import opentelemetry as ot
 from pathlib import Path
+from typing import List
 
 #
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
@@ -8,6 +9,7 @@ from pynb_dag_runner.tasks.tasks import _get_traceparent
 from pynb_dag_runner.tasks.task_opentelemetry_logging import (
     PydarLogger,
     SerializedData,
+    LoggableTypes,
     get_logged_values,
     get_logged_artifacts,
 )
@@ -34,7 +36,7 @@ def test__encode_decode_to_wire__explicit_examples(test_case):
 
 
 def test__encode_decode_to_wire__is_identity():
-    for msg in [
+    test_messages: List[LoggableTypes] = [
         "test-text-message",
         bytes([0, 1, 2, 3]),
         bytes(1000 * list(range(256))),
@@ -42,7 +44,8 @@ def test__encode_decode_to_wire__is_identity():
         1.23,
         1000000,
         {"a": 1, "b": [None, {"c": True}]},
-    ]:
+    ]
+    for msg in test_messages:
         assert msg == SerializedData.encode(msg).decode()
 
 

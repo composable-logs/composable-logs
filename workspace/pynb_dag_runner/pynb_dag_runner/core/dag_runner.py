@@ -19,7 +19,6 @@ from opentelemetry.trace import StatusCode, Status  # type: ignore
 #
 from pynb_dag_runner.helpers import pairs, Try
 from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
-from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
 from pynb_dag_runner.ray_mypy_helpers import RemoteGetFunction, RemoteSetFunction
 from pynb_dag_runner.opentelemetry_helpers import SpanId, get_span_hexid, AttributesDict
 
@@ -83,7 +82,7 @@ class GenTask_OT(Generic[U, A, B]):
 
     def __init__(
         self,
-        f_remote: Callable[[U], Awaitable[A]],
+        f_remote: Callable[[U], ray.ObjectRef],  # ray.ObjectRef[A]
         combiner: Callable[[Span, Try[A]], B],
         on_complete_callbacks: List[Callable[[B], Awaitable[None]]] = [],
         attributes: AttributesDict = {},
@@ -91,7 +90,7 @@ class GenTask_OT(Generic[U, A, B]):
         def create_future():
             return asyncio.get_running_loop().create_future()
 
-        self._f_remote: Callable[[U], Awaitable[A]] = f_remote
+        self._f_remote: Callable[[U], ray.ObjectRef] = f_remote  # ray.ObjectRef[A]
         self._combiner: Callable[[Span, Try[A]], B] = combiner
         self._on_complete_callbacks: List[
             Callable[[B], Awaitable[None]]
@@ -144,7 +143,7 @@ class GenTask_OT(Generic[U, A, B]):
 
                 # post-task
                 task_result = self._combiner(span, Try(f_result, None))
-            except BaseException as e:
+            except Exception as e:
                 task_result = self._combiner(span, Try(None, e))
 
         # note that result is set before callbacks are called
@@ -198,6 +197,7 @@ def _task_from_remote_f(
             span.set_status(Status(StatusCode.OK))
             return TaskOutcome(span_id=span_id, return_value=b.value, error=None)
         else:
+            assert b.error is not None
             span.record_exception(b.error)
             span.set_status(Status(StatusCode.ERROR, fail_message))
 
@@ -356,7 +356,7 @@ def fan_in(
 def start_and_await_tasks(
     tasks_to_start: List[RemoteTaskP[A, A]],
     tasks_to_await: List[RemoteTaskP[A, A]],
-    timeout_s: float = None,
+    timeout_s: float = 600.0,
     arg=None,
 ) -> List[A]:
     """

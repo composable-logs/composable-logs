@@ -1,4 +1,7 @@
-from typing import Awaitable, TypeVar, Protocol
+from typing import Any, Awaitable, Generic, TypeVar, Protocol
+
+# -
+import ray
 
 # Helper protocols for encoding Protocols for remote methods on Ray remote actors.
 
@@ -6,11 +9,11 @@ X = TypeVar("X", contravariant=True)
 Y = TypeVar("Y", covariant=True)
 
 
-class RemoteSetFunction(Protocol[X]):
+class RemoteSetFunction(Generic[X]):
     def remote(self, *args: X) -> None:
         ...
 
 
-class RemoteGetFunction(Protocol[Y]):
-    def remote(self) -> Awaitable[Y]:
+class RemoteGetFunction(Generic[Y]):
+    def remote(self) -> Any:  # return should be Awaitable[Y]
         ...

@@ -38,7 +38,7 @@ def _get_traceparent() -> str:
 def make_jupytext_task_ot(
     notebook: JupytextNotebook,
     tmp_dir: Path,
-    timeout_s: float = None,
+    timeout_s: float = 600.0,
     num_cpus: int = 1,
     parameters: AttributesDict = {},
 ):

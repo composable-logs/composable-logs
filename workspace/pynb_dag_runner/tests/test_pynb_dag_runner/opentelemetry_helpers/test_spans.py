@@ -1,4 +1,5 @@
 import time
+from typing import Any, Dict
 
 #
 import pytest
@@ -183,7 +184,7 @@ def test__otel__demo_context_propagation_mechanism():
                 # Get Span context as a string that can be propagated
                 # to other processes.
                 ctx_propagator1 = TraceContextTextMapPropagator()
-                carrier = {}
+                carrier: Dict[str, Any] = {}
                 ctx_propagator1.inject(carrier=carrier)
                 assert isinstance(carrier, dict)
                 assert carrier.keys() == {"traceparent"}
