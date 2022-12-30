@@ -19,7 +19,8 @@ from pynb_dag_runner.opentelemetry_helpers import Spans
 
 # ---- encode/decode functions -----
 
-LoggableTypes = Union[str, bytes, int, float, bool]
+# TODO: Review if Any/None should be loggable
+LoggableTypes = Union[str, bytes, int, float, bool, Any]
 
 
 @dataclass
@@ -102,7 +103,9 @@ def _call_in_trace_context(
     else:
         # Log artefact as sub-span with parent determined from context propagated
         # traceparent.
-        context: Mapping[str, str] = (
+        from opentelemetry.trace.propagation.tracecontext import Context
+
+        context: Context = (
             TraceContextTextMapPropagator()
             # -
             .extract(carrier={"traceparent": traceparent})

@@ -514,7 +514,7 @@ class SpanRecorder:
         pass
 
     def __enter__(self):
-        assert otel.trace.get_tracer_provider().force_flush()
+        assert otel.trace.get_tracer_provider().force_flush()  # type: ignore
 
         # get all span_id:s that exist before we start recording (inside with block)
         self._all_span_ids_pre_run = [get_span_id(s) for s in _get_all_spans()]
@@ -522,7 +522,7 @@ class SpanRecorder:
         return self
 
     def __exit__(self, type, value, traceback):
-        assert otel.trace.get_tracer_provider().force_flush()
+        assert otel.trace.get_tracer_provider().force_flush()  # type: ignore
 
         # get new spans after test has run
         self.spans = Spans(

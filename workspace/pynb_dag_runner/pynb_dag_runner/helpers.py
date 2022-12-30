@@ -144,8 +144,8 @@ def compose(*fs):
 
 
 class Try(Generic[A]):
-    def __init__(self, value: Optional[A], error: Optional[BaseException]):
-        assert error is None or isinstance(error, BaseException)
+    def __init__(self, value: Optional[A], error: Optional[Exception]):
+        assert error is None or isinstance(error, Exception)
         assert value is None or error is None
 
         self.value = value

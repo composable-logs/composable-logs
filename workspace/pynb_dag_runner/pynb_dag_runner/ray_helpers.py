@@ -1,4 +1,3 @@
-import asyncio
 from typing import TypeVar, Callable, Optional, Awaitable
 
 #
@@ -13,62 +12,6 @@ from pynb_dag_runner.opentelemetry_helpers import otel_add_baggage
 A = TypeVar("A")
 B = TypeVar("B")
 C = TypeVar("C")
-
-
-class Future(Awaitable[A]):
-    """
-    Helper class that can be used to add type hints for Ray Futures (or object ref:s).
-
-    We can not type check all interfaces to Ray, but type hints can be used to document
-    the code and at least catch some type errors.
-
-    See: https://github.com/ray-project/ray/blob/master/python/ray/types.py
-    """
-
-    @staticmethod
-    def value(a: A) -> Awaitable[A]:
-        return ray.put(a)
-
-    @staticmethod
-    def map(future: Awaitable[A], f: Callable[[A], B]) -> Awaitable[B]:
-        """
-        Return a new Future with the value of future mapped through f.
-
-        TODO: argument order should be consistent with Python's map.
-        """
-
-        @ray.remote(num_cpus=0)
-        def do_map(future_value: A) -> B:
-            return f(future_value)
-
-        return do_map.remote(future)
-
-    @staticmethod
-    def lift_async(
-        f: Callable[[B], Awaitable[C]], num_cpus: int = 0
-    ) -> Callable[[B], Awaitable[C]]:
-        """
-        Lift an async Python function f as below
-
-        ```
-        async def f(b: B) -> C:
-            ...
-        ```
-
-        into a Ray remote function operating on Ray object ref:s.
-
-        See: https://docs.ray.io/en/latest/async_api.html
-        """
-
-        @ray.remote(num_cpus=num_cpus)
-        def wrapped_f(arg: B) -> C:
-            return asyncio.get_event_loop().run_until_complete(f(arg))
-
-        return wrapped_f.remote
-
-    @staticmethod
-    def lift(f: Callable[[B], C]) -> Callable[[Awaitable[B]], Awaitable[C]]:
-        return lambda future: Future.map(future, f)
 
 
 def _try_eval_f_async_wrapper(
@@ -100,7 +43,7 @@ def _try_eval_f_async_wrapper(
                     result = success_handler(f(*args))
                     span.set_status(Status(StatusCode.OK))
 
-                except BaseException as e:
+                except Exception as e:
                     result = error_handler(e)
                     span.record_exception(e)
                     span.set_status(Status(StatusCode.ERROR, "Failure"))
@@ -117,7 +60,9 @@ def _try_eval_f_async_wrapper(
         """
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
         with tracer.start_as_current_span("timeout-guard") as span:
-            span.set_attribute("task.timeout_s", timeout_s)
+            # TODO: Review what happens here if timeout is None.
+            # Does set_attribute/add baggage support that?
+            span.set_attribute("task.timeout_s", timeout_s)  # type: ignore
             otel_add_baggage("task.timeout_s", timeout_s)
 
             work_actor = ExecActor.remote()  # type: ignore

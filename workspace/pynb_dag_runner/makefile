@@ -19,6 +19,7 @@ test-mypy:
 	@mypy \
 	    --ignore-missing-imports \
 	    --exclude build \
+	    --check-untyped-defs \
 	    "${ALL_CODE_FOLDERS}"
 
 test-black:
