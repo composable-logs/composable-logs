@@ -2,6 +2,7 @@ import time, random
 from typing import List, Set, Dict, Tuple
 
 #
+import pytest
 import ray
 
 #
@@ -21,10 +22,12 @@ from pynb_dag_runner.opentelemetry_helpers import (
 )
 from pynb_dag_runner.opentelemetry_task_span_parser import extract_task_dependencies
 from pynb_dag_runner.helpers import A, one
+from pynb_dag_runner.wrappers import task, run_dag, TaskContext
 
 import opentelemetry as otel
 
 
+@pytest.mark.skipif(True, reason="remove after move to new Ray interface")
 def test__task__can_access_otel_baggage_and_returns_outcome():
     def f(_):
         # check access to OpenTelemetry baggage
@@ -42,6 +45,77 @@ def test__task__can_access_otel_baggage_and_returns_outcome():
     assert isinstance(outcome, TaskOutcome)
     assert outcome.error is None
     assert outcome.return_value == 42
+
+
+def test__cl__can_compose():
+
+    # Check the following DAG:
+    #
+    #     numeric_input1 --\
+    #                       v
+    #                         process
+    #                       ^
+    #     numeric_input2 --/
+    #
+
+    @task(task_id="numeric_input1")
+    def numeric_input1():
+        return 10
+
+    @task(task_id="numeric_input1")
+    def numeric_input2(a_variable, C: TaskContext):
+        return a_variable + 20
+
+    @task(task_id="process")
+    def process(x, y, **kwargs):
+        return {"result": x + y, **kwargs}
+
+    dag = process.bind(
+        numeric_input1.bind(), numeric_input2.bind(a_variable=123), test=10
+    )
+
+    with SpanRecorder() as rec:
+        assert run_dag(dag) == {"result": 10 + (123 + 20), "test": 10}
+
+    assert len(rec.spans.exception_events()) == 0
+
+
+def test__cl__exceptions_are_recorded():
+    @task(task_id="test_function")
+    def f():
+        raise Exception("BOOM123")
+
+    try:
+        with SpanRecorder() as rec:
+            run_dag(dag=f.bind())
+
+        raise Exception("dag show throw an exception")
+
+    except Exception as e:
+        assert len(rec.spans.exception_events()) == 3  # TODO should be 1
+
+
+def test__cl__function_parameters_contain_task_and_system_and_global_parameters():
+    workflow_parameters = {"workflow.env": "local-test"}
+    task_parameters = {"task.X": 123, "task.Y": None}
+
+    @task(task_id="test_function", task_parameters=task_parameters)
+    def f(C: TaskContext):
+        return C.parameters
+
+    with SpanRecorder() as rec:
+        assert run_dag(dag=f.bind(), workflow_parameters=workflow_parameters) == {
+            # system
+            "task.task_id": "test_function",
+            "task.num_cpus": 1,
+            # task (**task_parameters)
+            "task.X": 123,
+            "task.Y": None,
+            # global (**workflow_parameters)
+            "workflow.env": "local-test",
+        }
+
+    assert len(rec.spans.exception_events()) == 0
 
 
 def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
