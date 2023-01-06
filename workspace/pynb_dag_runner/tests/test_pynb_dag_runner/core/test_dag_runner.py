@@ -20,8 +20,11 @@ from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
 )
-from pynb_dag_runner.opentelemetry_task_span_parser import extract_task_dependencies
-from pynb_dag_runner.helpers import A, one
+from pynb_dag_runner.opentelemetry_task_span_parser import (
+    parse_spans,
+    extract_task_dependencies,
+)
+from pynb_dag_runner.helpers import A, del_key, one
 from pynb_dag_runner.wrappers import task, run_dag, TaskContext
 
 import opentelemetry as otel
@@ -47,35 +50,89 @@ def test__task__can_access_otel_baggage_and_returns_outcome():
     assert outcome.return_value == 42
 
 
-def test__cl__can_compose():
+# --- Check the following DAG ---
+#
+#     numeric_input1 --\
+#                       v
+#                         process
+#                       ^
+#     numeric_input2 --/
+#
+TEST_TASK_ATTRIBUTES = {
+    "input_1": {"task.foo": 12, "task.abc": "abc", "task.gamma": 1.23},
+    "input_2": {"task.foo": 23},
+    "process": {},
+}
 
-    # Check the following DAG:
-    #
-    #     numeric_input1 --\
-    #                       v
-    #                         process
-    #                       ^
-    #     numeric_input2 --/
-    #
 
-    @task(task_id="numeric_input1")
-    def numeric_input1():
+@pytest.fixture(scope="module")
+def cl__can_compose_spans() -> Spans:
+    @task(task_id="input_1", task_parameters=TEST_TASK_ATTRIBUTES["input_1"])
+    def input_1():
         return 10
 
-    @task(task_id="numeric_input1")
-    def numeric_input2(a_variable, C: TaskContext):
+    @task(task_id="input_2", task_parameters=TEST_TASK_ATTRIBUTES["input_2"])
+    def input_2(a_variable, C: TaskContext):
         return a_variable + 20
 
-    @task(task_id="process")
+    @task(task_id="process", task_parameters=TEST_TASK_ATTRIBUTES["process"])
     def process(x, y, **kwargs):
         return {"result": x + y, **kwargs}
 
-    dag = process(numeric_input1(), numeric_input2(a_variable=123), test=10)
+    dag = process(input_1(), input_2(a_variable=123), test=10)
 
     with SpanRecorder() as rec:
-        assert run_dag(dag) == {"result": 10 + (123 + 20), "test": 10}
+        assert run_dag(dag, workflow_parameters={"workflow.env": "xyz"}) == {
+            "result": 10 + (123 + 20),
+            "test": 10,
+        }
 
     assert len(rec.spans.exception_events()) == 0
+
+    return rec.spans
+
+
+from pynb_dag_runner.helpers import del_key
+
+
+def test__cl__can_compose(cl__can_compose_spans: Spans):
+    pipeline_summary = parse_spans(cl__can_compose_spans)
+
+    assert pipeline_summary.attributes == {"workflow.env": "xyz"}
+
+    assert len(pipeline_summary.task_runs) == 3
+
+    span_id_to_task_id: Dict[str, str] = {}
+
+    # check attributes
+    for task_summary in pipeline_summary.task_runs:  # type: ignore
+        assert task_summary.is_success()
+
+        # assert that task has expected attributes logged
+        task_id: str = task_summary.attributes["task.task_id"]
+        assert task_id in TEST_TASK_ATTRIBUTES
+
+        assert del_key(task_summary.attributes, "task.task_id") == {
+            **TEST_TASK_ATTRIBUTES[task_id],
+            "workflow.env": "xyz",
+            "task.num_cpus": 1,
+        }
+
+        span_id_to_task_id[task_summary.span_id] = task_id
+
+    # --
+    assert len(pipeline_summary.task_dependencies) == 2
+    for span_id_from, span_id_to in pipeline_summary.task_dependencies:
+        task_id_from = span_id_to_task_id[span_id_from]
+        task_id_to = span_id_to_task_id[span_id_to]
+
+        assert (task_id_from, task_id_to) in [
+            ("input_1", "process"),
+            ("input_2", "process"),
+        ]
+
+
+# ---
 
 
 def test__cl__exceptions_are_recorded():

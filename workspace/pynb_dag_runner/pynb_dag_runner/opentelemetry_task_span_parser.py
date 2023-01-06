@@ -380,15 +380,19 @@ def _task_run_iterator(
 
 def parse_spans(spans: Spans) -> PipelineSummary:
     """
-    --- New parser: this will replace `get_pipeline_iterators` ---
-
     Parse spans into an easy to use object summarising outcomes of pipeline and
     individual tasks.
 
     Input is all OpenTelemetry spans logged for one pipeline run.
-
     """
-    pipeline_attributes = spans.get_attributes(allowed_prefixes={"pipeline."})
+    pipeline_attributes = spans.get_attributes(
+        allowed_prefixes={
+            # old API (to be removed)
+            "pipeline.",
+            # new Ray workflow-based API
+            "workflow.",
+        }
+    )
 
     # TODO 1:
     # - potentially (top) span_id could also be passed into function as argument
@@ -406,6 +410,7 @@ def parse_spans(spans: Spans) -> PipelineSummary:
         span_id=top_span_id,
         task_dependencies=extract_task_dependencies(spans),
         attributes=pipeline_attributes,
+        # TODO: get time range from top span
         timing=Timing(
             start_time_iso8601=min(span["start_time"] for span in spans),
             end_time_iso8601=max(span["end_time"] for span in spans),
