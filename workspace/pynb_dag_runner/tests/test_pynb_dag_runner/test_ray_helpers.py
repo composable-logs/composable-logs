@@ -2,11 +2,12 @@ import time
 from typing import Any, Awaitable, Callable
 
 #
+from ray import workflow
 import pytest, ray
 
 #
 from pynb_dag_runner.helpers import A, one, Try
-from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
+from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard, get_node_metadata
 from pynb_dag_runner.opentelemetry_helpers import (
     SpanDict,
     read_key,
@@ -201,3 +202,15 @@ def test_try_equality_checking():
 
     assert Try(123, None) != Exception("!!!")
     assert Try(123, None) != (lambda: None)
+
+
+# --- get_node_metadata ---
+
+
+def test_get_node_metadata():
+    @workflow.options(metadata={"k": 1})  # type: ignore
+    @ray.remote
+    def f123():
+        return 123
+
+    assert get_node_metadata(f123.bind()) == {"k": 1}

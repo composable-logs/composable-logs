@@ -2,6 +2,7 @@ from typing import TypeVar, Callable, Optional, Awaitable
 
 #
 import ray
+
 import opentelemetry as otel
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 
@@ -12,6 +13,27 @@ from pynb_dag_runner.opentelemetry_helpers import otel_add_baggage
 A = TypeVar("A")
 B = TypeVar("B")
 C = TypeVar("C")
+
+
+def get_node_metadata(dag_node):
+    """
+    For a Ray DAG Node (FunctionNode) return the metadata used when initiating the
+    task.
+
+    Ie., for
+    ```
+    @workflow.options(metadata={"k": 1})
+    @ray.remote
+    def f123():
+        return 123
+
+    assert get_node_metadata(f123.bind()) == {"k", 1}
+    ```
+    """
+    from ray.workflow.common import WORKFLOW_OPTIONS
+
+    options = dag_node.get_options()
+    return options["_metadata"][WORKFLOW_OPTIONS]["metadata"]
 
 
 def _try_eval_f_async_wrapper(
