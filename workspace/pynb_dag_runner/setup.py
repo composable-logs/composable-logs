@@ -27,7 +27,7 @@ def get_name_and_version():
     PYTHON_PACKAGE_RELEASE_TARGET = os.environ.get("PYTHON_PACKAGE_RELEASE_TARGET")
 
     # --- determine package name and version ---
-    PYTHON_PACKAGE_NAME: str = "pynb_dag_runner"
+    PYTHON_PACKAGE_NAME: str = "composable_logs"
     PYTHON_PACKAGE_VERSION: str = (
         Path("PYTHON_PACKAGE_VERSION").read_text().splitlines()[0]
     )
