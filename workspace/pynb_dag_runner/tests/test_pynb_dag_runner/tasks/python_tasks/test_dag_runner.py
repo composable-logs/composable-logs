@@ -1,5 +1,5 @@
 import time, random
-from typing import List, Set, Dict, Tuple
+from typing import Any, List, Set, Dict, Tuple
 
 #
 import pytest
@@ -58,7 +58,7 @@ def test__task__can_access_otel_baggage_and_returns_outcome():
 #                       ^
 #     numeric_input2 --/
 #
-TEST_TASK_ATTRIBUTES = {
+TEST_TASK_ATTRIBUTES: Dict[str, Dict[str, Any]] = {
     "input_1": {"task.foo": 12, "task.abc": "abc", "task.gamma": 1.23},
     "input_2": {"task.foo": 23},
     "process": {},
@@ -109,7 +109,7 @@ def test__cl__can_compose(cl__can_compose_spans: Spans):
         assert task_summary.is_success()
 
         # assert that task has expected attributes logged
-        task_id: str = task_summary.attributes["task.task_id"]
+        task_id: str = task_summary.attributes["task.task_id"]  # type: ignore
         assert task_id in TEST_TASK_ATTRIBUTES
 
         assert del_key(task_summary.attributes, "task.task_id") == {

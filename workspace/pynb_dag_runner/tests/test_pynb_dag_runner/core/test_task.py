@@ -14,6 +14,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
 )
 
 
+@pytest.mark.skipif(True, reason="remove after move to new Ray interface")
 @pytest.mark.parametrize("task_fail", [True, False])
 def disable_test_make_task_from_function_or_remote_function(task_fail: bool):
     def f(_):
