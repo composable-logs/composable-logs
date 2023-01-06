@@ -70,9 +70,7 @@ def test__cl__can_compose():
     def process(x, y, **kwargs):
         return {"result": x + y, **kwargs}
 
-    dag = process.bind(
-        numeric_input1.bind(), numeric_input2.bind(a_variable=123), test=10
-    )
+    dag = process(numeric_input1(), numeric_input2(a_variable=123), test=10)
 
     with SpanRecorder() as rec:
         assert run_dag(dag) == {"result": 10 + (123 + 20), "test": 10}
@@ -87,7 +85,7 @@ def test__cl__exceptions_are_recorded():
 
     try:
         with SpanRecorder() as rec:
-            run_dag(dag=f.bind())
+            run_dag(dag=f())
 
         raise Exception("dag show throw an exception")
 
@@ -104,7 +102,7 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
         return C.parameters
 
     with SpanRecorder() as rec:
-        assert run_dag(dag=f.bind(), workflow_parameters=workflow_parameters) == {
+        assert run_dag(dag=f(), workflow_parameters=workflow_parameters) == {
             # system
             "task.task_id": "test_function",
             "task.num_cpus": 1,
