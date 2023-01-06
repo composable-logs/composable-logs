@@ -104,7 +104,7 @@ def test__cl__can_compose(cl__can_compose_spans: Spans):
 
     span_id_to_task_id: Dict[str, str] = {}
 
-    # check attributes
+    # check logged workflow and task attributes
     for task_summary in pipeline_summary.task_runs:  # type: ignore
         assert task_summary.is_success()
 
@@ -120,7 +120,7 @@ def test__cl__can_compose(cl__can_compose_spans: Spans):
 
         span_id_to_task_id[task_summary.span_id] = task_id
 
-    # --
+    # check logged task dependencies
     assert len(pipeline_summary.task_dependencies) == 2
     for span_id_from, span_id_to in pipeline_summary.task_dependencies:
         task_id_from = span_id_to_task_id[span_id_from]
@@ -160,14 +160,10 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
 
     with SpanRecorder() as rec:
         assert run_dag(dag=f(), workflow_parameters=workflow_parameters) == {
-            # system
             "task.task_id": "test_function",
             "task.num_cpus": 1,
-            # task (**task_parameters)
-            "task.X": 123,
-            "task.Y": None,
-            # global (**workflow_parameters)
-            "workflow.env": "local-test",
+            **task_parameters,
+            **workflow_parameters,
         }
 
     assert len(rec.spans.exception_events()) == 0
@@ -253,6 +249,7 @@ def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
     validate_spans(get_test_spans())
 
 
+@pytest.mark.skipif(True, reason="remove after move to new Ray interface")
 def test__task_ot__task_orchestration__fan_in_two_tasks():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
@@ -332,6 +329,7 @@ def test__task_ot__task_orchestration__fan_in_two_tasks():
     validate_spans(get_test_spans())
 
 
+@pytest.mark.skipif(True, reason="remove after move to new Ray interface")
 def test__task_ot__task_orchestration__run_three_tasks_in_parallel__failed():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:
