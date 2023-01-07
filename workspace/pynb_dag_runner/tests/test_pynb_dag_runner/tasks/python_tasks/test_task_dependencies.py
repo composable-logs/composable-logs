@@ -5,7 +5,12 @@ from typing import List, Tuple
 import pytest
 
 #
-from pynb_dag_runner.opentelemetry_helpers import SpanId, Spans
+from pynb_dag_runner.opentelemetry_helpers import (
+    get_span_id,
+    SpanId,
+    Spans,
+    SpanRecorder,
+)
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 from pynb_dag_runner.helpers import (
     one,
@@ -17,11 +22,6 @@ from pynb_dag_runner.core.dag_runner import (
     start_and_await_tasks,
     task_from_python_function,
 )
-from pynb_dag_runner.opentelemetry_helpers import (
-    get_span_id,
-    Spans,
-    SpanRecorder,
-)
 
 
 # Note/TODO:
@@ -29,6 +29,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
 # and switching to Ray workflows. Would this test be relevant after that?
 
 
+@pytest.mark.skipif(True, reason="remove after move to new Ray interface")
 @pytest.mark.asyncio
 @pytest.mark.parametrize("dummy_loop_parameter", range(1))
 @pytest.mark.parametrize(

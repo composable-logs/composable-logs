@@ -4,12 +4,7 @@ import time
 import pytest
 
 #
-from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.helpers import range_intersect
-from pynb_dag_runner.core.dag_runner import (
-    start_and_await_tasks,
-    task_from_python_function,
-)
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
