@@ -1,6 +1,7 @@
 from functools import lru_cache
 
 #
+import ray
 import pytest
 
 #
@@ -20,6 +21,7 @@ from pynb_dag_runner.opentelemetry_helpers import (
     SpanDict,
     SpanRecorder,
 )
+from pynb_dag_runner.wrappers import task, run_dag
 
 # Error message for failing tasks
 ERROR_MSG = "!!!Exception-12342!!!"
@@ -63,6 +65,7 @@ def get_spans(task_should_fail: bool) -> Spans:
     return rec.spans
 
 
+@pytest.mark.skipif(True, reason="remove after move to new Ray interface")
 @pytest.mark.parametrize("task_should_fail", [True, False])
 def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
     spans = get_spans(task_should_fail)  # manually get spans for parameter
@@ -92,6 +95,7 @@ def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
                 assert e["attributes"]["exception.message"] == ERROR_MSG
 
 
+@pytest.mark.skipif(True, reason="move away from this file")
 def test__python_task__ok_or_fail__validate_spans():
     spans = get_spans(task_should_fail=False)
 
@@ -117,3 +121,72 @@ def test__python_task__ok_or_fail__validate_spans():
         timeout_span,
         call_function_span,
     )
+
+
+# --- assert that tasks are not retried by Ray ---
+
+
+@pytest.fixture(scope="module")
+def spans_a_failed_task_is_not_retried() -> Spans:
+    @ray.remote
+    class CallCounter:
+        def __init__(self):
+            self.count = 0
+
+        def get_count(self):
+            self.count += 1
+            return self.count
+
+    call_counter = CallCounter.remote()
+
+    @task(task_id="task-f")
+    def f():
+        assert ray.get(call_counter.get_count.remote()) == 1
+
+        raise Exception("BOOM-2000")
+
+    with SpanRecorder() as rec:
+        try:
+            run_dag(dag=f())
+            raise Exception("run_dag should raise an exception")
+
+        except Exception as e:
+            assert "BOOM-2000" in str(e)
+
+    return rec.spans
+
+
+def test_spans_a_failed_task_is_not_retried(spans_a_failed_task_is_not_retried: Spans):
+    # TODO: currently the exceptions is logged three times in the
+    # OpenTelemetry logs and not just once.
+    #
+    # A first question would be: are the exceptions logged to different of the same
+    # span?
+    #
+    # print("==============================", f().get_options())
+    #
+    # for x in rec.spans.exception_events():
+    #     import json
+    #     print(120 * "=")
+    #     print(json.dumps(x, indent=2))
+    #
+    # In particular, this is different from exception count below
+    all_exceptions = spans_a_failed_task_is_not_retried.exception_events()
+    assert len(all_exceptions) == 3
+    for e in all_exceptions:
+        assert "BOOM-2000" in str(e)
+
+    # Check parsed spans
+    pipeline_summary = parse_spans(spans_a_failed_task_is_not_retried)
+
+    assert pipeline_summary.attributes == {}
+
+    assert len(pipeline_summary.task_runs) == 1
+
+    for task_summary in pipeline_summary.task_runs:  # type: ignore
+        assert not task_summary.is_success()
+        assert len(task_summary.exceptions) == 1
+        assert "BOOM-2000" in str(task_summary.exceptions)
+
+    # check logged task dependencies
+    assert len(pipeline_summary.task_dependencies) == 0

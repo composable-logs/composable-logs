@@ -4,6 +4,7 @@ from typing import Any, List, Set, Dict, Tuple
 #
 import pytest
 import ray
+import opentelemetry as otel
 
 #
 from pynb_dag_runner.core.dag_runner import (
@@ -26,8 +27,6 @@ from pynb_dag_runner.opentelemetry_task_span_parser import (
 )
 from pynb_dag_runner.helpers import A, del_key, one
 from pynb_dag_runner.wrappers import task, run_dag, TaskContext
-
-import opentelemetry as otel
 
 
 @pytest.mark.skipif(True, reason="remove after move to new Ray interface")
@@ -92,9 +91,6 @@ def cl__can_compose_spans() -> Spans:
     return rec.spans
 
 
-from pynb_dag_runner.helpers import del_key
-
-
 def test__cl__can_compose(cl__can_compose_spans: Spans):
     pipeline_summary = parse_spans(cl__can_compose_spans)
 
@@ -135,21 +131,6 @@ def test__cl__can_compose(cl__can_compose_spans: Spans):
 # ---
 
 
-def test__cl__exceptions_are_recorded():
-    @task(task_id="test_function")
-    def f():
-        raise Exception("BOOM123")
-
-    try:
-        with SpanRecorder() as rec:
-            run_dag(dag=f())
-
-        raise Exception("dag show throw an exception")
-
-    except Exception as e:
-        assert len(rec.spans.exception_events()) == 3  # TODO should be 1
-
-
 def test__cl__function_parameters_contain_task_and_system_and_global_parameters():
     workflow_parameters = {"workflow.env": "local-test"}
     task_parameters = {"task.X": 123, "task.Y": None}
@@ -169,6 +150,7 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
     assert len(rec.spans.exception_events()) == 0
 
 
+@pytest.mark.skipif(True, reason="remove after move to new Ray interface")
 def test__task_ot__task_orchestration__run_three_tasks_in_sequence():
     def get_test_spans() -> Spans:
         with SpanRecorder() as sr:

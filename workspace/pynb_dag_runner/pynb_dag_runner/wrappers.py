@@ -60,19 +60,8 @@ def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
     """
 
     def decorator(f):
-        # This decorator is only updating the options for the remote function
         @workflow.options(task_id=task_id)  # type: ignore
-
-        # TODO: Ray error handling seems to have problems.
-        #
-        # Even if f raises an Exception, the below is retried 3 times.
-        #
-        # Solution here gives error "Setting 'max_calls' is not supported in '.options()"
-        # https://docs.ray.io/en/latest/workflows/basics.html#error-handling
-        #
-        # See:
-        # https://github.com/ray-project/ray/commit/84ccab2d5f262169f8b95e8aaf1f0e4bc851646c
-        @ray.remote(retry_exceptions=False, num_cpus=num_cpus)  # max_calls=1)
+        @ray.remote(retry_exceptions=False, num_cpus=num_cpus, max_retries=0)
         def wrapped_f(*args, **kwargs):
             tracer = otel.trace.get_tracer(__name__)
 
@@ -128,9 +117,12 @@ def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
                 else:
                     extra = {}
 
-                # Execute function and return wrapped value
+                # Note that any exception thrown here seems to be logged multiple times
+                # by Ray/OpenTelemetry
+                result = f(*args_unwrapped, **extra, **kwargs)
+
                 return TaskResult(
-                    result=f(*args_unwrapped, **extra, **kwargs),
+                    result=result,
                     span_id=this_task_span_id,
                 )
 
