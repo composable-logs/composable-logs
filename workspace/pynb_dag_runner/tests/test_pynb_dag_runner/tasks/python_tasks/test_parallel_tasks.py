@@ -58,7 +58,7 @@ def test__python_task__parallel_tasks__success(spans_ok: Spans):
 def spans_fail() -> Spans:
     @task(task_id="par-task-f", num_cpus=0)
     def f():
-        time.sleep(1.0)
+        time.sleep(0.5)
 
     @task(task_id="par-task-g", num_cpus=0)
     def g():
@@ -66,7 +66,7 @@ def spans_fail() -> Spans:
 
     @task(task_id="par-task-h", num_cpus=0)
     def h():
-        time.sleep(1.1)
+        time.sleep(0.5)
 
     with SpanRecorder() as rec:
         try:
@@ -74,7 +74,7 @@ def spans_fail() -> Spans:
         except:
             # TODO: without this sleep, f and h will not show up in the logs (for
             # this test). In fact, the logs for these may show up in other unit tests.
-            time.sleep(2.0)
+            time.sleep(4.0)
 
     return rec.spans
 
