@@ -85,8 +85,6 @@ def test__python_task__parallel_tasks_are_queued_based_on_available_ray_worker_c
     # running the above tasks with no constraints should take > 1 secs.
     assert pipeline_summary.timing.get_duration_s() > 1.0
 
-    pipeline_summary.timing.get_duration_s()
-
     # Check 2: since only 2 CPU:s are reserved (for unit tests, see above)
     # the intersection of three runtime ranges should always be empty.
     for r1, r2, r3 in it.combinations(task_runtime_ranges, 3):

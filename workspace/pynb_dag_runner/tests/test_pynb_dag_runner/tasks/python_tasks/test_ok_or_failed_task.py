@@ -188,3 +188,58 @@ def test_spans_a_failed_task_is_not_retried(spans_a_failed_task_is_not_retried: 
 
     # check logged task dependencies
     assert len(pipeline_summary.task_dependencies) == 0
+
+
+# --- error handling in case middle task fails in workflow ---
+
+
+@pytest.fixture(scope="module")
+def spans_middle_task_fails() -> Spans:
+
+    # Check error handling for below DAG when task-g throws an exception:
+    #
+    #   task-f  --->  task_g  --->  task-h
+    #
+
+    @task(task_id="mid-task-f")
+    def f():
+        pass
+
+    @task(task_id="mid-task-g")
+    def g(_):
+        raise Exception("middle task failed")
+
+    @task(task_id="mid-task-h")
+    def h(_):
+        pass
+
+    with SpanRecorder() as rec:
+        try:
+            run_dag(dag=h(g(f())))
+        except:
+            pass
+
+    return rec.spans
+
+
+def test_spans_middle_task_fails(spans_middle_task_fails: Spans):
+
+    # Check parsed spans
+    pipeline_summary = parse_spans(spans_middle_task_fails)
+
+    assert pipeline_summary.attributes == {}
+
+    assert len(pipeline_summary.task_runs) == 2
+
+    for task_summary in pipeline_summary.task_runs:  # type: ignore
+        if task_summary.task_id == "mid-task-f":
+            assert task_summary.is_success()
+        elif task_summary.task_id == "mid-task-g":
+            assert not task_summary.is_success()
+            assert len(task_summary.exceptions) == 1
+            assert "middle task failed" in str(task_summary.exceptions)
+        else:
+            raise Exception("Unknown task-id")
+
+    # check logged task dependencies
+    assert len(pipeline_summary.task_dependencies) == 1
