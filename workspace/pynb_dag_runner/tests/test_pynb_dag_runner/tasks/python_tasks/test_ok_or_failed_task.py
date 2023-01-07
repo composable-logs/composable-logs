@@ -137,7 +137,7 @@ def spans_a_failed_task_is_not_retried() -> Spans:
             self.count += 1
             return self.count
 
-    call_counter = CallCounter.remote()
+    call_counter = CallCounter.remote()  # type: ignore
 
     @task(task_id="task-f")
     def f():
@@ -162,8 +162,6 @@ def test_spans_a_failed_task_is_not_retried(spans_a_failed_task_is_not_retried: 
     #
     # A first question would be: are the exceptions logged to different of the same
     # span?
-    #
-    # print("==============================", f().get_options())
     #
     # for x in rec.spans.exception_events():
     #     import json

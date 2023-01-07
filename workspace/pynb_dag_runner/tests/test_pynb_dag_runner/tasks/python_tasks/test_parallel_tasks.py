@@ -15,21 +15,22 @@ from pynb_dag_runner.opentelemetry_helpers import (
     SpanRecorder,
 )
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
+from pynb_dag_runner.wrappers import task, run_dag
 
 
 @pytest.fixture(scope="module")
 def spans() -> Spans:
-    with SpanRecorder() as rec:
-        tasks = [
-            task_from_python_function(
-                lambda _: time.sleep(1.0),
-                attributes={"task.function_id": f"id#{function_id}"},
-                timeout_s=10.0,
-            )
-            for function_id in range(2)
-        ]
+    @task(task_id=f"f-#1", num_cpus=1)
+    def f1():
+        time.sleep(1.0)
 
-        _ = start_and_await_tasks(tasks, tasks, timeout_s=100, arg="dummy value")
+    @task(task_id=f"f-#2", num_cpus=1)
+    def f2():
+        time.sleep(1.0)
+
+    with SpanRecorder() as rec:
+        run_dag(dag=[f1(), f2()])
+
     return rec.spans
 
 
@@ -45,12 +46,11 @@ def test__python_task__parallel_tasks__parse_spans(spans: Spans):
         assert len(task_summary.logged_artifacts) == 0
         assert len(task_summary.logged_values) == 0
 
-        ids.append(task_summary.attributes["task.function_id"])
+        assert task_summary.task_id == task_summary.attributes["task.task_id"]
+        ids.append(task_summary.attributes["task.task_id"])
         ranges.append(task_summary.timing.get_task_timestamp_range_us_epoch())
-
-    # both tasks were run and found in logs
-    assert set(ids) == {"id#0", "id#1"}
 
     # Check: since there are no order constraints, the time ranges should
     # overlap provided tests are run on 2+ CPU cores
+    assert set(ids) == {"f-#1", "f-#2"}
     assert range_intersect(*ranges)

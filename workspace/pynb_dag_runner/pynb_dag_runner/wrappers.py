@@ -131,7 +131,15 @@ def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
     return decorator
 
 
-def run_dag(dag, workflow_parameters: Dict[str, Any] = {}):
+from ray.dag.function_node import FunctionNode
+from typing import Union, Sequence
+import collections
+
+
+def run_dag(
+    dag: Union[FunctionNode, Sequence[FunctionNode]],
+    workflow_parameters: Dict[str, Any] = {},
+):
     """
     Run a Ray DAG with OpenTelemetry logging
     """
@@ -143,7 +151,29 @@ def run_dag(dag, workflow_parameters: Dict[str, Any] = {}):
             span.set_attribute(k, v)
             otel_add_baggage(k, v)
 
-        dag_result = ray.get(dag.execute())
+        if isinstance(dag, FunctionNode):
+            dag_result = ray.get(dag.execute())  # type: ignore
+            assert isinstance(dag_result, TaskResult)
+            return dag_result.result
 
-        assert isinstance(dag_result, TaskResult)
-        return dag_result.result
+        elif isinstance(dag, collections.Sequence):
+            # Execute DAG with multiple ends like:
+            #
+            #       --> N2
+            #      /
+            #  N1 ----> N3
+            #      \
+            #       --> N4
+            #
+            # Now dag_run([N2, N3, N4]) allows us to await results for all end nodes.
+            #
+            # Returns output of end nodes as a list.
+            dag_results = ray.get([node.execute() for node in dag])  # type: ignore
+
+            for dag_result in dag_results:
+                assert isinstance(dag_result, TaskResult)
+
+            return [dag_result.result for dag_result in dag_results]
+
+        else:
+            raise Exception(f"Unknown input to run_dag {type(dag)}")
