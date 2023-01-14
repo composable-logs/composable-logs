@@ -10,12 +10,11 @@ from pynb_dag_runner.helpers import range_intersection, range_is_empty
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
+    iso8601_range_to_epoch_us_range,
 )
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 
 #
-from pynb_dag_runner.opentelemetry_helpers import iso8601_range_to_epoch_us_range
-
 from pynb_dag_runner.wrappers import task, run_dag
 
 
@@ -24,8 +23,7 @@ def spans() -> Spans:
     # Below we assert that function executions do not overlap and tasks are queued
     # taking into account num_cpus for each task.
     #
-    # For this, we need to distinguish between outer and inner timestamps for a
-    # task:
+    # For this, we distinguish between outer and inner timestamps for task:
     #
     # Outer timestamp range
     #    = start and end timestamps when task (wrapper) allocation starts

@@ -25,7 +25,7 @@ from pynb_dag_runner.opentelemetry_task_span_parser import (
     parse_spans,
     extract_task_dependencies,
 )
-from pynb_dag_runner.helpers import A, del_key, one
+from pynb_dag_runner.helpers import A, del_key, one, Try, Success, Failure
 from pynb_dag_runner.wrappers import task, run_dag, TaskContext
 
 
@@ -81,10 +81,12 @@ def cl__can_compose_spans() -> Spans:
     dag = process(input_1(), input_2(a_variable=123), test=10)
 
     with SpanRecorder() as rec:
-        assert run_dag(dag, workflow_parameters={"workflow.env": "xyz"}) == {
-            "result": 10 + (123 + 20),
-            "test": 10,
-        }
+        assert run_dag(dag, workflow_parameters={"workflow.env": "xyz"}) == Success(
+            {
+                "result": 10 + (123 + 20),
+                "test": 10,
+            }
+        )
 
     assert len(rec.spans.exception_events()) == 0
 
@@ -140,12 +142,14 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
         return C.parameters
 
     with SpanRecorder() as rec:
-        assert run_dag(dag=f(), workflow_parameters=workflow_parameters) == {
-            "task.task_id": "test_function",
-            "task.num_cpus": 1,
-            **task_parameters,
-            **workflow_parameters,
-        }
+        assert run_dag(dag=f(), workflow_parameters=workflow_parameters) == Success(
+            {
+                "task.task_id": "test_function",
+                "task.num_cpus": 1,
+                **task_parameters,
+                **workflow_parameters,
+            }
+        )
 
     assert len(rec.spans.exception_events()) == 0
 

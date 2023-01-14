@@ -180,6 +180,8 @@ class Try(Generic[A]):
         """ "
         Return new Try where f has been applied to the value
         (or do nothing and return self for failure)
+
+        f is assumed to not throw an Exception
         """
         return self if self.is_failure() else Try(value=f(self.value), error=None)
 

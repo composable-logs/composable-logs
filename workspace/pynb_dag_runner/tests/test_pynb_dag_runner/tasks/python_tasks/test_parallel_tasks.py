@@ -69,12 +69,9 @@ def spans_fail() -> Spans:
         time.sleep(0.5)
 
     with SpanRecorder() as rec:
-        try:
-            run_dag(dag=[f(), g(), h()])
-        except:
-            # TODO: without this sleep, f and h will not show up in the logs (for
-            # this test). In fact, the logs for these may show up in other unit tests.
-            time.sleep(4.0)
+        result = run_dag(dag=[f(), g(), h()])
+        time.sleep(4.0)
+        # TODO: check result
 
     return rec.spans
 

@@ -1,19 +1,26 @@
-from typing import Any, Dict
+from typing import Any, Dict, TypeVar, List, Union, Sequence
 import inspect
+import collections
 
 # -
-import ray
+import pydantic as p
 
+import ray
+from ray.dag.function_node import FunctionNode
 from ray import workflow
+
 import opentelemetry as otel
+from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 
 # -
 from pynb_dag_runner.opentelemetry_helpers import get_span_hexid, otel_add_baggage
-import pydantic as p
 from pynb_dag_runner.opentelemetry_task_span_parser import OpenTelemetrySpanId
+from pynb_dag_runner.helpers import one, Try, Failure, Success
 
 # --- schemas ---
+
+A = TypeVar("A")
 
 
 class TaskResult(p.BaseModel):
@@ -26,7 +33,7 @@ class TaskResult(p.BaseModel):
 
     task 1 ---\
                \
-    task 2 -------> task 4
+    task 2 -----+---> task 4
                /
     task 3 ---/
 
@@ -36,8 +43,23 @@ class TaskResult(p.BaseModel):
 
     span_id: OpenTelemetrySpanId
 
+    def __str__(self):
+        return f"TaskResult(result={self.result}, span_id={self.span_id})"
+
 
 # ---
+
+
+class ExceptionGroup(Exception):
+    # This would be available in Python 3.11, or in anyio-library (available as
+    # dependency of Ray, but this does not seem to inherit from Exception?)
+    #
+    def __init__(self, exceptions: List[Exception]):
+        self.exceptions = exceptions
+
+    def __str__(self):
+        # Note: str(ExceptionGroup([e])) == str(e)
+        return "-------\n".join(str(e) for e in self.exceptions)
 
 
 class TaskContext:
@@ -62,9 +84,18 @@ def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
     def decorator(f):
         @workflow.options(task_id=task_id)  # type: ignore
         @ray.remote(retry_exceptions=False, num_cpus=num_cpus, max_retries=0)
-        def wrapped_f(*args, **kwargs):
-            tracer = otel.trace.get_tracer(__name__)
+        def wrapped_f(*args: Try[TaskResult], **kwargs):
+            # Short circuit this task if there are upstream errors.
+            # In this case, exit with Failure containing an ExceptionGroup-error
+            # collecting all upstream errors.
+            upstream_exceptions = [arg.error for arg in args if not arg.is_success()]
+            if len(upstream_exceptions) > 0:
+                return Failure(ExceptionGroup(upstream_exceptions))  # type: ignore
 
+            args = [arg.get() for arg in args]  # type: ignore
+            # -
+
+            tracer = otel.trace.get_tracer(__name__)
             with tracer.start_as_current_span("execute-task") as span:
                 this_task_span_id: str = get_span_hexid(span)
 
@@ -117,23 +148,22 @@ def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
                 else:
                     extra = {}
 
-                # Note that any exception thrown here seems to be logged multiple times
-                # by Ray/OpenTelemetry
-                result = f(*args_unwrapped, **extra, **kwargs)
+                try_result = Try.call(lambda: f(*args_unwrapped, **extra, **kwargs))
 
-                return TaskResult(
-                    result=result,
-                    span_id=this_task_span_id,
-                )
+                if try_result.is_success():
+                    span.set_status(Status(StatusCode.OK))
+                else:
+                    span.record_exception(try_result.error)
+                    span.set_status(Status(StatusCode.ERROR, "Failure"))
+
+            # Wrap result into TaskResult
+            return try_result.map_value(
+                lambda x: TaskResult(result=x, span_id=this_task_span_id)
+            )
 
         return wrapped_f.bind
 
     return decorator
-
-
-from ray.dag.function_node import FunctionNode
-from typing import Union, Sequence
-import collections
 
 
 def run_dag(
@@ -152,28 +182,43 @@ def run_dag(
             otel_add_baggage(k, v)
 
         if isinstance(dag, FunctionNode):
-            dag_result = ray.get(dag.execute())  # type: ignore
-            assert isinstance(dag_result, TaskResult)
-            return dag_result.result
+            return run_dag([dag]).map_value(lambda xs: one(xs))
 
         elif isinstance(dag, collections.Sequence):
             # Execute DAG with multiple ends like:
             #
-            #       --> N2
-            #      /
-            #  N1 ----> N3
-            #      \
-            #       --> N4
+            #          ---> Node 2
+            #         /
+            #  Node 1 ----> Node 3
+            #         \
+            #          ---> Node 4
             #
             # Now dag_run([N2, N3, N4]) allows us to await results for all end nodes.
             #
             # Returns output of end nodes as a list.
             dag_results = ray.get([node.execute() for node in dag])  # type: ignore
 
+            # verify type of return values
             for dag_result in dag_results:
-                assert isinstance(dag_result, TaskResult)
+                if not (
+                    isinstance(dag_result, Try)
+                    and (
+                        dag_result.is_failure()
+                        or isinstance(dag_result.value, TaskResult)
+                    )
+                ):
+                    raise Exception(
+                        f"Expected a Try[TaskResult] got {str(dag_result)[:100]}"
+                    )
 
-            return [dag_result.result for dag_result in dag_results]
+            dag_errors: List[Exception] = [
+                result.error for result in dag_results if result.is_failure()
+            ]
+
+            if len(dag_errors) > 0:
+                return Failure(ExceptionGroup(dag_errors))
+            else:
+                return Success([dag_result.get().result for dag_result in dag_results])
 
         else:
             raise Exception(f"Unknown input to run_dag {type(dag)}")
