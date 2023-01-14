@@ -2,12 +2,11 @@ import time
 from typing import Any, Awaitable, Callable, TypeVar
 
 #
-from ray import workflow
 import pytest, ray
 
 #
 from pynb_dag_runner.helpers import Success, Failure, one, Try
-from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard, get_node_metadata
+from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
 from pynb_dag_runner.opentelemetry_helpers import (
     SpanDict,
     read_key,
@@ -232,15 +231,3 @@ def test_try_call():
         raise test_exception
 
     assert Try.call(f) == Try(None, test_exception) == Failure(test_exception)
-
-
-# --- get_node_metadata ---
-
-
-def test_get_node_metadata():
-    @workflow.options(metadata={"k": 1})  # type: ignore
-    @ray.remote
-    def f123():
-        return 123
-
-    assert get_node_metadata(f123.bind()) == {"k": 1}
