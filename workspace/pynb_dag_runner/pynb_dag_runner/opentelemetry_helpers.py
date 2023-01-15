@@ -1,5 +1,3 @@
-import glob
-from pathlib import Path
 from typing import (
     Any,
     Dict,
@@ -14,6 +12,9 @@ from typing import (
     Tuple,
     TypeVar,
 )
+
+import glob, time
+from pathlib import Path
 
 # Note eg "from opentelemetry import trace" fails mypy
 import opentelemetry as otel
@@ -522,6 +523,7 @@ class SpanRecorder:
         return self
 
     def __exit__(self, type, value, traceback):
+        time.sleep(0.25)
         assert otel.trace.get_tracer_provider().force_flush()  # type: ignore
 
         # get new spans after test has run

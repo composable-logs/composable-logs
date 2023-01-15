@@ -337,9 +337,12 @@ class PipelineSummary(p.BaseModel):
 
     task_dependencies: Set[Any]
 
-    def is_success(self):
+    def is_success(self) -> bool:
         # Did all tasks run successfully?
         return all(task_run.is_success() for task_run in self.task_runs)
+
+    def is_failure(self) -> bool:
+        return not self.is_success()
 
     def as_dict(self):
         return {

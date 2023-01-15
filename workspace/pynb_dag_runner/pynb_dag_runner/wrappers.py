@@ -51,15 +51,58 @@ class TaskResult(p.BaseModel):
 
 
 class ExceptionGroup(Exception):
-    # This would be available in Python 3.11, or in anyio-library (available as
-    # dependency of Ray, but this does not seem to inherit from Exception?)
+    # Exception subclass to contain ordered list of one or more Exceptions
     #
+    # When creating an ExceptionGroup, duplicate exceptions are removed (where two
+    # exceptions are equal if their string-representations coincide).
+    #
+    # --
+    # An ExceptionGroup implementation would be available in Python 3.11, or in the
+    # anyio-library (available as dependency of Ray, but this does not seem to inherit
+    # from Exception?)
     def __init__(self, exceptions: List[Exception]):
-        self.exceptions = exceptions
+        self.exceptions = []
+
+        # add listed exceptions in given order, with duplicates removed
+        str_exceptions_added = []
+        for exception in exceptions:
+            if str(exception) not in str_exceptions_added:
+                self.exceptions.append(exception)
+                str_exceptions_added.append(str(exception))
 
     def __str__(self):
         # Note: str(ExceptionGroup([e])) == str(e)
         return "-------\n".join(str(e) for e in self.exceptions)
+
+    def __eq__(self, other):
+        if isinstance(other, ExceptionGroup):
+            if len(self.exceptions) != len(other.exceptions):
+                return False
+            else:
+                return all(
+                    str(x) == str(y) for x, y in zip(self.exceptions, other.exceptions)
+                )
+        else:
+            return False
+
+
+def flatten_exceptions(
+    *exceptions: Union[Exception, ExceptionGroup]
+) -> Union[Exception, ExceptionGroup]:
+    assert len(exceptions) > 0
+    unwrapped_exceptions = []
+
+    for exception in exceptions:
+        if isinstance(exception, ExceptionGroup):
+            unwrapped_exceptions += exception.exceptions
+        else:
+            unwrapped_exceptions.append(exception)
+
+    return (
+        ExceptionGroup(unwrapped_exceptions)
+        if len(unwrapped_exceptions) > 1
+        else one(unwrapped_exceptions)
+    )
 
 
 class TaskContext:
@@ -90,7 +133,7 @@ def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
             # collecting all upstream errors.
             upstream_exceptions = [arg.error for arg in args if not arg.is_success()]
             if len(upstream_exceptions) > 0:
-                return Failure(ExceptionGroup(upstream_exceptions))  # type: ignore
+                return Failure(flatten_exceptions(*upstream_exceptions))  # type: ignore
 
             args = [arg.get() for arg in args]  # type: ignore
             # -
@@ -193,10 +236,28 @@ def run_dag(
             #         \
             #          ---> Node 4
             #
-            # Now dag_run([N2, N3, N4]) allows us to await results for all end nodes.
+            # Now dag_run([N2, N3, N4]) awaits the results for all end nodes,
+            # and returns a Try that:
+            #  - if all nodes ran successfully: return a Try(Success) with return values
+            #    of end nodes as a list.
             #
-            # Returns output of end nodes as a list.
-            dag_results = ray.get([node.execute() for node in dag])  # type: ignore
+            #  - if any node(s) in the DAG fails: return a Try(Failure) with an
+            #    ExceptionGroup collecting all exceptions. Note that two nodes in the
+            #    DAG can fail in parallel.
+            #
+            # Note:
+            #  - We do not want to [node.execute() for node in dag]. In the above DAG,
+            #    this would run Node 1 three times. Rather, we start execution on a
+            #    collect-node that waits for all upstream nodes.
+            #
+            #  - The collect node will not be seen in OpenTelemetry logs.
+
+            @workflow.options(task_id="collect-nodes")  # type: ignore
+            @ray.remote(retry_exceptions=False, num_cpus=0, max_retries=0)
+            def collect(*args):
+                return args
+
+            dag_results = ray.get(collect.bind(*dag).execute())  # type: ignore
 
             # verify type of return values
             for dag_result in dag_results:
@@ -216,7 +277,7 @@ def run_dag(
             ]
 
             if len(dag_errors) > 0:
-                return Failure(ExceptionGroup(dag_errors))
+                return Failure(flatten_exceptions(*dag_errors))
             else:
                 return Success([dag_result.get().result for dag_result in dag_results])
 
