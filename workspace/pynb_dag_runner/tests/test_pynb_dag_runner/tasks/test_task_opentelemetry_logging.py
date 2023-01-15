@@ -11,8 +11,6 @@ from pynb_dag_runner.tasks.task_opentelemetry_logging import (
     PydarLogger,
     SerializedData,
     LoggableTypes,
-    get_logged_values,
-    get_logged_artifacts,
 )
 
 from pynb_dag_runner.opentelemetry_task_span_parser import (

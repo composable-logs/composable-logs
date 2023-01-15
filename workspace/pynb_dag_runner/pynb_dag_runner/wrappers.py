@@ -120,15 +120,13 @@ class TaskContext:
 
         self.logger = ComposableLogsLogger(parameters)
 
-    # --- forward logging to ComposableLogsLogger (TODO revise)
-
-    def log_artefact(self, name: str, content: Union[bytes, str]):
-        self.logger.log_artefact(name, content)
+    # --- forward log-methods to ComposableLogsLogger
 
     def log_figure(self, name: str, fig):
         self.logger.log_figure(name, fig)
 
-    # --- log values ---
+    def log_artefact(self, name: str, content: Union[bytes, str]):
+        self.logger.log_artefact(name, content)
 
     def log_value(self, name: str, value: Any):
         self.logger.log_value(name, value)
