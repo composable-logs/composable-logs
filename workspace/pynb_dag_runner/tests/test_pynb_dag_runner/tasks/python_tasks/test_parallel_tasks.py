@@ -19,13 +19,13 @@ from pynb_dag_runner.wrappers import task, run_dag, ExceptionGroup
 def spans_ok() -> Spans:
     @task(task_id=f"f-#1", num_cpus=1)
     def f1():
-        time.sleep(1.0)
+        time.sleep(2.0)
 
         return 1
 
     @task(task_id=f"f-#2", num_cpus=1)
     def f2():
-        time.sleep(1.0)
+        time.sleep(2.0)
 
         return 2
 
@@ -54,6 +54,9 @@ def test__python_task__parallel_tasks__success(spans_ok: Spans):
     # Check: since there are no order constraints, the time ranges should
     # overlap provided tests are run on 2+ CPU cores
     assert set(ids) == {"f-#1", "f-#2"}
+
+    # If the below fails (in particular on lower-end Github action runners) the
+    # time.sleep in the tasks might be too short. Has failed eg for 1s.
     assert range_intersect(*ranges)
 
 
