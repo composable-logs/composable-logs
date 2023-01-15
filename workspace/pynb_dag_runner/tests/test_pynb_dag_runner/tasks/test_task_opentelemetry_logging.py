@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List
 
 #
+from pynb_dag_runner.wrappers import task, run_dag, TaskContext
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
 from pynb_dag_runner.helpers import one, Success
 from pynb_dag_runner.tasks.tasks import _get_traceparent
@@ -12,6 +13,12 @@ from pynb_dag_runner.tasks.task_opentelemetry_logging import (
     LoggableTypes,
     get_logged_values,
     get_logged_artifacts,
+)
+
+from pynb_dag_runner.opentelemetry_task_span_parser import (
+    parse_spans,
+    LoggedValueContent,
+    ArtifactContent,
 )
 
 # --
@@ -95,12 +102,6 @@ def test__pydar_logger__logged_spans_are_nested():
 
 
 # --- test logging of values work with Python tasks and Spans parser ---
-from pynb_dag_runner.wrappers import task, run_dag, TaskContext
-from pynb_dag_runner.opentelemetry_task_span_parser import (
-    parse_spans,
-    LoggedValueContent,
-    ArtifactContent,
-)
 
 TEST_MOCK_MATPLOTLIB_PNG = bytes([12, 23, 34, 45, 56, 67, 78, 89, 90])
 TEST_BINARY_FILE = bytes(1000 * list(range(256)))
@@ -192,6 +193,7 @@ def test__pydar_logger__parse_logged_values_from_three_python_tasks(
                 type="bytes",
                 content=TEST_MOCK_MATPLOTLIB_PNG,
             )
+
             assert len(task_summary.logged_values) == 5
             for args in [
                 ("a-logged-int", "int", 1020),
@@ -203,33 +205,3 @@ def test__pydar_logger__parse_logged_values_from_three_python_tasks(
                 check_logged_value(*args)
         else:
             raise Exception(f"Unknown task-id: {task_summary.task_id}")
-
-
-# ---
-
-
-def test__pydar_logger__values_are_logged_to_python_task():
-    def get_test_spans():
-        with SpanRecorder() as rec:
-            tracer = ot.trace.get_tracer(__name__)
-            with tracer.start_as_current_span("parent-span") as t1:
-                with tracer.start_as_current_span("sub-span") as t2:
-                    logger = PydarLogger(
-                        P={
-                            "_opentelemetry_traceparent": _get_traceparent(),
-                        }
-                    )
-                    logger.log_int("name", 1000)
-
-        return rec.spans
-
-    def validate_spans(spans: Spans):
-        assert len(spans) == 3
-
-        top_span = one(spans.filter(["name"], "parent-span"))
-        sub_span = one(spans.filter(["name"], "sub-span"))
-        log_span = one(spans.filter(["name"], "named-value"))
-
-        assert spans.contains_path(top_span, sub_span, log_span)
-
-    validate_spans(get_test_spans())
