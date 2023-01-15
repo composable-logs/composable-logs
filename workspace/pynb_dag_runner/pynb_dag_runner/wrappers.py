@@ -17,6 +17,7 @@ from opentelemetry.trace import StatusCode, Status  # type: ignore
 from pynb_dag_runner.opentelemetry_helpers import get_span_hexid, otel_add_baggage
 from pynb_dag_runner.opentelemetry_task_span_parser import OpenTelemetrySpanId
 from pynb_dag_runner.helpers import one, Try, Failure, Success
+from pynb_dag_runner.tasks.task_opentelemetry_logging import ComposableLogsLogger
 
 # --- schemas ---
 
@@ -116,6 +117,31 @@ class TaskContext:
     def __init__(self, span, parameters: Dict[str, Any]):
         self.span = span
         self.parameters = parameters
+
+        self.logger = ComposableLogsLogger(parameters)
+
+    # --- forward log-methods to ComposableLogsLogger
+
+    def log_figure(self, name: str, fig):
+        self.logger.log_figure(name, fig)
+
+    def log_artefact(self, name: str, content: Union[bytes, str]):
+        self.logger.log_artefact(name, content)
+
+    def log_value(self, name: str, value: Any):
+        self.logger.log_value(name, value)
+
+    def log_string(self, name: str, value: str):
+        self.logger.log_string(name, value)
+
+    def log_int(self, name: str, value: int):
+        self.logger.log_int(name, value)
+
+    def log_boolean(self, name: str, value: bool):
+        self.logger.log_boolean(name, value)
+
+    def log_float(self, name: str, value: float):
+        self.logger.log_float(name, value)
 
 
 def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):

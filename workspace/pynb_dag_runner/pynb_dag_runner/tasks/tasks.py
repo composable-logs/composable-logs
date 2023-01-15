@@ -18,7 +18,7 @@ from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNote
 
 def _get_traceparent() -> str:
     """
-    Get implicit OpenTelemetry span context for context propagation (to notebooks)
+    Get implicit OpenTelemetry span context for context propagation (eg. to notebooks)
     """
     carrier: Mapping[str, str] = {}
     TraceContextTextMapPropagator().inject(carrier=carrier)
