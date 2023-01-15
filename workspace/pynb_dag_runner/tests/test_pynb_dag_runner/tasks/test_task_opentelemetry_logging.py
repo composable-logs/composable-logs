@@ -5,7 +5,7 @@ from typing import List
 #
 from pynb_dag_runner.wrappers import task, run_dag, TaskContext
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
-from pynb_dag_runner.helpers import one, Success
+from pynb_dag_runner.helpers import one, Success, Failure
 from pynb_dag_runner.tasks.tasks import _get_traceparent
 from pynb_dag_runner.tasks.task_opentelemetry_logging import (
     PydarLogger,
@@ -72,7 +72,7 @@ def test__encode_decode_to_wire__exceptions_for_invalid_data():
 # ---- test logging from PydarLogger ----
 
 
-def test__pydar_logger__logged_spans_are_nested():
+def test__task_logger__logged_spans_are_nested():
     def get_test_spans():
         with SpanRecorder() as rec:
             tracer = ot.trace.get_tracer(__name__)
@@ -156,7 +156,7 @@ def spans_to_test_otel_loggging() -> Spans:
     return rec.spans
 
 
-def test__pydar_logger__parse_logged_values_from_three_python_tasks(
+def test__task_logger__parse_logged_values_from_three_python_tasks(
     spans_to_test_otel_loggging: Spans,
 ):
     pipeline_summary = parse_spans(spans_to_test_otel_loggging)
@@ -201,5 +201,44 @@ def test__pydar_logger__parse_logged_values_from_three_python_tasks(
                 ("a-logged-json-value", "json", TEST_PYTHON_DICT),
             ]:
                 check_logged_value(*args)
+        else:
+            raise Exception(f"Unknown task-id: {task_summary.task_id}")
+
+
+def test__task_logger__values_are_logged_also_for_failed_tasks():
+    test_exception = Exception("task-g failed")
+
+    @task(task_id="task-f")
+    def f(C: TaskContext):
+        C.log_int("log-a-value-in-first-task", 10000)
+
+    @task(task_id="task-g")
+    def g(arg, C: TaskContext):
+        C.log_artefact("read-me", "123!")
+        C.log_int("log-a-value-in-second-task-before-failing", 20000)
+        raise test_exception
+
+    with SpanRecorder() as rec:
+        assert Failure(test_exception) == run_dag(dag=g(f()))
+
+    for task_summary in parse_spans(rec.spans).task_runs:  # type: ignore
+
+        if task_summary.task_id == "task-f":
+            assert task_summary.logged_values[
+                "log-a-value-in-first-task"
+            ] == LoggedValueContent(type="int", content=10000)
+
+        elif task_summary.task_id == "task-g":
+            assert one(task_summary.logged_artifacts) == ArtifactContent(
+                name="read-me", type="utf-8", content="123!"
+            )
+
+            assert task_summary.logged_values[
+                "log-a-value-in-second-task-before-failing"
+            ] == LoggedValueContent(type="int", content=20000)
+
+            one(task_summary.exceptions)
+            assert str(test_exception) in str(task_summary.exceptions)
+
         else:
             raise Exception(f"Unknown task-id: {task_summary.task_id}")
