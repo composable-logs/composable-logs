@@ -2,6 +2,7 @@ from typing import TypeVar, Callable, Optional, Awaitable
 
 #
 import ray
+
 import opentelemetry as otel
 from opentelemetry.trace import StatusCode, Status  # type: ignore
 

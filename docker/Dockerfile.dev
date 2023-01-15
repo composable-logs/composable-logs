@@ -9,10 +9,14 @@ USER root
 RUN apt-get install -y -qq --no-install-recommends \
     tmuxinator \
     entr \
-    curl
+    curl \
+    graphviz
 USER host_user
 
 RUN : && \
+    : graphviz installed above + pydot useful for plotting Ray DAG:s && \
+    pip install pydot==1.4.2 && \
+    : && \
     : Add py-percent format support for Jupyter notebooks, see && \
     : https://jupytext.readthedocs.io/en/latest/install.html && \
     jupyter nbextension install --py jupytext --user && \

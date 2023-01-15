@@ -145,9 +145,23 @@ def compose(*fs):
 
 class Try(Generic[A]):
     def __init__(self, value: Optional[A], error: Optional[Exception]):
-        assert error is None or isinstance(error, Exception)
-        assert value is None or error is None
 
+        if error is not None:
+            if not isinstance(error, Exception):
+                raise Exception(
+                    f"Try: non-empty error should be Exception;" f"got {error}"
+                )
+
+            if value is not None:
+                raise Exception(f"Try: init with both value={value} and error={error}")
+            else:
+                # Failure(None, e)
+                pass
+        else:
+            # value may be None;
+            pass
+
+        # -
         self.value = value
         self.error = error
 
@@ -159,8 +173,27 @@ class Try(Generic[A]):
     def is_success(self) -> bool:
         return self.error is None
 
+    def is_failure(self) -> bool:
+        return not self.is_success()
+
+    def map_value(self, f):
+        """ "
+        Return new Try where f has been applied to the value
+        (or do nothing and return self for failure)
+
+        f is assumed to not throw an Exception
+        """
+        return self if self.is_failure() else Try(value=f(self.value), error=None)
+
     def __repr__(self) -> str:
         return f"Try(value={self.value}, error={self.error})"
+
+    @classmethod
+    def call(cls, f):
+        try:
+            return cls(value=f(), error=None)
+        except Exception as e:
+            return cls(value=None, error=e)
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Try):
@@ -169,6 +202,14 @@ class Try(Generic[A]):
             return self_tuple == other_tuple
         else:
             return False
+
+
+def Success(value):
+    return Try(value=value, error=None)
+
+
+def Failure(error):
+    return Try(value=None, error=error)
 
 
 # --- file I/O helper functions ---

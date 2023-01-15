@@ -16,10 +16,6 @@ from pynb_dag_runner.tasks.task_opentelemetry_logging import _log_named_value
 from pynb_dag_runner.notebooks_helpers import JupytextNotebook, JupyterIpynbNotebook
 
 
-def prefix_keys(prefix: str, a_dict: AttributesDict) -> AttributesDict:
-    return {f"{prefix}.{k}": v for k, v in a_dict.items()}
-
-
 def _get_traceparent() -> str:
     """
     Get implicit OpenTelemetry span context for context propagation (to notebooks)

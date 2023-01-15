@@ -1,11 +1,11 @@
 import time
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, TypeVar
 
 #
 import pytest, ray
 
 #
-from pynb_dag_runner.helpers import A, one, Try
+from pynb_dag_runner.helpers import Success, Failure, one, Try
 from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
 from pynb_dag_runner.opentelemetry_helpers import (
     SpanDict,
@@ -13,6 +13,9 @@ from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
 )
+
+
+A = TypeVar("A")
 
 
 @ray.remote(num_cpus=0)
@@ -191,13 +194,40 @@ def test_try_is_success_method():
 
 
 def test_try_equality_checking():
-    assert Try(None, None) == Try(None, None)
+    # wrapped None value
+    assert Try(None, None) == Try(None, None) == Success(None)
 
-    assert Try(12345, None) == Try(12345, None)
-    assert Try(12345, None) != Try(None, None)
+    # wrapped non-None value
+    assert Try(12345, None) == Success(12345)
 
-    assert Try(None, Exception("foo")) == Try(None, Exception("foo"))
-    assert Try(None, Exception("foo")) != Try(None, Exception("bar"))
+    for not_12345 in [Success(1), Success(None), Failure(Exception("12")), None, 12345]:
+        assert Try(12345, None) != not_12345
 
-    assert Try(123, None) != Exception("!!!")
-    assert Try(123, None) != (lambda: None)
+    for e1 in ["foo", "bar"]:
+        assert Success(e1) != Failure(Exception(e1))
+
+        for e2 in ["foo", "bar"]:
+            if e1 == e2:
+                assert Failure(Exception(e1)) == Failure(Exception(e2))
+            else:
+                assert Failure(Exception(e1)) != Failure(Exception(e2))
+
+
+def test_try_map_value():
+    assert Try(None, None).map_value(lambda x: x) == Try(None, None)
+    assert Try(1, None).map_value(lambda x: x + 1) == Try(2, None)
+    assert Try(None, Exception("foo")).map_value(lambda x: x) == Try(
+        None, Exception("foo")
+    )
+
+
+def test_try_call():
+    x = 1
+    assert Try.call(lambda: x + 1) == Try(2, None) == Success(2)
+
+    test_exception = Exception("xyz")
+
+    def f():
+        raise test_exception
+
+    assert Try.call(f) == Try(None, test_exception) == Failure(test_exception)
