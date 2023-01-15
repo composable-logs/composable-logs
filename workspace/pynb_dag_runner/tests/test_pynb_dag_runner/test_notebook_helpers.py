@@ -9,6 +9,7 @@ from pynb_dag_runner.notebooks_helpers import (
     JupytextNotebook,
     JupyterIpynbNotebook,
     convert_ipynb_to_html,
+    JupytextNotebookContent,
 )
 from pynb_dag_runner.helpers import read_json
 
@@ -32,7 +33,7 @@ def write_test_jupytext_notebook(path: Path) -> JupytextNotebook:
     return JupytextNotebook(output_path)
 
 
-def test_can_convert_jupytext_notebook_to_ipynb_and_html(tmp_path: Path):
+def test_nb_can_convert_jupytext_notebook_to_ipynb_and_html(tmp_path: Path):
     notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
 
     # Convert py-percent jupytext file into ipynb-notebook file format
@@ -48,7 +49,7 @@ def test_can_convert_jupytext_notebook_to_ipynb_and_html(tmp_path: Path):
     assert "# Example comment" in filepath_html.read_text()
 
 
-def test_can_convert_jupytext_notebook_to_ipynb_and_evaluate(tmp_path: Path):
+def test_nb_can_convert_jupytext_notebook_to_ipynb_and_evaluate(tmp_path: Path):
     notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
 
     # Convert py-percent jupytext file into ipynb-notebook file format
@@ -64,14 +65,14 @@ def test_can_convert_jupytext_notebook_to_ipynb_and_evaluate(tmp_path: Path):
     assert "variable_a=hello" in notebook_eval_ipynb.filepath.read_text()
 
 
-def test_random_ipynb_notebook_path(tmp_path: Path):
+def test_nb_random_ipynb_notebook_path(tmp_path: Path):
     notebook_ipynb = JupyterIpynbNotebook.temp(tmp_path)
 
     assert not notebook_ipynb.filepath.is_file()
     assert str(notebook_ipynb.filepath).startswith(str(tmp_path))
 
 
-def test_evaluate_jupytext_notebook(tmp_path: Path):
+def test_nb_evaluate_jupytext_notebook(tmp_path: Path):
     output_path = tmp_path / "output"
     output_path.mkdir()
 
@@ -89,7 +90,7 @@ def test_evaluate_jupytext_notebook(tmp_path: Path):
     assert "variable_a=baz" in output_ipynb.filepath.read_text()
 
 
-def test_convert_ipynb_string_to_html(tmp_path: Path):
+def test_nb_convert_ipynb_string_to_html(tmp_path: Path):
     notebook_py: JupytextNotebook = write_test_jupytext_notebook(tmp_path)
 
     output_ipynb = JupyterIpynbNotebook(tmp_path / "foo.ipynb")
@@ -124,7 +125,7 @@ raise Exception("Failed notebook123")
     return JupytextNotebook(output_path)
 
 
-def test_evaluate_jupytext_notebook_that_fails(
+def test_nb_evaluate_jupytext_notebook_that_fails(
     failing_jupytext_notebook: JupytextNotebook,
 ):
 
@@ -144,3 +145,23 @@ def test_evaluate_jupytext_notebook_that_fails(
         assert output_ipynb.filepath.is_file()
         for s in ["variable_xyz", "foobarbaz", str(1234 + 234 + 54 + 6)]:
             assert s in output_ipynb.filepath.read_text()
+
+
+# --- New notebook interface ---
+
+
+@pytest.fixture
+def ok_jupytext_notebook() -> JupytextNotebookContent:
+    return JupytextNotebookContent(
+        filepath=Path("notebooks/ok_notebook.py"),
+        content=TEST_JUPYTEXT_NOTEBOOK,
+    )
+
+
+import jupytext, nbformat
+
+
+def test_nb_evaluated_jupytext_content_to_ipynb_content(
+    ok_jupytext_notebook: JupytextNotebookContent,
+):
+    pass

@@ -1,11 +1,13 @@
-from pathlib import Path
 import tempfile, os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TypeVar, List, Union, Sequence
+from pathlib import Path
 
-#
-import jupytext, papermill
+# -
+import pydantic as p
+import jupytext, nbformat, papermill
 from nbconvert import HTMLExporter
 
+# -
 
 """
 On the command line (bash), a Jupytext notebooks can be evaluated and converted into an
@@ -32,10 +34,72 @@ def convert_ipynb_to_html(ipynb_notebook_content: str) -> str:
     tmp_path: str = tempfile.mkdtemp(prefix="pynb-dag-runner-temp")
     tmp_filepath: Path = Path(tmp_path) / "temp-notebook.ipynb"
     tmp_filepath.write_text(ipynb_notebook_content)
+
+    # TODO: rewrite to use .from_file that can read from in-memory file stream
     output, _ = HTMLExporter(template_name="classic").from_filename(str(tmp_filepath))
 
     os.remove(tmp_filepath)
     return output
+
+
+class JupyterIpynbNotebookContent(p.BaseModel):
+    """
+    Model a named Jupyter notebook in .ipynb format where cells have been evaluated.
+
+    May be evaluated, or un-evaluated.
+    """
+
+    filepath: Path
+
+    content: str
+
+    def to_html(self) -> str:
+        return convert_ipynb_to_html(self.content)
+
+    def eval(tmp_path: Path, self) -> "JupyterIpynbNotebookContent":
+
+        ipynb_content: str = JupytextNotebook(self.content)
+
+        ipynb_file = JupyterIpynbNotebook(tmp_path, self.content)
+
+        ipynb_file.evaluate()
+
+
+class JupytextNotebookContent(p.BaseModel):
+    """
+    Contain content of Jupyter notebook in Jupytext (non-JSON) file format.
+
+    This file format contains the input code cells, but no output.
+    """
+
+    # eg "notebooks/eda.py" or "eda.py"; should end with .py
+    filepath: Path
+
+    content: str
+
+    def __str__(self):
+        return "\n".join(
+            [
+                f"JupytextNotebookContent (relative_filepath={self.relative_filepath})",
+                80 * "=",
+                (self.content)[:1000],
+                "...",
+                80 * "=",
+            ]
+        )
+
+    def to_ipynb(self) -> JupyterIpynbNotebookContent:
+        # Convert Jupytext input into ipynb file (without executing cells)
+        nb = jupytext.reads(self.content, fmt="py:percent")
+        ipynb_content: str = jupytext.writes(
+            nb,
+            version=nbformat.NO_CONVERT,
+            fmt="notebook",
+        )
+        return JupyterIpynbNotebookContent(
+            filepath=self.filepath.with_suffix(".ipynb"),
+            content=ipynb_content,
+        )
 
 
 class JupyterIpynbNotebook:
@@ -43,6 +107,15 @@ class JupyterIpynbNotebook:
     def __init__(self, filepath: Path):
         assert filepath.suffix == ".ipynb"
         self.filepath = filepath
+
+    def read_content(self) -> JupyterIpynbNotebookContent:
+        return JupyterIpynbNotebookContent(
+            filepath=self.filepath,
+            content=self.filepath.read_text(),
+        )
+
+    def write_content(self, content: str):
+        self.filepath.write_text(content)
 
     def evaluate(
         self,
@@ -88,17 +161,16 @@ class JupyterIpynbNotebook:
         """
         assert self.filepath.is_file()
 
-        output_filepath = self.filepath.with_suffix(".html")
+        output_filepath: Path = self.filepath.with_suffix(".html")
 
-        output, _ = HTMLExporter(template_name="classic").from_filename(
-            str(self.filepath)
-        )
-        output_filepath.write_text(output)
+        html_content: str = self.read_content().to_html()
+
+        output_filepath.write_text(html_content)
 
         return output_filepath
 
     @staticmethod
-    def temp(path: Path) -> "JupyterIpynbNotebook":
+    def temp(path: Path, content: str = None) -> "JupyterIpynbNotebook":
         """
         Return a JupyterIpynbNotebook with a (random) non-existent filename in the
         provided path.
@@ -110,8 +182,13 @@ class JupyterIpynbNotebook:
             prefix="temp-notebook-",
             suffix=".ipynb",
         )
-        os.close(fp)
-        os.remove(tmp_filepath)
+        if content is None:
+            os.close(fp)
+            os.remove(tmp_filepath)
+        else:
+            assert isinstance(content, str)
+            fp.write(content)
+            os.close(fp)
 
         return JupyterIpynbNotebook(Path(tmp_filepath))
 
@@ -126,6 +203,13 @@ class JupytextNotebook:
         assert filepath.suffix == ".py"
         self.filepath = filepath
 
+    def read_content(self) -> str:
+        return self.filepath.read_text()
+
+    def write_content(self, content: str) -> "JupytextNotebook":
+        self.filepath.write_text(content)
+        return self
+
     def to_ipynb(self, output: Optional[JupyterIpynbNotebook] = None):
         """
         Notes:
@@ -139,8 +223,13 @@ class JupytextNotebook:
             output = JupyterIpynbNotebook(self.filepath.with_suffix(".ipynb"))
 
         # see https://jupytext.readthedocs.io/en/latest/using-library.html
-        nb = jupytext.read(self.filepath, fmt="py:percent")
-        jupytext.write(nb, fp=output.filepath, fmt="notebook")
+
+        nb = jupytext.reads(self.read_content(), fmt="py:percent")
+        ipynb_content: str = jupytext.writes(
+            nb, version=nbformat.NO_CONVERT, fmt="notebook"
+        )
+
+        output.write_content(ipynb_content)
 
         return output
 
@@ -182,3 +271,6 @@ class JupytextNotebook:
             # (eg by timeout)
             if tmp_notebook_ipynb.filepath.is_file():
                 os.remove(tmp_notebook_ipynb.filepath)
+
+
+# ---
