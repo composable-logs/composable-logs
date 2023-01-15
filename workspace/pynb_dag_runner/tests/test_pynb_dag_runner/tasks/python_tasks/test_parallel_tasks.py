@@ -51,10 +51,11 @@ def test__python_task__parallel_tasks__success(spans_ok: Spans):
         ids.append(task_summary.attributes["task.task_id"])
         ranges.append(task_summary.timing.get_task_timestamp_range_us_epoch())
 
-    # Check: since there are no order constraints, the time ranges should
-    # overlap provided tests are run on 2+ CPU cores
     assert set(ids) == {"f-#1", "f-#2"}
 
+    # Check: since there are no order constraints, the time ranges should
+    # overlap provided tests are run on 2+ CPU cores
+    #
     # If the below fails (in particular on lower-end Github action runners) the
     # time.sleep in the tasks might be too short. Has failed eg for 1s.
     assert range_intersect(*ranges)
