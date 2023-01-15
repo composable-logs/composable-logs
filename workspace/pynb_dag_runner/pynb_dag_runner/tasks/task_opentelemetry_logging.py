@@ -185,11 +185,13 @@ def get_logged_values(spans: Spans) -> Dict[str, Any]:
 
 class PydarLogger:
     """
-    pynb-dag-runner logger that can be used eg notebooks
+    Logger for writing artifacts/key-values as OpenTelemetry events
     """
 
     def __init__(self, P: Mapping[str, Any]):
         assert isinstance(P, dict)
+
+        # --- Check: should init of Ray cluster be done here?
 
         try:
             # - Connect to running Ray cluster if running
@@ -202,6 +204,8 @@ class PydarLogger:
         except:
             # No cluster running, start
             ray.init(namespace="pydar-ray-cluster")
+
+        # ---
 
         # Get context for Task that triggered notebook (for context propagation)
         self._traceparent = P.get("_opentelemetry_traceparent", None)
@@ -285,3 +289,6 @@ class PydarLogger:
             content_type="float",
             traceparent=self._traceparent,
         )
+
+
+ComposableLogsLogger = PydarLogger

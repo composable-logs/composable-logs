@@ -4,7 +4,7 @@ from typing import List
 
 #
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
-from pynb_dag_runner.helpers import one
+from pynb_dag_runner.helpers import one, Success
 from pynb_dag_runner.tasks.tasks import _get_traceparent
 from pynb_dag_runner.tasks.task_opentelemetry_logging import (
     PydarLogger,
@@ -69,7 +69,7 @@ def test__encode_decode_to_wire__exceptions_for_invalid_data():
 
 def test__pydar_logger__logged_spans_are_nested():
     def get_test_spans():
-        with SpanRecorder() as r:
+        with SpanRecorder() as rec:
             tracer = ot.trace.get_tracer(__name__)
             with tracer.start_as_current_span("parent-span") as t1:
                 with tracer.start_as_current_span("sub-span") as t2:
@@ -80,7 +80,7 @@ def test__pydar_logger__logged_spans_are_nested():
                     )
                     logger.log_int("name", 1000)
 
-        return r.spans
+        return rec.spans
 
     def validate_spans(spans: Spans):
         assert len(spans) == 3
@@ -94,94 +94,142 @@ def test__pydar_logger__logged_spans_are_nested():
     validate_spans(get_test_spans())
 
 
-class _fig:
-    # dummy mock of matplotlib figure object for testing
-    def savefig(self, file_name, **kw_args):
-        Path(file_name).write_bytes(bytes([23, 34]))
-
-
-@pytest.mark.parametrize(
-    "test_case",
-    [
-        # -- logged values --
-        {
-            "name": "x",
-            "value": 1.23,
-            "log_named_value": lambda logger: logger.log_float,
-            "get_logged_named_values": get_logged_values,
-        },
-        {
-            "name": "y",
-            "value": 123,
-            "log_named_value": lambda logger: logger.log_int,
-            "get_logged_named_values": get_logged_values,
-        },
-        {
-            "name": "z",
-            "value": True,
-            "log_named_value": lambda logger: logger.log_boolean,
-            "get_logged_named_values": get_logged_values,
-        },
-        {
-            "name": "u",
-            "value": "foo123",
-            "log_named_value": lambda logger: logger.log_string,
-            "get_logged_named_values": get_logged_values,
-        },
-        {
-            "name": "v",
-            "value": {"a": 123, "b": None},
-            "log_named_value": lambda logger: logger.log_value,
-            "get_logged_named_values": get_logged_values,
-        },
-        # -- logged files --
-        {
-            "name": "file.txt",
-            "value": "utf-8-file-content-EOF",
-            "log_named_value": lambda logger: logger.log_artefact,
-            "get_logged_named_values": get_logged_artifacts,
-        },
-        {
-            "name": "file.bin",
-            "value": bytes([0, 1]),
-            "log_named_value": lambda logger: logger.log_artefact,
-            "get_logged_named_values": get_logged_artifacts,
-        },
-        {
-            "name": "file.png",
-            "f": lambda logger: logger.log_figure("file.png", _fig()),
-            "value": bytes([23, 34]),
-            "log_named_value": lambda logger: lambda name, _: logger.log_figure(
-                name, _fig()
-            ),
-            "get_logged_named_values": get_logged_artifacts,
-        },
-    ],
+# --- test logging of values work with Python tasks and Spans parser ---
+from pynb_dag_runner.wrappers import task, run_dag, TaskContext
+from pynb_dag_runner.opentelemetry_task_span_parser import (
+    parse_spans,
+    LoggedValueContent,
+    ArtifactContent,
 )
-def test__pydar_logger__logged_span_values_and_artifacts(test_case):
-    get_logged_named_values = test_case["get_logged_named_values"]
-    log_named_value = test_case["log_named_value"]
-    name = test_case["name"]
-    value = test_case["value"]
 
+TEST_MOCK_MATPLOTLIB_PNG = bytes([12, 23, 34, 45, 56, 67, 78, 89, 90])
+TEST_BINARY_FILE = bytes(1000 * list(range(256)))
+TEST_PYTHON_DICT = {"a": 1, "b": [2, 3, None], "c": 2}
+
+
+@pytest.fixture(scope="module")
+def spans_to_test_otel_loggging() -> Spans:
+    #
+    #   task-f  ---\
+    #               \
+    #                +--- task-h
+    #               /
+    #   task-g  ---/
+    #
+    #
+    # In this setup, tasks f ang g log the same artifact/value names, but with different
+    # values. This allows us to test that logging keeps track where a value was logged.
+    #
+    @task(task_id="task-f")
+    def f(C: TaskContext):
+        C.log_artefact("read-first", "hello")
+        C.log_int("read-first", 111)
+        return 1000
+
+    @task(task_id="task-g")
+    def g(C: TaskContext):
+        C.log_artefact("read-first", TEST_BINARY_FILE)
+        C.log_int("read-first", 222)
+        return 2000
+
+    @task(task_id="task-h")
+    def h(f_output, g_output, C: TaskContext):
+        assert f_output == 1000 and g_output == 2000
+        C.log_int("a-logged-int", 1020)
+        C.log_float("a-logged-float", 12.3)
+        # C.log_float("b-float", 12) will fail
+        C.log_boolean("a-logged-bool", True)
+        C.log_string("a-logged-string", "///")
+        C.log_value("a-logged-json-value", TEST_PYTHON_DICT)
+
+        class _mock_fig:
+            # dummy mock of matplotlib figure object for testing
+            def savefig(self, file_name, **kw_args):
+                Path(file_name).write_bytes(TEST_MOCK_MATPLOTLIB_PNG)
+
+        C.log_figure("mock-matplot-lib-figure.png", _mock_fig())
+
+        return 3000
+
+    with SpanRecorder() as rec:
+        assert Success(3000) == run_dag(dag=h(f(), g()))
+
+    return rec.spans
+
+
+def test__pydar_logger__parse_logged_values_from_three_python_tasks(
+    spans_to_test_otel_loggging: Spans,
+):
+    pipeline_summary = parse_spans(spans_to_test_otel_loggging)
+
+    for task_summary in pipeline_summary.task_runs:  # type: ignore
+
+        def check_logged_value(value_name, value_type, value):
+            assert task_summary.logged_values[value_name] == LoggedValueContent(
+                type=value_type, content=value
+            ), f"mismatch: {value_name} ({value_type}) = {value}"
+
+        if task_summary.task_id == "task-f":
+            assert one(task_summary.logged_artifacts) == ArtifactContent(
+                name="read-first", type="utf-8", content="hello"
+            )
+            one(task_summary.logged_values)
+
+            check_logged_value("read-first", "int", 111)
+
+        elif task_summary.task_id == "task-g":
+            assert one(task_summary.logged_artifacts) == ArtifactContent(
+                name="read-first",
+                type="bytes",
+                content=TEST_BINARY_FILE,
+            )
+            one(task_summary.logged_values)
+            check_logged_value("read-first", "int", 222)
+
+        elif task_summary.task_id == "task-h":
+            assert one(task_summary.logged_artifacts) == ArtifactContent(
+                name="mock-matplot-lib-figure.png",
+                type="bytes",
+                content=TEST_MOCK_MATPLOTLIB_PNG,
+            )
+            assert len(task_summary.logged_values) == 5
+            for args in [
+                ("a-logged-int", "int", 1020),
+                ("a-logged-float", "float", 12.3),
+                ("a-logged-bool", "bool", True),
+                ("a-logged-string", "utf-8", "///"),
+                ("a-logged-json-value", "json", TEST_PYTHON_DICT),
+            ]:
+                check_logged_value(*args)
+        else:
+            raise Exception(f"Unknown task-id: {task_summary.task_id}")
+
+
+# ---
+
+
+def test__pydar_logger__values_are_logged_to_python_task():
     def get_test_spans():
-        with SpanRecorder() as r:
+        with SpanRecorder() as rec:
             tracer = ot.trace.get_tracer(__name__)
             with tracer.start_as_current_span("parent-span") as t1:
-                logger = PydarLogger(
-                    P={
-                        "_opentelemetry_traceparent": _get_traceparent(),
-                    }
-                )
-                log_named_value(logger)(name, value)
+                with tracer.start_as_current_span("sub-span") as t2:
+                    logger = PydarLogger(
+                        P={
+                            "_opentelemetry_traceparent": _get_traceparent(),
+                        }
+                    )
+                    logger.log_int("name", 1000)
 
-        return r.spans
+        return rec.spans
 
     def validate_spans(spans: Spans):
-        assert len(spans) == 2
+        assert len(spans) == 3
 
-        data = get_logged_named_values(spans)
-        assert data.keys() == set([name])
-        assert data[name] == value
+        top_span = one(spans.filter(["name"], "parent-span"))
+        sub_span = one(spans.filter(["name"], "sub-span"))
+        log_span = one(spans.filter(["name"], "named-value"))
+
+        assert spans.contains_path(top_span, sub_span, log_span)
 
     validate_spans(get_test_spans())
