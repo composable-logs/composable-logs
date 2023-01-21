@@ -11,18 +11,13 @@ from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
 from pynb_dag_runner.tasks.tasks import make_jupytext_task
 from pynb_dag_runner.wrappers import run_dag
 
+# -
+from .nb_test_helpers import get_test_jupytext_nb
+
 #
 
 TASK_PARAMETERS = {"pipeline.foo": "bar", "task.variable_a": "task-value"}
-TEST_NOTEBOOK = JupytextNotebookContent(
-    filepath="notebook_ok.py",
-    content=(
-        Path(__file__).parent
-        # -
-        / "jupytext_test_notebooks"
-        / "notebook_ok.py"
-    ).read_text(),
-)
+TEST_NOTEBOOK = get_test_jupytext_nb("notebook_ok.py")
 
 
 @pytest.fixture(scope="module")

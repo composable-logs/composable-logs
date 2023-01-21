@@ -6,7 +6,7 @@ from functools import lru_cache
 import pytest
 
 #
-from pynb_dag_runner.core.dag_runner import start_and_await_tasks
+# from pynb_dag_runner.core.dag_runner import start_and_await_tasks
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.opentelemetry_task_span_parser import (
     parse_spans,
@@ -22,24 +22,25 @@ from otel_output_parser.cli_pynb_log_parser import (
     make_mermaid_dag_inputfile,
 )
 
-from .nb_test_helpers import make_test_nb_task
+from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
+from pynb_dag_runner.tasks.tasks import make_jupytext_task
+from pynb_dag_runner.wrappers import run_dag
 
+# -
+from .nb_test_helpers import get_test_jupytext_nb
 
+# -
+
+TASK_PARAMETERS = {"pipeline.foo": "bar", "task.variable_a": "task-value"}
+TEST_NOTEBOOK = get_test_jupytext_nb("notebook_otel_logging.py")
+
+# -
 @pytest.fixture(scope="module")
-@lru_cache
 def spans() -> Spans:
-    """
-    Pytest fixture to return Spans after running notebook_otel_logging.py notebook
-    """
     with SpanRecorder() as rec:
-        jupytext_task = make_test_nb_task(
-            nb_name="notebook_otel_logging.py",
-            parameters={
-                "task.variable_a": "task-value",
-                "pipeline.pipeline_run_id": "12345",
-            },
+        run_dag(
+            make_jupytext_task(notebook=TEST_NOTEBOOK, parameters=TASK_PARAMETERS)()
         )
-        _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
     return rec.spans
 
