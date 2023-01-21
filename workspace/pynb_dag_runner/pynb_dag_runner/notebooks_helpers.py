@@ -1,4 +1,4 @@
-import tempfile, os
+import io, tempfile, os
 from typing import Any, Dict, Optional, Tuple, List, Union, Sequence
 from pathlib import Path
 
@@ -30,15 +30,10 @@ def convert_ipynb_to_html(ipynb_notebook_content: str) -> str:
 
     No evaluation of code cells.
     """
+    output, _ = HTMLExporter(template_name="classic").from_file(
+        file_stream=io.StringIO(ipynb_notebook_content)
+    )
 
-    tmp_path: str = tempfile.mkdtemp(prefix="pynb-dag-runner-temp")
-    tmp_filepath: Path = Path(tmp_path) / "temp-notebook.ipynb"
-    tmp_filepath.write_text(ipynb_notebook_content)
-
-    # TODO: rewrite to use .from_file that can read from in-memory file stream
-    output, _ = HTMLExporter(template_name="classic").from_filename(str(tmp_filepath))
-
-    os.remove(tmp_filepath)
     return output
 
 
