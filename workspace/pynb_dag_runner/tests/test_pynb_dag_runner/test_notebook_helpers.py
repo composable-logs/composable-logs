@@ -153,15 +153,27 @@ def test_nb_evaluate_jupytext_notebook_that_fails(
 @pytest.fixture
 def ok_jupytext_notebook() -> JupytextNotebookContent:
     return JupytextNotebookContent(
-        filepath=Path("notebooks/ok_notebook.py"),
+        filepath=Path("nb/ok_notebook.py"),
         content=TEST_JUPYTEXT_NOTEBOOK,
     )
 
 
 import jupytext, nbformat
+import json
 
 
-def test_nb_evaluated_jupytext_content_to_ipynb_content(
+def test_nnb_convert_jupytext_content_to_ipynb_and_html_content(
     ok_jupytext_notebook: JupytextNotebookContent,
 ):
-    pass
+    ipynb_nb = ok_jupytext_notebook.to_ipynb()
+
+    # check jupytext -> ipynb conversion output
+    assert ipynb_nb.filepath == Path("nb/ok_notebook.ipynb")
+    json.loads(ipynb_nb.content)
+    assert "print(1 + 12 + 123)" in ipynb_nb.content
+    assert len(ipynb_nb.content) > len(ok_jupytext_notebook.content)
+
+    # check ipynb -> html conversion output
+    nb_html: str = ipynb_nb.to_html()
+    assert len(nb_html) > len(ok_jupytext_notebook.content)
+    assert "<html>" in nb_html

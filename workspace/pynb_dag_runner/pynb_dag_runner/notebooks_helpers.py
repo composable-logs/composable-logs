@@ -44,7 +44,9 @@ def convert_ipynb_to_html(ipynb_notebook_content: str) -> str:
 
 class JupyterIpynbNotebookContent(p.BaseModel):
     """
-    Model a named Jupyter notebook in .ipynb format where cells have been evaluated.
+    Model a named Jupyter notebook in .ipynb format.
+
+    Cells may or may not have been evaluated.
 
     May be evaluated, or un-evaluated.
     """
@@ -56,13 +58,14 @@ class JupyterIpynbNotebookContent(p.BaseModel):
     def to_html(self) -> str:
         return convert_ipynb_to_html(self.content)
 
-    def eval(tmp_path: Path, self) -> "JupyterIpynbNotebookContent":
+    def eval(self, tmp_path: Path) -> "JupyterIpynbNotebookContent":
 
-        ipynb_content: str = JupytextNotebook(self.content)
+        # ipynb_content: str = JupytextNotebook(self.content)
 
-        ipynb_file = JupyterIpynbNotebook(tmp_path, self.content)
+        # ipynb_file = JupyterIpynbNotebook(tmp_path, self.content)
 
-        ipynb_file.evaluate()
+        # ipynb_file.evaluate()
+        return self
 
 
 class JupytextNotebookContent(p.BaseModel):
@@ -80,7 +83,7 @@ class JupytextNotebookContent(p.BaseModel):
     def __str__(self):
         return "\n".join(
             [
-                f"JupytextNotebookContent (relative_filepath={self.relative_filepath})",
+                f"JupytextNotebookContent (relative_filepath={self.filepath})",
                 80 * "=",
                 (self.content)[:1000],
                 "...",
@@ -170,7 +173,7 @@ class JupyterIpynbNotebook:
         return output_filepath
 
     @staticmethod
-    def temp(path: Path, content: str = None) -> "JupyterIpynbNotebook":
+    def temp(path: Path, content: Optional[str] = None) -> "JupyterIpynbNotebook":
         """
         Return a JupyterIpynbNotebook with a (random) non-existent filename in the
         provided path.
@@ -187,7 +190,7 @@ class JupyterIpynbNotebook:
             os.remove(tmp_filepath)
         else:
             assert isinstance(content, str)
-            fp.write(content)
+            os.write(fp, content.encode(encoding="utf-8"))
             os.close(fp)
 
         return JupyterIpynbNotebook(Path(tmp_filepath))
