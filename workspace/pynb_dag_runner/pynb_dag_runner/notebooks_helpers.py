@@ -168,15 +168,6 @@ class JupyterIpynbNotebook:
         assert filepath.suffix == ".ipynb"
         self.filepath = filepath
 
-    def read_content(self) -> JupyterIpynbNotebookContent:
-        return JupyterIpynbNotebookContent(
-            filepath=self.filepath,
-            content=self.filepath.read_text(),
-        )
-
-    def write_content(self, content: str):
-        self.filepath.write_text(content)
-
     def evaluate(
         self,
         output: "JupyterIpynbNotebook",
@@ -221,16 +212,17 @@ class JupyterIpynbNotebook:
         """
         assert self.filepath.is_file()
 
-        output_filepath: Path = self.filepath.with_suffix(".html")
+        output_filepath = self.filepath.with_suffix(".html")
 
-        html_content: str = self.read_content().to_html()
-
-        output_filepath.write_text(html_content)
+        output, _ = HTMLExporter(template_name="classic").from_filename(
+            str(self.filepath)
+        )
+        output_filepath.write_text(output)
 
         return output_filepath
 
     @staticmethod
-    def temp(path: Path, content: Optional[str] = None) -> "JupyterIpynbNotebook":
+    def temp(path: Path) -> "JupyterIpynbNotebook":
         """
         Return a JupyterIpynbNotebook with a (random) non-existent filename in the
         provided path.
@@ -242,13 +234,8 @@ class JupyterIpynbNotebook:
             prefix="temp-notebook-",
             suffix=".ipynb",
         )
-        if content is None:
-            os.close(fp)
-            os.remove(tmp_filepath)
-        else:
-            assert isinstance(content, str)
-            os.write(fp, content.encode(encoding="utf-8"))
-            os.close(fp)
+        os.close(fp)
+        os.remove(tmp_filepath)
 
         return JupyterIpynbNotebook(Path(tmp_filepath))
 
@@ -263,13 +250,6 @@ class JupytextNotebook:
         assert filepath.suffix == ".py"
         self.filepath = filepath
 
-    def read_content(self) -> str:
-        return self.filepath.read_text()
-
-    def write_content(self, content: str) -> "JupytextNotebook":
-        self.filepath.write_text(content)
-        return self
-
     def to_ipynb(self, output: Optional[JupyterIpynbNotebook] = None):
         """
         Notes:
@@ -283,13 +263,8 @@ class JupytextNotebook:
             output = JupyterIpynbNotebook(self.filepath.with_suffix(".ipynb"))
 
         # see https://jupytext.readthedocs.io/en/latest/using-library.html
-
-        nb = jupytext.reads(self.read_content(), fmt="py:percent")
-        ipynb_content: str = jupytext.writes(
-            nb, version=nbformat.NO_CONVERT, fmt="notebook"
-        )
-
-        output.write_content(ipynb_content)
+        nb = jupytext.read(self.filepath, fmt="py:percent")
+        jupytext.write(nb, fp=output.filepath, fmt="notebook")
 
         return output
 
