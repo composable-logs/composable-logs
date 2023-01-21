@@ -32,7 +32,9 @@ from .nb_test_helpers import get_test_jupytext_nb
 # -
 
 TASK_PARAMETERS = {"pipeline.foo": "bar", "task.variable_a": "task-value"}
-TEST_NOTEBOOK = get_test_jupytext_nb("notebook_otel_logging.py")
+TEST_NOTEBOOK: JupytextNotebookContent = get_test_jupytext_nb(
+    "notebook_otel_logging.py"
+)
 
 # -
 @pytest.fixture(scope="module")
