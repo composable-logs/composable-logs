@@ -53,7 +53,7 @@ class JupyterIpynbNotebookContent(p.BaseModel):
 
     def evaluate(
         self,
-        tmp_path: Path,
+        tmp_path: Path = Path("/tmp"),
         cwd: Optional[Path] = None,
         parameters: Dict[str, Any] = {},
     ) -> Tuple[Optional[Exception], "JupyterIpynbNotebookContent"]:

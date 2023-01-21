@@ -1,45 +1,58 @@
+from pathlib import Path
+
+#
 import pytest
 
 #
-from pynb_dag_runner.core.dag_runner import start_and_await_tasks
 from pynb_dag_runner.helpers import del_key, one
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
+from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
+from pynb_dag_runner.tasks.tasks import make_jupytext_task
+from pynb_dag_runner.wrappers import run_dag
 
 #
-from .nb_test_helpers import make_test_nb_task, TEST_NOTEBOOK_PATH
 
-NOTEBOOK_PATH = str(TEST_NOTEBOOK_PATH / "notebook_ok.py")
 TASK_PARAMETERS = {"pipeline.foo": "bar", "task.variable_a": "task-value"}
+TEST_NOTEBOOK = JupytextNotebookContent(
+    filepath="notebook_ok.py",
+    content=(
+        Path(__file__).parent
+        # -
+        / "jupytext_test_notebooks"
+        / "notebook_ok.py"
+    ).read_text(),
+)
 
 
 @pytest.fixture(scope="module")
-def spans() -> Spans:
+def spans_once() -> Spans:
+    # Return spans for running DAG with one node where notebook is executed
+
     with SpanRecorder() as rec:
-        jupytext_task = make_test_nb_task(
-            nb_name="notebook_ok.py",
-            parameters=TASK_PARAMETERS,
+        run_dag(
+            make_jupytext_task(notebook=TEST_NOTEBOOK, parameters=TASK_PARAMETERS)()
         )
-        _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
     return rec.spans
 
 
-def test__jupytext__ok_notebook__parse_spans(spans: Spans):
-    pipeline_summary = parse_spans(spans)
+def test__jupytext__ok_notebook__parse_spans(spans_once: Spans):
+    pipeline_summary = parse_spans(spans_once)
 
     # assert there is one successful task
     task_summary = one(pipeline_summary.task_runs)
     assert task_summary.is_success()
 
     # assert attributes are logged
-    assert task_summary.attributes["task.notebook"] == NOTEBOOK_PATH
+    assert task_summary.attributes["task.notebook"] == str(TEST_NOTEBOOK.filepath)
 
     assert del_key(task_summary.attributes, "task.notebook") == {
         **TASK_PARAMETERS,
         "task.num_cpus": 1,
+        "task.task_id": str(TEST_NOTEBOOK.filepath),
         "task.task_type": "jupytext",
-        "task.timeout_s": 10.0,
+        # "task.timeout_s": 10.0,
     }
 
     # Check properties of artifact with the evaluated notebook
@@ -62,3 +75,37 @@ def test__jupytext__ok_notebook__parse_spans(spans: Spans):
 
     for name in ["notebook.ipynb", "notebook.html"]:
         validate(one(a for a in task_summary.logged_artifacts if a.name == name))
+
+    assert len(pipeline_summary.task_dependencies) == 0
+
+
+@pytest.fixture(scope="module")
+def spans_run_twice() -> Spans:
+    # Return spans for running DAG with two nodes
+    #
+    #      "notebook_ok.py"    --->       "notebook_ok.py"
+    #
+
+    with SpanRecorder() as rec:
+
+        nb = make_jupytext_task(notebook=TEST_NOTEBOOK, parameters=TASK_PARAMETERS)
+
+        node1 = nb()
+        node2 = nb(node1)
+
+        run_dag(node2)
+
+    return rec.spans
+
+
+def test__jupytext__ok_notebook__run_twice(spans_run_twice: Spans):
+    pipeline_summary = parse_spans(spans_run_twice)
+
+    # assert there is one successful task
+    assert len(pipeline_summary.task_runs) == 2
+
+    for task_summary in pipeline_summary.task_runs:
+        assert task_summary.is_success()
+        assert task_summary.task_id == str(TEST_NOTEBOOK.filepath)
+
+    assert len(pipeline_summary.task_dependencies) == 1
