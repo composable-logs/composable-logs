@@ -1,5 +1,5 @@
 import tempfile, os
-from typing import Any, Dict, Optional, TypeVar, List, Union, Sequence
+from typing import Any, Dict, Optional, Tuple, List, Union, Sequence
 from pathlib import Path
 
 # -
@@ -63,12 +63,15 @@ class JupyterIpynbNotebookContent(p.BaseModel):
         tmp_path: Path,
         cwd: Optional[Path] = None,
         parameters: Dict[str, Any] = {},
-    ) -> "JupyterIpynbNotebookContent":
+    ) -> Tuple[Optional[Exception], "JupyterIpynbNotebookContent"]:
         """
-        Evaluate notebook, and inject provided parameters using Papermill.
+        Evaluate notebook using Papermill with the provided parameters injected.
 
-        Exceptions thrown (eg from a cell) in the notebook are propagated and thrown by
-        this function.
+        If an exception is thrown from a cell in the notebook, execution is stopped
+        and we return the tuple: (Exception, the partially evaluated notebook)
+
+        If notebook runs succussfully we return the tuple: (None, the evaluated
+        notebook)
         """
 
         # Determine a temp file for input/output
@@ -80,6 +83,12 @@ class JupyterIpynbNotebookContent(p.BaseModel):
         assert tmp_path == Path(tmp_filepath).parent
         os.write(fp, self.content.encode(encoding="utf-8"))
         os.close(fp)
+
+        def get_notebook():
+            return JupyterIpynbNotebookContent(
+                filepath=self.filepath,
+                content=Path(tmp_filepath).read_text(),
+            )
 
         try:
             # For all parameters, see
@@ -98,11 +107,7 @@ class JupyterIpynbNotebookContent(p.BaseModel):
                 log_output=True,
                 cwd=cwd if cwd is not None else tmp_path,
             )
-
-            return JupyterIpynbNotebookContent(
-                filepath=self.filepath,
-                content=Path(tmp_filepath).read_text(),
-            )
+            return None, get_notebook()
 
         except BaseException as e:
             # Convert any Papermill custom exceptions into a standard Python
@@ -112,7 +117,7 @@ class JupyterIpynbNotebookContent(p.BaseModel):
             #
             # Otherwise, we get problems with Ray not able to serialize/deserialize
             # the Exception
-            raise Exception(str(e))
+            return Exception(str(e)), get_notebook()
 
         finally:
             # Note: this may not run if the Python process is cancelled by Ray
