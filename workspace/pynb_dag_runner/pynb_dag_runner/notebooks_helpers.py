@@ -58,14 +58,66 @@ class JupyterIpynbNotebookContent(p.BaseModel):
     def to_html(self) -> str:
         return convert_ipynb_to_html(self.content)
 
-    def eval(self, tmp_path: Path) -> "JupyterIpynbNotebookContent":
+    def evaluate(
+        self,
+        tmp_path: Path,
+        cwd: Optional[Path] = None,
+        parameters: Dict[str, Any] = {},
+    ) -> "JupyterIpynbNotebookContent":
+        """
+        Evaluate notebook, and inject provided parameters using Papermill.
 
-        # ipynb_content: str = JupytextNotebook(self.content)
+        Exceptions thrown (eg from a cell) in the notebook are propagated and thrown by
+        this function.
+        """
 
-        # ipynb_file = JupyterIpynbNotebook(tmp_path, self.content)
+        # Determine a temp file for input/output
+        fp, tmp_filepath = tempfile.mkstemp(
+            dir=tmp_path,
+            prefix="temp-notebook-",
+            suffix=".ipynb",
+        )
+        assert tmp_path == Path(tmp_filepath).parent
+        os.write(fp, self.content.encode(encoding="utf-8"))
+        os.close(fp)
 
-        # ipynb_file.evaluate()
-        return self
+        try:
+            # For all parameters, see
+            # https://github.com/nteract/papermill/blob/main/papermill/cli.py
+            # https://github.com/nteract/papermill/blob/main/papermill/execute.py
+            papermill.execute_notebook(
+                input_path=tmp_filepath,
+                output_path=tmp_filepath,
+                parameters=parameters,
+                request_save_on_cell_execute=True,
+                kernel_name="python",
+                language="python",
+                progress_bar=True,
+                stdout_file=None,
+                stderr_file=None,
+                log_output=True,
+                cwd=cwd if cwd is not None else tmp_path,
+            )
+
+            return JupyterIpynbNotebookContent(
+                filepath=self.filepath,
+                content=Path(tmp_filepath).read_text(),
+            )
+
+        except BaseException as e:
+            # Convert any Papermill custom exceptions into a standard Python
+            # Exception-class, see
+            #
+            # https://github.com/nteract/papermill/blob/main/papermill/exceptions.py
+            #
+            # Otherwise, we get problems with Ray not able to serialize/deserialize
+            # the Exception
+            raise Exception(str(e))
+
+        finally:
+            # Note: this may not run if the Python process is cancelled by Ray
+            # (eg by timeout)
+            os.remove(tmp_filepath)
 
 
 class JupytextNotebookContent(p.BaseModel):
@@ -103,6 +155,9 @@ class JupytextNotebookContent(p.BaseModel):
             filepath=self.filepath.with_suffix(".ipynb"),
             content=ipynb_content,
         )
+
+
+# --- old interface, to be deleted ---
 
 
 class JupyterIpynbNotebook:
@@ -274,6 +329,3 @@ class JupytextNotebook:
             # (eg by timeout)
             if tmp_notebook_ipynb.filepath.is_file():
                 os.remove(tmp_notebook_ipynb.filepath)
-
-
-# ---

@@ -1,5 +1,5 @@
 from pathlib import Path
-import os
+import os, json
 
 #
 import pytest
@@ -10,6 +10,7 @@ from pynb_dag_runner.notebooks_helpers import (
     JupyterIpynbNotebook,
     convert_ipynb_to_html,
     JupytextNotebookContent,
+    JupyterIpynbNotebookContent,
 )
 from pynb_dag_runner.helpers import read_json
 
@@ -158,10 +159,6 @@ def ok_jupytext_notebook() -> JupytextNotebookContent:
     )
 
 
-import jupytext, nbformat
-import json
-
-
 def test_nnb_convert_jupytext_content_to_ipynb_and_html_content(
     ok_jupytext_notebook: JupytextNotebookContent,
 ):
@@ -177,3 +174,22 @@ def test_nnb_convert_jupytext_content_to_ipynb_and_html_content(
     nb_html: str = ipynb_nb.to_html()
     assert len(nb_html) > len(ok_jupytext_notebook.content)
     assert "<html>" in nb_html
+
+
+def test_nnb_evaluate_jupytext_content_notebook(
+    ok_jupytext_notebook: JupytextNotebookContent,
+    tmp_path: Path,
+):
+    parameters = {"variable_a": "aaaaabbbbbbccccccc"}
+
+    evaluated_ipynb_nb: JupyterIpynbNotebookContent = (
+        ok_jupytext_notebook.to_ipynb().evaluate(tmp_path, parameters=parameters)
+    )
+
+    # check jupytext -> ipynb conversion output
+    assert evaluated_ipynb_nb.filepath == Path("nb/ok_notebook.ipynb")
+    json.loads(evaluated_ipynb_nb.content)
+
+    assert "print(1 + 12 + 123)" in evaluated_ipynb_nb.content
+    assert parameters["variable_a"] in evaluated_ipynb_nb.content
+    assert str(1 + 12 + 123) in evaluated_ipynb_nb.content
