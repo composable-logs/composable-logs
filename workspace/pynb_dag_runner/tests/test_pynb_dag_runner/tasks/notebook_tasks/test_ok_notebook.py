@@ -1,10 +1,8 @@
-from pathlib import Path
-
 #
 import pytest
 
 #
-from pynb_dag_runner.helpers import del_key, one
+from pynb_dag_runner.helpers import one
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
 from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
@@ -17,7 +15,7 @@ from .nb_test_helpers import get_test_jupytext_nb
 #
 
 TASK_PARAMETERS = {"pipeline.foo": "bar", "task.variable_a": "task-value"}
-TEST_NOTEBOOK = get_test_jupytext_nb("notebook_ok.py")
+TEST_NOTEBOOK: JupytextNotebookContent = get_test_jupytext_nb("notebook_ok.py")
 
 
 @pytest.fixture(scope="module")
@@ -39,13 +37,11 @@ def test__jupytext__ok_notebook__parse_spans(spans_once: Spans):
     task_summary = one(pipeline_summary.task_runs)
     assert task_summary.is_success()
 
-    # assert attributes are logged
-    assert task_summary.attributes["task.notebook"] == str(TEST_NOTEBOOK.filepath)
-
-    assert del_key(task_summary.attributes, "task.notebook") == {
+    assert task_summary.attributes == {
         **TASK_PARAMETERS,
         "task.num_cpus": 1,
         "task.task_id": str(TEST_NOTEBOOK.filepath),
+        "task.notebook": str(TEST_NOTEBOOK.filepath),
         "task.task_type": "jupytext",
         # "task.timeout_s": 10.0,
     }
