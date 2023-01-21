@@ -13,6 +13,54 @@ from opentelemetry.trace.propagation.tracecontext import (
     TraceContextTextMapPropagator,
 )
 
+# -
+from pynb_dag_runner.opentelemetry_helpers import Spans
+
+
+# --- The functions three functions should be revised (deleted) ---
+#
+# The function get_logged_values is used by the summary step in mnist demo pipeline.
+# This should be refactored to use the same log parser as all other tools. Then
+# the log parsing logic is only implemented in one place.
+#
+# https://github.com/orgs/composable-logs/projects/2/views/3?pane=issue&itemId=18581653
+
+# to be deleted
+def _read_logged_serialized_data(spans: Spans, filter_name: str):
+    """
+    Inverse of _log_named_value; read all logged artifacts/named values from
+    a collection of spans.
+    The return value is a key-value dictionary with deserialized values.
+    If there are multiple values logged under the same name, the last logged value
+    is used.
+    """
+    assert filter_name in ["artefact", "named-value"]
+
+    values = {}
+    for s0 in spans.filter(["name"], filter_name).sort_by_start_time(reverse=True):
+        data_attr = s0["attributes"]
+        value = SerializedData(
+            type=data_attr["type"],
+            encoding=data_attr["encoding"],
+            encoded_content=data_attr["content_encoded"],
+        ).decode()
+        value_name = data_attr["name"]
+
+        if value_name not in values:
+            values[value_name] = value
+
+    return values
+
+
+# to be deleted
+def get_logged_artifacts(spans: Spans) -> Dict[str, Any]:
+    return _read_logged_serialized_data(spans, filter_name="artefact")
+
+
+# to be deleted
+def get_logged_values(spans: Spans) -> Dict[str, Any]:
+    return _read_logged_serialized_data(spans, filter_name="named-value")
+
 
 # ---- encode/decode functions -----
 
