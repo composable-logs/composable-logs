@@ -1,29 +1,35 @@
-from functools import lru_cache
+from pathlib import Path
 
 #
 import pytest
 
 #
 from pynb_dag_runner.helpers import del_key, one
-from pynb_dag_runner.core.dag_runner import start_and_await_tasks
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
+from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
+from pynb_dag_runner.tasks.tasks import make_jupytext_task
+from pynb_dag_runner.wrappers import run_dag
 
-#
-from .nb_test_helpers import make_test_nb_task, TEST_NOTEBOOK_PATH
 
-TEST_TASK_PARAMETERS = {"task.injected_parameter": 123123}
+TASK_PARAMETERS = {"task.injected_parameter": 123123}
+TEST_NOTEBOOK = JupytextNotebookContent(
+    filepath="notebook_always_fail.py",
+    content=(
+        Path(__file__).parent
+        # -
+        / "jupytext_test_notebooks"
+        / "notebook_always_fail.py"
+    ).read_text(),
+)
 
 
 @pytest.fixture(scope="module")
-@lru_cache
 def spans() -> Spans:
     with SpanRecorder() as rec:
-        jupytext_task = make_test_nb_task(
-            nb_name="notebook_always_fail.py",
-            parameters=TEST_TASK_PARAMETERS,
+        run_dag(
+            make_jupytext_task(notebook=TEST_NOTEBOOK, parameters=TASK_PARAMETERS)()
         )
-        _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
     return rec.spans
 
@@ -36,16 +42,18 @@ def test__jupytext__always_fail__parse_spans(spans: Spans):
 
     # assert that exception is logged
     assert not task_summary.is_success()
-    assert len(task_summary.exceptions) == 2
+    assert len(task_summary.exceptions) == 1
     assert "This notebook always fails" in str(task_summary.exceptions)
 
     # asset attributes are logged
     # (str needed to avoid mypy validation error)
     assert "notebook_always_fail.py" in str(task_summary.attributes["task.notebook"])
 
-    assert del_key(task_summary.attributes, "task.notebook") == {
-        **TEST_TASK_PARAMETERS,
+    assert task_summary.attributes == {
+        **TASK_PARAMETERS,
         "task.num_cpus": 1,
         "task.task_type": "jupytext",
-        "task.timeout_s": 10.0,
+        "task.task_id": "notebook_always_fail.py",
+        "task.notebook": "notebook_always_fail.py",
+        # "task.timeout_s": 10.0,
     }

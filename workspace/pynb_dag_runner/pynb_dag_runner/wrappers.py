@@ -1,4 +1,4 @@
-from typing import Any, Dict, TypeVar, List, Union, Sequence
+from typing import Any, Dict, TypeVar, List, Mapping, Union, Sequence
 import inspect
 import collections
 
@@ -144,7 +144,7 @@ class TaskContext:
         self.logger.log_float(name, value)
 
 
-def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
+def task(task_id: str, task_parameters: Mapping[str, Any] = {}, num_cpus: int = 1):
     """
     Wrapper to convert Python function into Ray remote function that can be included
     in pynb-dag-runner Ray based DAG workflows.

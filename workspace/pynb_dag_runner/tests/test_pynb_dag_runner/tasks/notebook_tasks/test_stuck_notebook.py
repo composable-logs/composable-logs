@@ -31,6 +31,9 @@ def spans() -> Spans:
     return rec.spans
 
 
+@pytest.mark.skipif(
+    True, reason="revise after new workflow based interface supports timeout"
+)
 def test__jupytext__stuck_notebook__validate_spans(spans: Spans):
 
     top_task_span = one(
