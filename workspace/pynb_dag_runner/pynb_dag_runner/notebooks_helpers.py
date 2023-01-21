@@ -47,8 +47,6 @@ class JupyterIpynbNotebookContent(p.BaseModel):
     Model a named Jupyter notebook in .ipynb format.
 
     Cells may or may not have been evaluated.
-
-    May be evaluated, or un-evaluated.
     """
 
     filepath: Path
@@ -120,8 +118,7 @@ class JupyterIpynbNotebookContent(p.BaseModel):
             return Exception(str(e)), get_notebook()
 
         finally:
-            # Note: this may not run if the Python process is cancelled by Ray
-            # (eg by timeout)
+            # This may not run if the Python process is cancelled by Ray (eg timeout).
             os.remove(tmp_filepath)
 
 
