@@ -48,7 +48,7 @@ def test__jupytext__ok_notebook__parse_spans(spans_once: Spans):
         **TASK_PARAMETERS,
         "task.num_cpus": 1,
         "task.task_id": str(TEST_NOTEBOOK.filepath),
-        "task.notebook": str(TEST_NOTEBOOK.filepath),
+        "task.notebook": str(TEST_NOTEBOOK.filepath),  # <-- to be deleted
         "task.task_type": "jupytext",
         "task.timeout_s": -1,
         # None converted into -1 since OpenTelemetry attributes should be non-null

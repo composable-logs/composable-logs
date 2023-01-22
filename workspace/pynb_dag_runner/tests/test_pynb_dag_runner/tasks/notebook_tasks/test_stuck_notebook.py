@@ -1,64 +1,63 @@
 import pytest
 
 #
-from pynb_dag_runner.core.dag_runner import start_and_await_tasks
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
     SpanRecorder,
     get_duration_s,
 )
+from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
+from pynb_dag_runner.tasks.tasks import make_jupytext_task
+from pynb_dag_runner.wrappers import run_dag
+from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 
-from .nb_test_helpers import make_test_nb_task
 
-# Currently, timeout canceling is done on Ray level, but error handling and
-# recovery is done only within the Python process (using try .. catch).
-#
-# Therefore, timeout-canceled tasks can not currently do proper error handling.
-# Eg., there would be no notebook artifact logged from a timeout-canceled task
+from .nb_test_helpers import get_test_jupytext_nb
+
+
+TASK_PARAMETERS = {
+    "workflow.foo": "bar",
+    "task.variable_a": "task-value",
+}
+TEST_NOTEBOOK: JupytextNotebookContent = get_test_jupytext_nb("notebook_stuck.py")
+TASK_TIMEOUT_S = 1.0
 
 
 @pytest.fixture(scope="module")
 def spans() -> Spans:
     with SpanRecorder() as rec:
-        jupytext_task = make_test_nb_task(
-            nb_name="notebook_stuck.py",
-            timeout_s=10.0,
-            parameters={},
+        run_dag(
+            make_jupytext_task(
+                notebook=TEST_NOTEBOOK,
+                parameters=TASK_PARAMETERS,
+                timeout_s=TASK_TIMEOUT_S,
+            )()
         )
-        _ = start_and_await_tasks([jupytext_task], [jupytext_task], arg={})
 
     return rec.spans
 
 
-@pytest.mark.skipif(
-    True, reason="revise after new workflow based interface supports timeout"
-)
 def test__jupytext__stuck_notebook__validate_spans(spans: Spans):
+    pipeline_summary = parse_spans(spans)
+    assert pipeline_summary.is_failure()
 
-    top_task_span = one(
-        spans.filter(["name"], "execute-task")
-        #
-        .filter(["attributes", "task.task_type"], "jupytext")
-    )
+    for task_summary in [one(pipeline_summary.task_runs)]:  # type: ignore
+        assert task_summary.is_failure()
+        assert "timeout" in str(one(task_summary.exceptions)).lower()
 
-    assert top_task_span["status"] == {
-        "description": "Remote function call failed",
-        "status_code": "ERROR",
-    }
+        assert len(task_summary.logged_artifacts) == 0
+        assert len(task_summary.logged_values) == 0
 
-    timeout_guard_span = one(spans.filter(["name"], "timeout-guard"))
-    assert timeout_guard_span["status"] == {
-        "status_code": "ERROR",
-        "description": "Timeout",
-    }
+        assert task_summary.attributes == {
+            "task.task_id": "notebook_stuck.py",
+            "task.task_type": "jupytext",
+            "task.notebook": "notebook_stuck.py", # <-- to be deleted
+            "task.num_cpus": 1,
+            "task.timeout_s": TASK_TIMEOUT_S,
+            **TASK_PARAMETERS,
+        }
 
-    spans.contains_path(top_task_span, timeout_guard_span)
+        assert task_summary.timing.get_duration_s() > TASK_TIMEOUT_S
 
-    assert get_duration_s(top_task_span) > get_duration_s(timeout_guard_span) > 10.0
-
-    assert len(spans.exception_events()) == 1
-
-    # notebook evaluation never finishes, and is cancled by Ray. Therefore no
-    # artefact ipynb content is logged
-    assert len(spans.filter(["name"], "artefact")) == 0
+    assert len(pipeline_summary.task_dependencies) == 0

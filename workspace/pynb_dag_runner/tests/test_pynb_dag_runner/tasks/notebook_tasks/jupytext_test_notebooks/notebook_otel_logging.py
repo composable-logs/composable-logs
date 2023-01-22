@@ -8,7 +8,7 @@ P = {"task.variable_a": "value-used-during-interactive-development"}
 # %%
 # Example comment
 
-# Currently, pynb_dag_runner package is imported in editable mode in dev-notebook,
+# TODO: Currently, pynb_dag_runner package is imported in editable mode in dev-notebook,
 # but this is not accessible when running unit tests in ci.
 import sys
 
