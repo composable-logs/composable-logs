@@ -10,7 +10,6 @@ from ray.dag.function_node import FunctionNode
 from ray import workflow
 
 import opentelemetry as otel
-from opentelemetry.trace import StatusCode, Status  # type: ignore
 
 
 # -
@@ -202,6 +201,9 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
 
             try:
                 result = ray.get(future, timeout=timeout_s)
+
+                # If python finished within timeout, do not log any Exception for f
+                # into the timeout-guard span.
                 result.log_outcome_to_opentelemetry_span(span, record_exception=False)
 
             except Exception as e:

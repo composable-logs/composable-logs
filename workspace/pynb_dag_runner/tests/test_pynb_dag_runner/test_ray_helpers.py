@@ -42,8 +42,15 @@ def test_timeout_with_success(timeout_s: Optional[float]):
 
         return rec.spans
 
-    for span in [one(get_spans().filter(["name"], "call-python-function"))]:
+    spans = get_spans()
+
+    python_call_span = one(spans.filter(["name"], "call-python-function"))
+    timeout_guard_span = one(spans.filter(["name"], "timeout-guard"))
+
+    for span in [timeout_guard_span, python_call_span]:
         assert read_key(span, ["status", "status_code"]) == "OK"
+
+    spans.contains_path(timeout_guard_span, python_call_span)
 
 
 @pytest.mark.parametrize("timeout_s", [None, 10.0])
