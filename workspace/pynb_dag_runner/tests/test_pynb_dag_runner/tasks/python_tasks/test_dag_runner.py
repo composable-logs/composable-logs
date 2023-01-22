@@ -25,7 +25,7 @@ from pynb_dag_runner.opentelemetry_task_span_parser import (
     parse_spans,
     extract_task_dependencies,
 )
-from pynb_dag_runner.helpers import A, one, Try, Success, Failure
+from pynb_dag_runner.helpers import A, one, Success
 from pynb_dag_runner.wrappers import task, run_dag, TaskContext
 
 

@@ -301,6 +301,9 @@ class TaskRunSummary(p.BaseModel):
     def is_success(self) -> bool:
         return len(self.exceptions) == 0
 
+    def is_failure(self) -> bool:
+        return not self.is_success()
+
     # --- serialise into Python dict
     def as_dict(self):
         return {
