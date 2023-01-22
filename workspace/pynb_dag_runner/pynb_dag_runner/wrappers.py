@@ -186,17 +186,24 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     @ray.remote(num_cpus=num_cpus)
     class ExecActor:
         def call(self, *args, **kwargs):
-            return Try.wrap(f)(*args, **kwargs)
+            tracer = otel.trace.get_tracer(__name__)  # type: ignore
+            with tracer.start_as_current_span("call-python-function") as span:
+                return (
+                    Try.wrap(f)(*args, **kwargs)
+                    # -
+                    .log_outcome_to_opentelemetry_span(span, record_exception=True)
+                )
 
     def make_call_with_timeout_guard(*args, **kwargs):
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
-        with tracer.start_as_current_span("call-python-function") as span:
+        with tracer.start_as_current_span("timeout-guard") as span:
             work_actor = ExecActor.remote()  # type: ignore
             future = work_actor.call.remote(*args, **kwargs)
 
-            # TODO: check Exception
             try:
                 result = ray.get(future, timeout=timeout_s)
+                result.log_outcome_to_opentelemetry_span(span, record_exception=False)
+
             except Exception as e:
                 ray.kill(work_actor)
 
@@ -206,7 +213,7 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
                     )
                 )
 
-            result.log_outcome_to_opentelemetry_span(span)
+                result.log_outcome_to_opentelemetry_span(span, record_exception=True)
             return result
 
     return make_call_with_timeout_guard
@@ -319,7 +326,7 @@ def task(
                 try_result: Try = (
                     f_timeout_guarded(*args_unwrapped, **kwargs)
                     # -
-                    .log_outcome_to_opentelemetry_span(span)
+                    .log_outcome_to_opentelemetry_span(span, record_exception=False)
                 )
 
             # Wrap any successful result into TaskResult

@@ -108,6 +108,7 @@ def one(xs: Iterable[A]) -> A:
 
 
 def del_key(a_dict: Mapping[A, B], key: A, strict: bool = False) -> Mapping[A, B]:
+
     """
     Return new dictionary that is identical to `a_dict` with `key`
     removed (if `key` exists).
@@ -201,13 +202,6 @@ class Try(Generic[A]):
         return f"Try(value={self.value}, error={self.error})"
 
     @classmethod
-    def call(cls, f):
-        try:
-            return cls(value=f(), error=None)
-        except Exception as e:
-            return cls(value=None, error=e)
-
-    @classmethod
     def wrap(cls, f):
         def wrapped_f(*args, **kwargs):
             try:
@@ -217,13 +211,15 @@ class Try(Generic[A]):
 
         return wrapped_f
 
-    def log_outcome_to_opentelemetry_span(self, span: Span):
+    def log_outcome_to_opentelemetry_span(self, span: Span, record_exception: bool):
         if self.is_success():
             span.set_status(Status(StatusCode.OK))
         else:
             assert self.error is not None
-            span.record_exception(self.error)
             span.set_status(Status(StatusCode.ERROR, "Failure"))
+
+            if record_exception:
+                span.record_exception(self.error)
 
         return self
 

@@ -5,7 +5,7 @@ from typing import TypeVar, Optional
 import pytest, ray
 
 #
-from pynb_dag_runner.helpers import Success, Failure, one, Try, del_key
+from pynb_dag_runner.helpers import Success, Failure, one, Try
 from pynb_dag_runner.wrappers import timeout_guard_wrapper
 from pynb_dag_runner.opentelemetry_helpers import SpanDict, read_key, SpanRecorder
 
@@ -65,7 +65,8 @@ def test_timeout_with_function_failure(timeout_s: Optional[float]):
         assert span["status"] == {"status_code": "ERROR", "description": "Failure"}
 
         for event in [one(read_key(span, ["events"]))]:
-            assert del_key(event, "timestamp", strict=True) == {
+            del event["timestamp"]
+            assert event == {
                 "attributes": {
                     "exception.escaped": "False",
                     "exception.message": "The test function f failed",
@@ -92,15 +93,16 @@ def test_timeout_with_stuck_function():
 
         return rec.spans
 
-    for span in [one(get_spans().filter(["name"], "call-python-function"))]:
+    for span in [one(get_spans().filter(["name"], "timeout-guard"))]:
         assert span["status"] == {"status_code": "ERROR", "description": "Failure"}
 
         for event in [one(read_key(span, ["events"]))]:
-            assert del_key(event, "timestamp", strict=True) == {
+            del event["timestamp"]
+            del event["attributes"]["exception.stacktrace"]
+            assert event == {
                 "attributes": {
                     "exception.escaped": "False",
                     "exception.message": "Timeout error: execution did not finish within timeout limit",
-                    "exception.stacktrace": "NoneType: None\n",
                     "exception.type": "Exception",
                 },
                 "name": "exception",
