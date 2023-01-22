@@ -1,4 +1,4 @@
-from typing import Any, Dict, TypeVar, List, Union, Sequence, Optional
+from typing import Any, Dict, TypeVar, List, Mapping, Union, Sequence, Optional
 import inspect
 import collections
 
@@ -60,7 +60,7 @@ class ExceptionGroup(Exception):
     # An ExceptionGroup implementation would be available in Python 3.11, or in the
     # anyio-library (available as dependency of Ray, but this does not seem to inherit
     # from Exception?)
-    def __init__(self, exceptions: List[Exception]):
+    def __init__(self, exceptions: Sequence[Exception]):
         self.exceptions = []
 
         # add listed exceptions in given order, with duplicates removed
@@ -113,7 +113,7 @@ class TaskContext:
     OpenTelemetry span).
     """
 
-    def __init__(self, parameters: Dict[str, Any]):
+    def __init__(self, parameters: Mapping[str, Any]):
         self.parameters = parameters
 
         # logging context determined by OpenTelemetry context propagation
@@ -143,7 +143,7 @@ class TaskContext:
         self.logger.log_float(name, value)
 
 
-def inject_task_context_argument_wrapper(f, parameters: Dict[str, Any]):
+def inject_task_context_argument_wrapper(f, parameters: Mapping[str, Any]):
     """
     TODO Revise logic.
 
@@ -165,22 +165,37 @@ def inject_task_context_argument_wrapper(f, parameters: Dict[str, Any]):
 
 def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     """
-    See also Ray issues/documentation:
-    - "Support timeout option in Ray tasks"  https://github.com/ray-project/ray/issues/17451
-    - "Set time-out on individual ray task" https://github.com/ray-project/ray/issues/15672
+    Return a wrapped function `f_wrapped(*args, **kwargs)` such that:
+     - Return value a Try indicating either Success of Failure
+     - A Failure is returned if:
+        - the function f throws an Exception
+        - or, execution of f takes more that `timeout_s`. In this case, the process
+          running f is killed.
+     - Otherwise a Success is returned with the function return value.
+     - timeout_s == None indicates no timeout.
+     - Executing is logged into two OpenTelemetry spans, and allocates `num_cpus`
+       on the execution node in the Ray cluster.
 
     Notes:
      - we a Ray actor since this can be kill (unlike ordinary Ray remote functions).
 
         https://docs.ray.io/en/latest/actors.html#terminating-actors
 
+     - See also Ray issues/documentation re potential native Ray support for timeouts
+        - "Support timeout option in Ray tasks"  https://github.com/ray-project/ray/issues/17451
+        - "Set time-out on individual ray task" https://github.com/ray-project/ray/issues/15672
+
      - timeout_guard_wrapper does not log the timeout_s
 
+     - If there is no timeout (timeout_s = -1), one could potentially avoid the outer
+       Ray remote function. However, then one needs to revise how num_cpus:s are
+       allocated for the task.
     """
-
-    # We could do this, but then num_cpus allocation logic becomes more complex.
-    # if timeout_s is None:
-    #    return Try.wrap(f)
+    if not (timeout_s is None or timeout_s > 0):
+        raise ValueError(
+            f"timeout_guard_wrapper: timeout_s should be positive of None (no timeout), "
+            f" not {timeout_s}."
+        )
 
     @ray.remote(num_cpus=num_cpus)
     class ExecActor:
@@ -202,7 +217,7 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
             try:
                 result = ray.get(future, timeout=timeout_s)
 
-                # If python finished within timeout, do not log any Exception for f
+                # If python finished within timeout, do not log any Exception from f
                 # into the timeout-guard span.
                 result.log_outcome_to_opentelemetry_span(span, record_exception=False)
 
@@ -223,7 +238,7 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
 
 def task(
     task_id: str,
-    task_parameters: Dict[str, Any] = {},
+    task_parameters: Mapping[str, Any] = {},
     num_cpus: int = 1,
     timeout_s: Optional[float] = None,
 ):
@@ -231,8 +246,8 @@ def task(
     Wrapper to convert Python function into Ray remote function that can be included
     in pynb-dag-runner Ray based DAG workflows.
     """
-
-    assert timeout_s is None or timeout_s > 0
+    if not (timeout_s is None or timeout_s > 0):
+        raise ValueError("timeout_s should be positive of None (no timeout)")
 
     for k in task_parameters.keys():
         if not (k.startswith("task.") or k.startswith("workflow.")):
@@ -267,7 +282,7 @@ def task(
                 # Note that when task is defined, we know the task parameters, but
                 # we are not given the global workflow.* parameters. At task runtime,
                 # these are determined by the span's baggage.
-                augmented_task_parameters: Dict[str, Any] = {
+                augmented_task_parameters: Mapping[str, Any] = {
                     **otel.baggage.get_all(),
                     **task_parameters,
                     "task.task_id": task_id,
@@ -277,6 +292,7 @@ def task(
 
                 for k, v in augmented_task_parameters.items():
                     if v is None:
+                        # Behavior of NULL OpenTelemetry attributes is undefined.
                         # See
                         # https://opentelemetry-python.readthedocs.io/en/latest/api/trace.span.html#opentelemetry.trace.span.Span.set_attributes
                         raise ValueError("OpenTelemetry attributes should be non-null")
@@ -322,7 +338,9 @@ def task(
                 )
 
                 f_timeout_guarded = timeout_guard_wrapper(
-                    f_injected, timeout_s=timeout_s, num_cpus=num_cpus
+                    f_injected,
+                    timeout_s=timeout_s,
+                    num_cpus=num_cpus,
                 )
 
                 try_result: Try = (

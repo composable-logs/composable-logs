@@ -357,7 +357,7 @@ def _task_run_iterator(
     top_span_id: str, pipeline_attributes: Mapping[str, Any], spans: Spans
 ) -> Iterable[TaskRunSummary]:
     for task_top_span in spans.filter(["name"], "execute-task").sort_by_start_time():
-        task_attributes: Dict[str, Any] = {
+        task_attributes: Mapping[str, Any] = {
             **pipeline_attributes,  # inherited attributes from pipeline
             **(
                 spans.bound_inclusive(task_top_span)
