@@ -185,11 +185,8 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
         - "Support timeout option in Ray tasks"  https://github.com/ray-project/ray/issues/17451
         - "Set time-out on individual ray task" https://github.com/ray-project/ray/issues/15672
 
-     - timeout_guard_wrapper does not log the timeout_s
+     - This function does not log the timeout_s parameter.
 
-     - If there is no timeout (timeout_s = -1), one could potentially avoid the outer
-       Ray remote function. However, then one needs to revise how num_cpus:s are
-       allocated for the task.
     """
     if not (timeout_s is None or timeout_s > 0):
         raise ValueError(
@@ -226,7 +223,7 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
 
                 result = Failure(
                     Exception(
-                        "Timeout error: execution did not finish within timeout limit"
+                        "Timeout error: execution did not finish within timeout limit."
                     )
                 )
 
@@ -421,7 +418,7 @@ def run_dag(
                     )
                 ):
                     raise Exception(
-                        f"Expected a Try[TaskResult] got {str(dag_result)[:100]}"
+                        f"Expected a Try[TaskResult] got {str(dag_result)[:100]}."
                     )
 
             dag_errors: List[Exception] = [
