@@ -94,7 +94,7 @@ def test_timeout_with_stuck_function():
         with SpanRecorder() as rec:
             assert timeout_f() == Failure(
                 Exception(
-                    "Timeout error: execution did not finish within timeout limit"
+                    "Timeout error: execution did not finish within timeout limit."
                 )
             )
 
@@ -109,7 +109,7 @@ def test_timeout_with_stuck_function():
             assert event == {
                 "attributes": {
                     "exception.escaped": "False",
-                    "exception.message": "Timeout error: execution did not finish within timeout limit",
+                    "exception.message": "Timeout error: execution did not finish within timeout limit.",
                     "exception.type": "Exception",
                 },
                 "name": "exception",
@@ -136,7 +136,7 @@ def test_timeout_w_timeout(dummy_loop_parameter: int, timeout_s: float):
     if timeout_s < task_duration_s:
         # f should have been timed out, and f should not have finished executing
         assert result == Failure(
-            Exception("Timeout error: execution did not finish within timeout limit")
+            Exception("Timeout error: execution did not finish within timeout limit.")
         )
         assert ray.get(state_actor.get.remote()) == []
     else:
