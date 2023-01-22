@@ -99,6 +99,16 @@ def make_jupytext_task(
 ):
     """
     Make task from a Jupytext notebook that can be run in a Composable-Logs DAG.
+
+    Notes:
+     - Currently, timeout canceling is done on Ray level, but error handling and
+       is done only within the Python process (using try .. catch).
+
+       Therefore, timeout-canceled tasks can not currently do proper error handling.
+       Eg., there would be no notebook artifact logged from a timeout-canceled task.
+
+       The solution would be to enable OpenTelemetry logging for Papermill on a
+       per-cell level.
     """
     task_parameters: AttributesDict = {
         **parameters,
@@ -126,6 +136,8 @@ def make_jupytext_task(
                     "All task parameter names should start with 'task.'"
                 )
 
+        # The below return type is not a Try. Even in case of error, we would obtain
+        # a partially evaluated notebook.
         err, evaluated_notebook = notebook.to_ipynb().evaluate(
             cwd=cwd,
             parameters={
