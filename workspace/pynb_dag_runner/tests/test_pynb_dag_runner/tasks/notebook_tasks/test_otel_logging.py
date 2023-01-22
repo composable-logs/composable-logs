@@ -31,7 +31,10 @@ from .nb_test_helpers import get_test_jupytext_nb
 
 # -
 
-TASK_PARAMETERS = {"pipeline.foo": "bar", "task.variable_a": "task-value"}
+TASK_PARAMETERS = {
+    "workflow.foo": "bar",
+    "task.variable_a": "task-value",
+}
 TEST_NOTEBOOK: JupytextNotebookContent = get_test_jupytext_nb(
     "notebook_otel_logging.py"
 )

@@ -14,7 +14,10 @@ from .nb_test_helpers import get_test_jupytext_nb
 
 #
 
-TASK_PARAMETERS = {"pipeline.foo": "bar", "task.variable_a": "task-value"}
+TASK_PARAMETERS = {
+    "workflow.foo": "bar",
+    "task.variable_a": "task-value",
+}
 TEST_NOTEBOOK: JupytextNotebookContent = get_test_jupytext_nb("notebook_ok.py")
 
 
@@ -24,7 +27,11 @@ def spans_once() -> Spans:
 
     with SpanRecorder() as rec:
         run_dag(
-            make_jupytext_task(notebook=TEST_NOTEBOOK, parameters=TASK_PARAMETERS)()
+            make_jupytext_task(
+                notebook=TEST_NOTEBOOK,
+                parameters=TASK_PARAMETERS,
+                timeout_s=None,
+            )()
         )
 
     return rec.spans
@@ -43,7 +50,8 @@ def test__jupytext__ok_notebook__parse_spans(spans_once: Spans):
         "task.task_id": str(TEST_NOTEBOOK.filepath),
         "task.notebook": str(TEST_NOTEBOOK.filepath),
         "task.task_type": "jupytext",
-        # "task.timeout_s": 10.0,
+        "task.timeout_s": -1,
+        # None converted into -1 since OpenTelemetry attributes should be non-null
     }
 
     # Check properties of artifact with the evaluated notebook

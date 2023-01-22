@@ -93,7 +93,7 @@ def make_jupytext_task_ot(
 def make_jupytext_task(
     notebook: JupytextNotebookContent,
     cwd: Optional[Path] = None,
-    # timeout_s: float = 600.0,
+    timeout_s: Optional[float] = 60.0,
     num_cpus: int = 1,
     parameters: AttributesDict = {},
 ):
@@ -111,6 +111,7 @@ def make_jupytext_task(
     @task(
         task_id=str(notebook.filepath),
         task_parameters=task_parameters,
+        timeout_s=timeout_s,
         num_cpus=num_cpus,
     )
     def run_notebook_task(*dummy_args, **kwargs):
