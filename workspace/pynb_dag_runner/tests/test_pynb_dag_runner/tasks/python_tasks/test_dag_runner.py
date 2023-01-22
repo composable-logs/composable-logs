@@ -139,7 +139,7 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
     workflow_parameters = {"workflow.env": "local-test"}
     task_parameters = {"task.X": 123, "task.Y": "indigo"}
 
-    @task(task_id="test_function", task_parameters=task_parameters, timeout_s=1.23)
+    @task(task_id="test_function", task_parameters=task_parameters, timeout_s=12.78)
     def f(C: TaskContext):
         return C.parameters
 
@@ -148,7 +148,7 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
             {
                 "task.task_id": "test_function",
                 "task.num_cpus": 1,
-                "task.timeout_s": 1.23,
+                "task.timeout_s": 12.78,
                 **task_parameters,
                 **workflow_parameters,
             }
