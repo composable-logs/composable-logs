@@ -221,13 +221,14 @@ def test_try_map_value():
     )
 
 
-def test_try_call():
-    x = 1
-    assert Try.call(lambda: x + 1) == Try(2, None) == Success(2)
+def test_try_wrap():
+    def f(x, y, z):
+        assert z == "z"
+        if x == y:
+            return x + y
+        else:
+            raise Exception(f"x!=y, got x={x} and y={y}")
 
-    test_exception = Exception("xyz")
+    assert Try.wrap(f)(1, 1, z="z") == Success(2)
 
-    def f():
-        raise test_exception
-
-    assert Try.call(f) == Try(None, test_exception) == Failure(test_exception)
+    assert Try.wrap(f)(1, 2, z="z") == Failure(Exception(f"x!=y, got x=1 and y=2"))

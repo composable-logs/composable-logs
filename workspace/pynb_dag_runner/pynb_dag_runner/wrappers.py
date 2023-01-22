@@ -169,14 +169,17 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     See also Ray issues/documentation:
     - "Support timeout option in Ray tasks"  https://github.com/ray-project/ray/issues/17451
     - "Set time-out on individual ray task" https://github.com/ray-project/ray/issues/15672
-    - https://docs.ray.io/en/latest/actors.html#terminating-actors
+
+    Note that we a Ray actor since this can be kill (unlike ordinary Ray
+    remote functions).
+
+    https://docs.ray.io/en/latest/actors.html#terminating-actors
     """
 
     # We could do this, but then num_cpus allocation logic becomes more complex.
     # if timeout_s is None:
     #    return Try.wrap(f)
 
-    # We use a Ray actor since this can be kill (unlike ordinary Ray remote functions)
     @ray.remote(num_cpus=num_cpus)
     class ExecActor:
         def call(self, *args, **kwargs):
@@ -355,6 +358,7 @@ def run_dag(
             #
             # Now dag_run([N2, N3, N4]) awaits the results for all end nodes,
             # and returns a Try that:
+            #
             #  - if all nodes ran successfully: return a Try(Success) with return values
             #    of end nodes as a list.
             #
@@ -362,13 +366,14 @@ def run_dag(
             #    ExceptionGroup collecting all exceptions. Note that two nodes in the
             #    DAG can fail in parallel.
             #
-            # Note:
+            # Notes:
+            #
             #  - We do not want to [node.execute() for node in dag]. In the above DAG,
             #    this would run Node 1 three times. Rather, we start execution on a
             #    collect-node that waits for all upstream nodes.
             #
             #  - The collect node will not be seen in OpenTelemetry logs.
-
+            #
             @workflow.options(task_id="collect-nodes")  # type: ignore
             @ray.remote(retry_exceptions=False, num_cpus=0, max_retries=0)
             def collect(*args):
