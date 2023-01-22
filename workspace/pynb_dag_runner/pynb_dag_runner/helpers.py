@@ -13,6 +13,12 @@ from typing import (
     Optional,
 )
 
+# -
+from opentelemetry.trace import StatusCode, Status  # type: ignore
+from opentelemetry.trace.span import Span
+
+# -
+
 A = TypeVar("A")
 B = TypeVar("B")
 K = TypeVar("K")
@@ -194,6 +200,26 @@ class Try(Generic[A]):
             return cls(value=f(), error=None)
         except Exception as e:
             return cls(value=None, error=e)
+
+    @classmethod
+    def wrap(cls, f):
+        def wrapped_f(*args, **kwargs):
+            try:
+                return cls(value=f(*args, **kwargs), error=None)
+            except Exception as e:
+                return cls(value=None, error=e)
+
+        return wrapped_f
+
+    def log_outcome_to_opentelemetry_span(self, span: Span):
+        if self.is_success():
+            span.set_status(Status(StatusCode.OK))
+        else:
+            assert self.error is not None
+            span.record_exception(self.error)
+            span.set_status(Status(StatusCode.ERROR, "Failure"))
+
+        return self
 
     def __eq__(self, other: Any) -> bool:
         if isinstance(other, Try):

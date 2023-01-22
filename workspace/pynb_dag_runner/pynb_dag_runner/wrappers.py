@@ -1,4 +1,4 @@
-from typing import Any, Dict, TypeVar, List, Union, Sequence
+from typing import Any, Dict, TypeVar, List, Union, Sequence, Optional
 import inspect
 import collections
 
@@ -114,10 +114,10 @@ class TaskContext:
     OpenTelemetry span).
     """
 
-    def __init__(self, span, parameters: Dict[str, Any]):
-        self.span = span
+    def __init__(self, parameters: Dict[str, Any]):
         self.parameters = parameters
 
+        # logging context determined by OpenTelemetry context propagation
         self.logger = ComposableLogsLogger(parameters)
 
     # --- forward log-methods to ComposableLogsLogger
@@ -144,15 +144,94 @@ class TaskContext:
         self.logger.log_float(name, value)
 
 
-def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
+def inject_task_context_argument_wrapper(f, parameters: Dict[str, Any]):
+    """
+    TODO Revise logic.
+
+     - Eg. inject only TaskContext for a variable that has this is type.
+     - Ensure that there is at most one TaskContext argument in f
+
+    """
+    if "C" in inspect.signature(f).parameters.keys():
+        extra = {"C": TaskContext(parameters=parameters)}
+
+        def wrapped(*args, **kwargs):
+            return f(*args, **extra, **kwargs)
+
+        return wrapped
+
+    else:
+        return f
+
+
+def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
+    """
+    See also Ray issues/documentation:
+    - "Support timeout option in Ray tasks"  https://github.com/ray-project/ray/issues/17451
+    - "Set time-out on individual ray task" https://github.com/ray-project/ray/issues/15672
+    - https://docs.ray.io/en/latest/actors.html#terminating-actors
+    """
+
+    # We could do this, but then num_cpus allocation logic becomes more complex.
+    # if timeout_s is None:
+    #    return Try.wrap(f)
+
+    # We use a Ray actor since this can be kill (unlike ordinary Ray remote functions)
+    @ray.remote(num_cpus=num_cpus)
+    class ExecActor:
+        def call(self, *args, **kwargs):
+            return Try.wrap(f)(*args, **kwargs)
+
+    def make_call_with_timeout_guard(*args, **kwargs):
+        tracer = otel.trace.get_tracer(__name__)  # type: ignore
+        with tracer.start_as_current_span("timeout-guard") as span:
+            work_actor = ExecActor.remote()  # type: ignore
+            future = work_actor.call.remote(*args, **kwargs)
+
+            # TODO
+            try:
+                result = ray.get(future, timeout=timeout_s)
+                span.set_status(Status(StatusCode.OK))
+                return result
+            except Exception as e:
+                span.set_status(Status(StatusCode.ERROR, "Timeout"))
+                ray.kill(work_actor)
+
+                return Failure(
+                    Exception(
+                        "Timeout error: execution did not finish within timeout limit"
+                    )
+                )
+
+    return make_call_with_timeout_guard
+
+
+def task(
+    task_id: str,
+    task_parameters: Dict[str, Any] = {},
+    num_cpus: int = 1,
+    timeout_s: Optional[float] = None,
+):
     """
     Wrapper to convert Python function into Ray remote function that can be included
     in pynb-dag-runner Ray based DAG workflows.
     """
 
+    assert timeout_s is None or timeout_s > 0
+
+    for k in task_parameters.keys():
+        if not (k.startswith("task.") or k.startswith("workflow.")):
+            raise ValueError(
+                f"Task defined with task parameter {k}. "
+                "Parameters should start with 'task.' or 'workflow."
+            )
+
     def decorator(f):
-        @workflow.options(task_id=task_id)  # type: ignore
-        @ray.remote(retry_exceptions=False, num_cpus=num_cpus, max_retries=0)
+        @ray.remote(
+            retry_exceptions=False,
+            num_cpus=0,
+            max_retries=0,
+        )
         def wrapped_f(*args: Try[TaskResult], **kwargs):
             # Short circuit this task if there are upstream errors.
             # In this case, exit with Failure containing an ExceptionGroup-error
@@ -162,13 +241,44 @@ def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
                 return Failure(flatten_exceptions(*upstream_exceptions))  # type: ignore
 
             args = [arg.get() for arg in args]  # type: ignore
-            # -
 
             tracer = otel.trace.get_tracer(__name__)
             with tracer.start_as_current_span("execute-task") as span:
                 this_task_span_id: str = get_span_hexid(span)
 
-                # --- unwrap values from upstream tasks and log task dependencies
+                # ---
+                # Log all task parameters into new span.
+                #
+                # Note that when task is defined, we know the task parameters, but
+                # we are not given the global workflow.* parameters. At task runtime,
+                # these are determined by the span's baggage.
+                augmented_task_parameters: Dict[str, Any] = {
+                    **otel.baggage.get_all(),
+                    **task_parameters,
+                    "task.task_id": task_id,
+                    "task.num_cpus": num_cpus,
+                    "task.timeout_s": -1 if timeout_s is None else timeout_s,
+                }
+
+                for k, v in augmented_task_parameters.items():
+                    if v is None:
+                        # See
+                        # https://opentelemetry-python.readthedocs.io/en/latest/api/trace.span.html#opentelemetry.trace.span.Span.set_attributes
+                        raise ValueError("OpenTelemetry attributes should be non-null")
+                    span.set_attribute(k, v)
+
+                # ---
+                # Input arguments to this task are wrapped using TaskResult that
+                # contain values and upstream OpenTelemetry span_id:s where these
+                # were computed.
+                #
+                # We now know span_id of this task, so we can:
+                #  - unwrap input values from upstream tasks
+                #  - log task dependencies (parent_span_id, this_span_id)
+                #
+                # Of note: this is done dynamically at runtime.
+                #
+                # TODO: support also upsteam tasks passed in using kwargs
                 args_unwrapped = []
                 for arg in args:
                     if isinstance(arg, TaskResult):
@@ -188,44 +298,25 @@ def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
                             "task composition not yet supported using kwargs"
                         )
 
+                del args
+
                 # ---
 
-                # --- log attributes to this task-span
-                augmented_task_parameters: Dict[str, Any] = {
-                    "task.task_id": task_id,
-                    "task.num_cpus": num_cpus,
-                    **task_parameters,
-                }
+                f_injected = inject_task_context_argument_wrapper(
+                    f, augmented_task_parameters
+                )
 
-                for k, v in augmented_task_parameters.items():
-                    span.set_attribute(k, v)
-                    otel_add_baggage(k, v)
+                f_timeout_guarded = timeout_guard_wrapper(
+                    f_injected, timeout_s=timeout_s, num_cpus=num_cpus
+                )
 
-                # Inject logger if needed
-                if "C" in inspect.signature(f).parameters.keys():
-                    extra = {
-                        "C": TaskContext(
-                            span,
-                            parameters={
-                                **augmented_task_parameters,
-                                # global (workflow-level) parameters are stored
-                                # as OpenTelemetry baggage
-                                **otel.baggage.get_all(),
-                            },
-                        )
-                    }
-                else:
-                    extra = {}
+                try_result: Try = (
+                    f_timeout_guarded(*args_unwrapped, **kwargs)
+                    # -
+                    .log_outcome_to_opentelemetry_span(span)
+                )
 
-                try_result = Try.call(lambda: f(*args_unwrapped, **extra, **kwargs))
-
-                if try_result.is_success():
-                    span.set_status(Status(StatusCode.OK))
-                else:
-                    span.record_exception(try_result.error)
-                    span.set_status(Status(StatusCode.ERROR, "Failure"))
-
-            # Wrap result into TaskResult
+            # Wrap any successful result into TaskResult
             return try_result.map_value(
                 lambda x: TaskResult(result=x, span_id=this_task_span_id)
             )
@@ -238,7 +329,7 @@ def task(task_id: str, task_parameters: Dict[str, Any] = {}, num_cpus: int = 1):
 def run_dag(
     dag: Union[FunctionNode, Sequence[FunctionNode]],
     workflow_parameters: Dict[str, Any] = {},
-):
+) -> Try:
     """
     Run a Ray DAG with OpenTelemetry logging
     """

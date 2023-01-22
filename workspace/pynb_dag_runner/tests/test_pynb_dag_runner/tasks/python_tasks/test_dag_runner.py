@@ -110,10 +110,12 @@ def test__cl__can_compose(cl__can_compose_spans: Spans):
         task_id: str = task_summary.attributes["task.task_id"]  # type: ignore
         assert task_id in TEST_TASK_ATTRIBUTES
 
-        assert del_key(task_summary.attributes, "task.task_id") == {
+        assert task_summary.attributes == {
+            "task.task_id": task_id,
             **TEST_TASK_ATTRIBUTES[task_id],
             "workflow.env": "xyz",
             "task.num_cpus": 1,
+            "task.timeout_s": -1,
         }
 
         span_id_to_task_id[task_summary.span_id] = task_id
@@ -135,9 +137,9 @@ def test__cl__can_compose(cl__can_compose_spans: Spans):
 
 def test__cl__function_parameters_contain_task_and_system_and_global_parameters():
     workflow_parameters = {"workflow.env": "local-test"}
-    task_parameters = {"task.X": 123, "task.Y": None}
+    task_parameters = {"task.X": 123, "task.Y": "indigo"}
 
-    @task(task_id="test_function", task_parameters=task_parameters)
+    @task(task_id="test_function", task_parameters=task_parameters, timeout_s=1.23)
     def f(C: TaskContext):
         return C.parameters
 
@@ -146,6 +148,7 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
             {
                 "task.task_id": "test_function",
                 "task.num_cpus": 1,
+                "task.timeout_s": 1.23,
                 **task_parameters,
                 **workflow_parameters,
             }
