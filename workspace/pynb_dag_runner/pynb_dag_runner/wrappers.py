@@ -358,7 +358,7 @@ def task(
 
 def run_dag(
     dag: Union[FunctionNode, Sequence[FunctionNode]],
-    workflow_parameters: Dict[str, Any] = {},
+    workflow_parameters: Mapping[str, Any] = {},
 ) -> Try:
     """
     Run a Ray DAG with OpenTelemetry logging

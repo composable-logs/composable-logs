@@ -1,13 +1,12 @@
 from functools import lru_cache
-import time
 
-#
+# -
 import ray
 import pytest
 
-#
+# -
 from pynb_dag_runner.opentelemetry_helpers import Spans
-from pynb_dag_runner.helpers import one, Try, Success, Failure
+from pynb_dag_runner.helpers import one, Failure
 from pynb_dag_runner.core.dag_runner import (
     TaskOutcome,
     start_and_await_tasks,
@@ -41,6 +40,7 @@ def get_spans(task_should_fail: bool) -> Spans:
     https://docs.pytest.org/en/stable/example/parametrize.html#indirect-parametrization
 
     """
+    assert False
     with SpanRecorder() as rec:
 
         def f(_):
