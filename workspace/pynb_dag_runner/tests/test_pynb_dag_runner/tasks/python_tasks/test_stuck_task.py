@@ -4,50 +4,48 @@ import time
 import pytest
 
 #
-from pynb_dag_runner.opentelemetry_helpers import Spans
-from pynb_dag_runner.helpers import one
-from pynb_dag_runner.core.dag_runner import (
-    TaskOutcome,
-    start_and_await_tasks,
-    RemoteTaskP,
-    task_from_python_function,
-)
-from pynb_dag_runner.opentelemetry_helpers import (
-    Spans,
-    SpanRecorder,
-)
+from pynb_dag_runner.helpers import one, Failure
+from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
+from pynb_dag_runner.wrappers import task, run_dag
+
+TASK_TIMEOUT_S = 0.5
 
 
 @pytest.fixture(scope="module")
 def spans() -> Spans:
     with SpanRecorder() as rec:
 
-        def f(_):
+        @task(task_id="f-sleep-task", timeout_s=TASK_TIMEOUT_S)
+        def f():
             time.sleep(1e6)
 
-        task: RemoteTaskP = task_from_python_function(
-            f, attributes={"task.id": "stuck-function"}, timeout_s=1.0
-        )
-        [outcome] = start_and_await_tasks(
-            [task], [task], timeout_s=10, arg="dummy value"
+        assert run_dag(f()) == Failure(
+            Exception("Timeout error: execution did not finish within timeout limit.")
         )
 
-        assert isinstance(outcome, TaskOutcome)
-        assert "timeout" in str(outcome.error)
+    assert len(rec.spans.exception_events()) == 1
 
     return rec.spans
 
 
 def test__python_task__stuck_tasks__parse_spans(spans: Spans):
     pipeline_summary = parse_spans(spans)
+    assert pipeline_summary.is_failure()
 
     for task_summary in [one(pipeline_summary.task_runs)]:  # type: ignore
-        assert not task_summary.is_success()
+        assert task_summary.is_failure()
         assert "timeout" in str(task_summary.exceptions).lower()
 
         assert len(task_summary.logged_artifacts) == 0
         assert len(task_summary.logged_values) == 0
 
-        assert task_summary.attributes["task.id"] == "stuck-function"
-        assert task_summary.attributes["task.timeout_s"] == 1.0
+        assert task_summary.attributes == {
+            "task.task_id": "f-sleep-task",
+            "task.num_cpus": 1,
+            "task.timeout_s": TASK_TIMEOUT_S,
+        }
+
+        assert task_summary.timing.get_duration_s() > TASK_TIMEOUT_S
+
+    assert len(pipeline_summary.task_dependencies) == 0

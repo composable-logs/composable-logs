@@ -1,5 +1,5 @@
 import io, tempfile, os
-from typing import Any, Dict, Optional, Tuple, List, Union, Sequence
+from typing import Any, Dict, Optional, Tuple, List, Mapping
 from pathlib import Path
 
 # -
@@ -55,7 +55,7 @@ class JupyterIpynbNotebookContent(p.BaseModel):
         self,
         tmp_path: Path = Path("/tmp"),
         cwd: Optional[Path] = None,
-        parameters: Dict[str, Any] = {},
+        parameters: Mapping[str, Any] = {},
     ) -> Tuple[Optional[Exception], "JupyterIpynbNotebookContent"]:
         """
         Evaluate notebook using Papermill with the provided parameters injected.
@@ -167,7 +167,7 @@ class JupyterIpynbNotebook:
         self,
         output: "JupyterIpynbNotebook",
         cwd: Path,
-        parameters: Dict[str, Any],
+        parameters: Mapping[str, Any],
     ):
         """
         Evaluate this Jupyter notebook and write evaluated notebook to output_path.
@@ -263,7 +263,9 @@ class JupytextNotebook:
 
         return output
 
-    def evaluate(self, output: JupyterIpynbNotebook, parameters: Dict[str, Any] = {}):
+    def evaluate(
+        self, output: JupyterIpynbNotebook, parameters: Mapping[str, Any] = {}
+    ):
         """
         Evaluate a Jupytext notebook, and inject provided parameters using Papermill.
 
