@@ -1,18 +1,14 @@
 import pytest
 
-#
+# -
 from pynb_dag_runner.helpers import one
-from pynb_dag_runner.opentelemetry_helpers import (
-    Spans,
-    SpanRecorder,
-    get_duration_s,
-)
+from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
 from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
 from pynb_dag_runner.tasks.tasks import make_jupytext_task
 from pynb_dag_runner.wrappers import run_dag
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
 
-
+# -
 from .nb_test_helpers import get_test_jupytext_nb
 
 
@@ -52,11 +48,14 @@ def test__jupytext__stuck_notebook__validate_spans(spans: Spans):
         assert task_summary.attributes == {
             "task.task_id": "notebook_stuck.py",
             "task.task_type": "jupytext",
-            "task.notebook": "notebook_stuck.py", # <-- to be deleted
+            "task.notebook": "notebook_stuck.py",  # <-- to be deleted
             "task.num_cpus": 1,
             "task.timeout_s": TASK_TIMEOUT_S,
             **TASK_PARAMETERS,
         }
+
+        # TODO: ideally check here that logged artifacts and values are still captured
+        # even if the task is killed early.
 
         assert task_summary.timing.get_duration_s() > TASK_TIMEOUT_S
 

@@ -1,6 +1,5 @@
 import glob
 from pathlib import Path
-from functools import lru_cache
 
 #
 import pytest
@@ -12,10 +11,7 @@ from pynb_dag_runner.opentelemetry_task_span_parser import (
     parse_spans,
     LoggedValueContent,
 )
-from pynb_dag_runner.opentelemetry_helpers import (
-    Spans,
-    SpanRecorder,
-)
+from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
 from otel_output_parser.cli_pynb_log_parser import (
     write_spans_to_output_directory_structure,
     make_mermaid_gantt_inputfile,
