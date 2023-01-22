@@ -33,9 +33,12 @@ AttributesDict = Mapping[str, Any]
 
 def otel_add_baggage(key: str, value: Any):
     """
-    Add key=value to baggage (propagated also downstreams).
+    Add key=value to baggage (propagated also downstreams OpenTelmetry spans).
 
-    Note: baggage content is not stored to logged Span:s.
+    Then in downstream spans, the collection of all baggage recorded
+    upstream can be retried using otel.baggage.get_all().
+
+    Note: baggage content is not automatically stored to logged Span:s.
 
     See:
     https://github.com/open-telemetry/opentelemetry-python/blob/main/opentelemetry-api/tests/baggage/test_baggage.py
@@ -61,7 +64,7 @@ def read_key(nested_dict, keys: List[str]) -> Any:
     first_key, *rest_keys = keys
 
     if first_key not in nested_dict:
-        raise Exception(f"read_key: {first_key} not found")
+        raise Exception(f"read_key: {first_key} not found in {nested_dict}")
 
     if len(rest_keys) == 0:
         return nested_dict[first_key]

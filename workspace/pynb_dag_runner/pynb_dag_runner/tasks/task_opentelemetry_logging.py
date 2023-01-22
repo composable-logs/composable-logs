@@ -53,12 +53,12 @@ def _read_logged_serialized_data(spans: Spans, filter_name: str):
 
 
 # to be deleted
-def get_logged_artifacts(spans: Spans) -> Dict[str, Any]:
+def get_logged_artifacts(spans: Spans) -> Mapping[str, Any]:
     return _read_logged_serialized_data(spans, filter_name="artefact")
 
 
 # to be deleted
-def get_logged_values(spans: Spans) -> Dict[str, Any]:
+def get_logged_values(spans: Spans) -> Mapping[str, Any]:
     return _read_logged_serialized_data(spans, filter_name="named-value")
 
 
