@@ -1,18 +1,13 @@
 import time
-from typing import Any, Awaitable, Callable, TypeVar
+from typing import TypeVar, Optional
 
 #
 import pytest, ray
 
 #
-from pynb_dag_runner.helpers import Success, Failure, one, Try
-from pynb_dag_runner.ray_helpers import try_f_with_timeout_guard
-from pynb_dag_runner.opentelemetry_helpers import (
-    SpanDict,
-    read_key,
-    Spans,
-    SpanRecorder,
-)
+from pynb_dag_runner.helpers import Success, Failure, one, Try, del_key
+from pynb_dag_runner.wrappers import timeout_guard_wrapper
+from pynb_dag_runner.opentelemetry_helpers import SpanDict, read_key, SpanRecorder
 
 
 A = TypeVar("A")
@@ -33,150 +28,112 @@ class StateActor:
 ### --- tests for try_f_with_timeout_guard wrapper ---
 
 
-@pytest.mark.asyncio
-async def test_timeout_w_success():
-    N_calls = 3
+@pytest.mark.parametrize("timeout_s", [None, 10.0])
+def test_timeout_with_success(timeout_s: Optional[float]):
+    def get_spans():
+        def f(x, y, z):
+            assert z == "z"
+            return x + y
 
-    async def get_test_spans():
+        timeout_f = timeout_guard_wrapper(f, timeout_s=timeout_s, num_cpus=1)
+
         with SpanRecorder() as rec:
-
-            def f(x: int) -> int:
-                return x + 1
-
-            f_timeout: Callable[[int], Awaitable[Try[int]]] = try_f_with_timeout_guard(
-                f, timeout_s=10, num_cpus=1
-            )
-
-            for x in range(N_calls):
-                assert await f_timeout(x) == Try(x + 1, None)
+            assert timeout_f(1, 2, z="z") == Success(1 + 2)
 
         return rec.spans
 
-    def validate_spans(spans: Spans):
-        func_call_spans: Spans = spans.filter(["name"], "call-python-function")
-        assert len(func_call_spans) == N_calls
-
-        for span in func_call_spans:
-            assert read_key(span, ["status", "status_code"]) == "OK"
-
-    validate_spans(await get_test_spans())
+    for span in [one(get_spans().filter(["name"], "call-python-function"))]:
+        assert read_key(span, ["status", "status_code"]) == "OK"
 
 
-@pytest.mark.asyncio
-async def test_timeout_w_exception():
-    N_calls = 3
+@pytest.mark.parametrize("timeout_s", [None, 10.0])
+def test_timeout_with_function_failure(timeout_s: Optional[float]):
+    test_exception = ValueError("The test function f failed")
 
-    async def get_test_spans():
+    def get_spans():
+        def f():
+            raise test_exception
+
+        timeout_f = timeout_guard_wrapper(f, timeout_s=timeout_s, num_cpus=1)
+
         with SpanRecorder() as rec:
+            assert timeout_f() == Failure(test_exception)
 
-            def error(dummy: int) -> Exception:
-                return ValueError(f"BOOM{dummy}")
-
-            def f(dummy: int):
-                raise error(dummy)
-
-            f_timeout: Callable[[int], Awaitable[Try[int]]] = try_f_with_timeout_guard(
-                f, timeout_s=10, num_cpus=1
-            )
-
-            for x in range(N_calls):
-                assert await f_timeout(x) == Try(None, error(x))
         return rec.spans
 
-    def validate_spans(spans: Spans):
-        func_call_spans: Spans = spans.filter(["name"], "call-python-function")
-        assert len(func_call_spans) == N_calls
+    for span in [one(get_spans().filter(["name"], "call-python-function"))]:
+        assert span["status"] == {"status_code": "ERROR", "description": "Failure"}
 
-        for span in func_call_spans:
-            assert span["status"] == {"status_code": "ERROR", "description": "Failure"}
-
-            event = one(read_key(span, ["events"]))
-            assert set(event.keys()) == set(["name", "timestamp", "attributes"])
-            assert event["name"] == "exception"
-            assert set(event["attributes"]) == set(
-                [
-                    "exception.type",
-                    "exception.message",
-                    "exception.stacktrace",
-                    "exception.escaped",
-                ]
-            )
-            assert read_key(event, ["attributes", "exception.type"]) == "ValueError"
-
-    validate_spans(await get_test_spans())
+        for event in [one(read_key(span, ["events"]))]:
+            assert del_key(event, "timestamp", strict=True) == {
+                "attributes": {
+                    "exception.escaped": "False",
+                    "exception.message": "The test function f failed",
+                    "exception.stacktrace": "NoneType: None\n",
+                    "exception.type": "ValueError",
+                },
+                "name": "exception",
+            }
 
 
-@pytest.mark.asyncio
-async def test_timeout_w_timeout_cancel():
-    N_calls = 3
+def test_timeout_with_stuck_function():
+    def get_spans():
+        def f():
+            time.sleep(1e6)
 
-    async def get_test_spans():
+        timeout_f = timeout_guard_wrapper(f, timeout_s=1.0, num_cpus=1)
+
         with SpanRecorder() as rec:
-
-            def f(_: str) -> int:
-                time.sleep(1e6)
-                return 123
-
-            f_timeout: Callable[[str], Awaitable[Try[int]]] = try_f_with_timeout_guard(
-                f, timeout_s=0.5, num_cpus=1
-            )
-
-            for _ in range(N_calls):
-                result = await f_timeout("argument-to-function-f")
-                assert result == Try(
-                    value=None,
-                    error=Exception(
-                        "Timeout error: execution did not finish within timeout limit"
-                    ),
+            assert timeout_f() == Failure(
+                Exception(
+                    "Timeout error: execution did not finish within timeout limit"
                 )
+            )
 
         return rec.spans
 
-    def validate_spans(spans: Spans):
-        func_call_spans: Spans = spans.filter(["name"], "timeout-guard")
-        assert len(func_call_spans) == N_calls
+    for span in [one(get_spans().filter(["name"], "call-python-function"))]:
+        assert span["status"] == {"status_code": "ERROR", "description": "Failure"}
 
-        for span in func_call_spans:
-            assert read_key(span, ["attributes", "task.timeout_s"]) == 0.5
-            assert span["status"] == {"status_code": "ERROR", "description": "Timeout"}
+        for event in [one(read_key(span, ["events"]))]:
+            assert del_key(event, "timestamp", strict=True) == {
+                "attributes": {
+                    "exception.escaped": "False",
+                    "exception.message": "Timeout error: execution did not finish within timeout limit",
+                    "exception.stacktrace": "NoneType: None\n",
+                    "exception.type": "Exception",
+                },
+                "name": "exception",
+            }
 
-    validate_spans(await get_test_spans())
 
-
-# this test has failed randomly (TODO)
-@pytest.mark.asyncio
+# earlier versions of this test (w earlier versions of Ray) has failed randomly
 @pytest.mark.parametrize("dummy_loop_parameter", range(1))
-@pytest.mark.parametrize("task_timeout_s", [0.001, 10.0])
-async def test_timeout_w_timeout(dummy_loop_parameter, task_timeout_s):
+@pytest.mark.parametrize("timeout_s", [0.001, 10.0])
+def test_timeout_w_timeout(dummy_loop_parameter: int, timeout_s: float):
     state_actor = StateActor.remote()  # type: ignore
 
-    task_duration_s = 0.2
+    task_duration_s = 0.5
 
-    def f(_: Any) -> int:
+    def f() -> int:
         time.sleep(task_duration_s)
 
-        # We should not get here *if* task is canceled by timeout
-        state_actor.add.remote("foo")
+        state_actor.add.remote("f not killed by timeout")
         return 123
 
-    f_timeout: Callable[[Any], Awaitable[Try[int]]] = try_f_with_timeout_guard(
-        f, timeout_s=task_timeout_s, num_cpus=1
-    )
+    # Wait for wrapped task to finish.
+    result = timeout_guard_wrapper(f, timeout_s=timeout_s, num_cpus=1)()
 
-    result: Try[int] = await f_timeout("dummy")
-
-    # Wait for task to finish
-    time.sleep(4.0)
-
-    state_has_flipped: bool = "foo" in await state_actor.get.remote()
-
-    if task_timeout_s < task_duration_s:
-        # f should have been canceled, and state should not have flipped
-        assert not state_has_flipped
-        assert "timeout" in str(result.error)
+    if timeout_s < task_duration_s:
+        # f should have been timed out, and f should not have finished executing
+        assert result == Failure(
+            Exception("Timeout error: execution did not finish within timeout limit")
+        )
+        assert ray.get(state_actor.get.remote()) == []
     else:
-        assert state_has_flipped
-        assert result == Try(123, None)
+        # f had time to fully execute
+        assert result == Success(123)
+        assert ray.get(state_actor.get.remote()) == ["f not killed by timeout"]
 
 
 ### ---- test Try implementation ----

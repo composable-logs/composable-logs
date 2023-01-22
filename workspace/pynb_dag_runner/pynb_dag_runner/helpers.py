@@ -107,13 +107,19 @@ def one(xs: Iterable[A]) -> A:
 # --- dict manipulation helper functions ---
 
 
-def del_key(a_dict: Mapping[A, B], key: A) -> Mapping[A, B]:
+def del_key(a_dict: Mapping[A, B], key: A, strict: bool = False) -> Mapping[A, B]:
     """
     Return new dictionary that is identical to `a_dict` with `key`
     removed (if `key` exists).
 
+    If strict = True, then an exception is thrown unless key in a_dict.
+
     Input dictionary is not modified.
     """
+    if strict and key not in a_dict:
+        raise ValueError(
+            f"del_key: strict is set and key='{key}' not a key in a_dict='{a_dict}'"
+        )
     return {k: v for k, v in a_dict.items() if k != key}
 
 
@@ -183,7 +189,7 @@ class Try(Generic[A]):
         return not self.is_success()
 
     def map_value(self, f):
-        """ "
+        """
         Return new Try where f has been applied to the value
         (or do nothing and return self for failure)
 

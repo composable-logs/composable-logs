@@ -170,10 +170,13 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     - "Support timeout option in Ray tasks"  https://github.com/ray-project/ray/issues/17451
     - "Set time-out on individual ray task" https://github.com/ray-project/ray/issues/15672
 
-    Note that we a Ray actor since this can be kill (unlike ordinary Ray
-    remote functions).
+    Notes:
+     - we a Ray actor since this can be kill (unlike ordinary Ray remote functions).
 
-    https://docs.ray.io/en/latest/actors.html#terminating-actors
+        https://docs.ray.io/en/latest/actors.html#terminating-actors
+
+     - timeout_guard_wrapper does not log the timeout_s
+
     """
 
     # We could do this, but then num_cpus allocation logic becomes more complex.
@@ -187,24 +190,24 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
 
     def make_call_with_timeout_guard(*args, **kwargs):
         tracer = otel.trace.get_tracer(__name__)  # type: ignore
-        with tracer.start_as_current_span("timeout-guard") as span:
+        with tracer.start_as_current_span("call-python-function") as span:
             work_actor = ExecActor.remote()  # type: ignore
             future = work_actor.call.remote(*args, **kwargs)
 
-            # TODO
+            # TODO: check Exception
             try:
                 result = ray.get(future, timeout=timeout_s)
-                span.set_status(Status(StatusCode.OK))
-                return result
             except Exception as e:
-                span.set_status(Status(StatusCode.ERROR, "Timeout"))
                 ray.kill(work_actor)
 
-                return Failure(
+                result = Failure(
                     Exception(
                         "Timeout error: execution did not finish within timeout limit"
                     )
                 )
+
+            result.log_outcome_to_opentelemetry_span(span)
+            return result
 
     return make_call_with_timeout_guard
 
