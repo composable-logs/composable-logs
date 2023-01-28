@@ -24,9 +24,9 @@ def render_seconds(us_range) -> str:
 
 def make_link_to_task_run(task_summary) -> str:
     # -- This is not provided during unit tests
-    if "pipeline.github.repository" in task_summary.attributes:
+    if "workflow.github.repository" in task_summary.attributes:
         repo_owner, repo_name = task_summary.attributes[
-            "pipeline.github.repository"
+            "workflow.github.repository"
         ].split("/")
 
         host = f"https://{repo_owner}.github.io/{repo_name}"

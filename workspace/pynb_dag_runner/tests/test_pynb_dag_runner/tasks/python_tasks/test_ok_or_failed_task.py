@@ -50,7 +50,7 @@ def get_spans(task_should_fail: bool) -> Spans:
                 return 123
 
         task: RemoteTaskP = task_from_python_function(
-            f, attributes={"pipeline.foo": "bar", "task.foo": "my_test_func"}
+            f, attributes={"workflow.foo": "bar", "task.foo": "my_test_func"}
         )
         [outcome] = start_and_await_tasks(
             [task], [task], timeout_s=10, arg="dummy value"
@@ -74,7 +74,7 @@ def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
     pipeline_summary = parse_spans(spans)
 
     assert pipeline_summary.task_dependencies == set()
-    assert pipeline_summary.attributes == {"pipeline.foo": "bar"}
+    assert pipeline_summary.attributes == {"workflow.foo": "bar"}
 
     for task_summary in [one(pipeline_summary.task_runs)]:  # type: ignore
         assert len(task_summary.logged_values) == 0
@@ -82,7 +82,7 @@ def test__python_task__ok_or_fail__parsed_spans(task_should_fail: bool):
 
         assert task_summary.is_success() == (not task_should_fail)
         assert task_summary.attributes == {
-            "pipeline.foo": "bar",
+            "workflow.foo": "bar",
             "task.foo": "my_test_func",
             "task.num_cpus": 1,
             "task.task_type": "Python",

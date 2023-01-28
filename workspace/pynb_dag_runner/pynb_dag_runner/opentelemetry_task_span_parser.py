@@ -405,24 +405,18 @@ def parse_spans(spans: Spans) -> PipelineSummary:
 
     Input is all OpenTelemetry spans logged for one pipeline run.
     """
-    pipeline_attributes = spans.get_attributes(
-        allowed_prefixes={
-            # old API (to be removed)
-            "pipeline.",
-            # new Ray workflow-based API
-            "workflow.",
-        }
-    )
+    pipeline_attributes = spans.get_attributes(allowed_prefixes={"workflow."})
 
     # TODO 1:
     # - potentially (top) span_id could also be passed into function as argument
     # - or, we could determine top node dynamically from input spans, provided it is unique
     #
     # TODO 2:
-    # - Move to have a top span for pipeline. use that for ID and time-ranges.
-    #   Currently we determine the time range dynamically for now, see below.
-    if "pipeline.pipeline_run_id" in pipeline_attributes:
-        top_span_id = pipeline_attributes["pipeline.pipeline_run_id"]
+    # - Move to have a top span for every workflow, and use that for span ID
+    #   to determine the time-ranges. Currently we determine the time range
+    #   dynamically for now, see below.
+    if "workflow.pipeline_run_id" in pipeline_attributes:
+        top_span_id = pipeline_attributes["workflow.pipeline_run_id"]
     else:
         top_span_id = "NO-TOP-SPAN--TEMP" + str(uuid.uuid4())
 

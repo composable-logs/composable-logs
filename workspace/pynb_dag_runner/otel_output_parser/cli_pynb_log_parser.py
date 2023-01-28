@@ -1,15 +1,13 @@
 from pathlib import Path
 from argparse import ArgumentParser
 
-#
+# -
 from pynb_dag_runner import version_string
 from pynb_dag_runner.helpers import read_json, write_json
 from pynb_dag_runner.opentelemetry_helpers import Spans
-from pynb_dag_runner.opentelemetry_task_span_parser import (
-    # get_pipeline_iterators,
-    # add_html_notebook_artefacts,
-    parse_spans,
-)
+from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
+
+# -
 from .mermaid_graphs import (
     make_mermaid_dag_inputfile,
     make_mermaid_gantt_inputfile,

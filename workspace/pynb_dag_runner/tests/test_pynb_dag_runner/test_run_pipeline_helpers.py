@@ -19,7 +19,7 @@ def github_env(monkeypatch):
 def test_get_github_env_variables(github_env):
     result = get_github_env_variables()
 
-    assert result["pipeline.github.actor"] == "someone"
-    assert result["pipeline.github.runner_name"] == "my-runner-vm-2"
+    assert result["workflow.github.actor"] == "someone"
+    assert result["workflow.github.runner_name"] == "my-runner-vm-2"
 
     assert "GITHUB_SHA" not in result.keys()

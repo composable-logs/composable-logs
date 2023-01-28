@@ -11,8 +11,6 @@ from pynb_dag_runner import version_string
 from pynb_dag_runner.helpers import dict_prefix_keys
 from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.opentelemetry_task_span_parser import (
-    # get_pipeline_iterators,
-    # add_html_notebook_artefacts,
     parse_spans,
     ArtifactName,
     ArtifactContent,
@@ -55,7 +53,7 @@ def get_recorded_spans_from_zip(zip_file_content: bytes) -> Spans:
     """
     Input:
        zip_file_content: bytes
-            byte-array with zip file created by pipeline run process with recorded
+            byte-array with zip file created by workflow run process with recorded
             OpenTelemetry spans recorded in a "opentelemetry-spans.json" file.
 
     Output:
@@ -78,21 +76,21 @@ def _write_artifacts(output_path: Path, artifacts):
 
 def process(spans: Spans, www_root: Path):
     pipeline_summary = parse_spans(spans)
-    print("> processing pipeline run", pipeline_summary.span_id)
+    print("> processing workflow run", pipeline_summary.span_id)
 
     pipeline_artifact_relative_root = (
-        Path("artifacts") / "pipeline" / pipeline_summary.span_id
+        Path("artifacts") / "workflow" / pipeline_summary.span_id
     )
 
-    # The below are not real artifacts logged during pipeline execution.
+    # The below are not real artifacts logged during workflow execution.
     # Normal artifacts (and logged values) are only logged on per-task level
-    # (and not on pipeline-level).
+    # (and not on workflow-level).
     #
     # Rather, these are assets generated for reporting/visualisation.
     #
-    # We want to generate these *after the pipeline has run* so these
+    # We want to generate these *after the workflow has run* so these
     # can be generated dynamically and updated independently without having
-    # to rerun the pipeline.
+    # to rerun the workflow.
     #
     reporting_artifacts = [
         ArtifactContent(
@@ -179,10 +177,10 @@ def process(spans: Spans, www_root: Path):
 
 
 def entry_point():
-    print(f"--- generate_static_data cli {version_string()} ---")
-    print("github_repository          :", args().github_repository)
-    print("zip_cache_dir              :", args().zip_cache_dir)
-    print("output_www_root_directory  :", args().output_www_root_directory)
+    print(f"--- generate_static_data cli (v. {version_string()})")
+    print(" - github_repository             :", args().github_repository)
+    print(" - zip_cache_dir                 :", args().zip_cache_dir)
+    print(" - output_www_root_directory     :", args().output_www_root_directory)
 
     entries = []
     for artifact_zip in github_repo_artifact_zips(
