@@ -27,7 +27,7 @@ def get_github_env_variables() -> Mapping[str, str]:
       from output).
 
     - In the returned dictionary, variables are placed in lower case and prefixed with
-      pipeline.github. For example, the key "pipeline.github.actor" contains the
+      workflow.github. For example, the key "workflow.github.actor" contains the
       Github username who triggered the task run.
     """
     gh_env_vars: List[str] = [
@@ -86,9 +86,14 @@ def get_github_env_variables() -> Mapping[str, str]:
         #
     ]
 
+    def get_var(env_variable: str) -> Optional[str]:
+        if any(s in env_variable.lower() for s in ["token", "secret", "password"]):
+            raise ValueError(f"Tried to inject potential secret {env_variable}")
+        return os.getenv(env_variable)
+
     return _dict_filter_none_values(
         {
-            "pipeline.github." + var.lower().replace("github_", ""): os.getenv(var)
+            "workflow.github." + var.lower().replace("github_", ""): get_var(var)
             for var in gh_env_vars
         }
     )

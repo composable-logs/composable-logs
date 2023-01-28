@@ -11,7 +11,7 @@ generate_static_data --help
 
 #### Expand one OpenTelemetry JSON into a directory structure (eg for debugging)
 ```bash
-# First: copy a pipeline trace JSON to opentelemetry-spans.json
+# First: copy a workflow trace JSON to opentelemetry-spans.json
 pynb_log_parser \
     --input_span_file opentelemetry-spans.json \
     --output_filepath_mermaid_gantt $(pwd)/out/gantt.mmd \
