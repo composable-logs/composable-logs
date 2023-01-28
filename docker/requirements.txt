@@ -1,5 +1,6 @@
 ray[default]==2.2.0
 notebook==6.5.2
+jupyter-client==7.3.5
 jupytext==1.14.4
 papermill==2.4.0
 opentelemetry-api==1.15.0
