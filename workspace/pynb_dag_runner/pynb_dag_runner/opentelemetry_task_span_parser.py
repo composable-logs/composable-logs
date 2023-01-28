@@ -271,10 +271,10 @@ class TaskRunSummary(p.BaseModel):
     #  - format "0x0123456789abcdef", 64 bit.
     span_id: OpenTelemetrySpanId
 
-    # The ID for the parent pipeline OpenTelemetry top span.
+    # The ID for the parent workflow OpenTelemetry top span.
     parent_span_id: OpenTelemetrySpanId
 
-    # eg "train-model", "evaluate-model", "ingest-data"
+    # eg "f", "train-model", "evaluate-model", "ingest-data"
     task_id: NonEmptyString
 
     exceptions: List[Any]
@@ -324,7 +324,7 @@ class TaskRunSummary(p.BaseModel):
         }
 
 
-# --- Data structure to represent: pipeline (of multiple tasks) run summary ---
+# --- Data structure to represent: workflow (of multiple tasks) run summary ---
 
 
 class PipelineSummary(p.BaseModel):
@@ -332,10 +332,10 @@ class PipelineSummary(p.BaseModel):
 
     timing: Timing
 
-    # pipeline-level attributes
+    # workflow-level attributes
     attributes: AttributeMapping
 
-    # summaries of all task runs than executed as part of pipeline
+    # summaries of all task runs than executed as part of workflow
     task_runs: List[TaskRunSummary]
 
     task_dependencies: Set[Any]
@@ -416,7 +416,7 @@ def parse_spans(spans: Spans) -> PipelineSummary:
     #   to determine the time-ranges. Currently we determine the time range
     #   dynamically for now, see below.
     if "workflow.pipeline_run_id" in pipeline_attributes:
-        top_span_id = pipeline_attributes["workflow.pipeline_run_id"]
+        top_span_id = pipeline_attributes["workflow.workflow_run_id"]
     else:
         top_span_id = "NO-TOP-SPAN--TEMP" + str(uuid.uuid4())
 

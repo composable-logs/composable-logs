@@ -120,7 +120,7 @@ def process(spans: Spans, www_root: Path):
     yield {
         "parent_span_id": None,
         "span_id": pipeline_summary.span_id,
-        "type": "pipeline",
+        "type": "workflow",
         **dict_prefix_keys("timing_", pipeline_summary.timing.as_dict()),
         "is_success": pipeline_summary.is_success(),
         "attributes": pipeline_summary.attributes,
