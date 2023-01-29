@@ -238,8 +238,10 @@ def task(
     timeout_s: Optional[float] = None,
 ):
     """
-    Wrapper to convert Python function into Ray remote function that can be included
-    in pynb-dag-runner Ray based DAG workflows.
+    Composable Logs wrapper to convert Python function into a Ray remote function that
+    can be run as a Ray Workflow.
+
+    Unlike the default Ray Workflow API we return f.bind and not f.
     """
     if not (timeout_s is None or timeout_s > 0):
         raise ValueError("timeout_s should be positive of None (no timeout)")
