@@ -8,38 +8,45 @@
 
 </div>
 
-# `composable-logs`
-# Composable Logs
 # `Composable Logs`
-# `Composable logs`
 
-***Composable Logs** is a Python library that can run ML/data pipelines on stateless compute infrastructure (that may be ephemeral or serverless).*
+> ***Composable Logs** is a Python library to run ML/data workflows on stateless compute infrastructure (that may be ephemeral or serverless).*
 
-This means that Composable Logs does not need a tracking server (or database) to record task outcomes (like logged ML metrics, models, artifacts).
-Instead, pipeline outputs are emitted using the [OpenTelemetry standard](https://opentelemetry.io/).
-Since structured logs can be directed to a file (as one option), this can be used to run pipelines on limited or no cloud infrastructure;
-after pipeline execution one only needs to preserve the structured logs.
+This means that Composable Logs can do ML experiment tracking, does it not need a tracking server (or database) to record ML metrics, models or artifacts.
+Instead, these are emitted using the **[OpenTelemetry standard](https://opentelemetry.io/)** for logging.
+This is an open standard in software engineering with growing support.
 
-### Documentation and architecture
+For example, log events emitted from Composable Logs can be directed to a JSON-file, or sent to any log storage supporting OpenTelemetry (span) events. In either case, one does not need a custom tracking service separate for ML experiments.
+
+Composable Logs uses the **[Ray framework](https://www.ray.io/ray-core)** for parallel task execution.
+
+### For more details:
+
+#### Documentation and architecture
 - **https://composable-logs.github.io/composable-logs**
 
-### Demo
-- The below shows a demo ML training pipeline that uses only Github infrastructure (that is: Github actions for compute; Build artifacts for storage; and Github Pages for reporting). This uses Composable Logs and a fork of MLFlow that can be deployed as a static website (see, https://github.com/composable-logs/mlflow).
+#### Live demo
+- Using Composable Logs one can run a ML training pipeline using only a free Github account. This uses:
+   - Github actions: trigger the ML pipeline daily and for each PR.
+   - Build artifacts: to store OpenTelemetry logs of past runs.
+   - Github Pages: to host static website for reporting on past runs.
+
+   The static website is rebuilt after each pipeline run (by extracting relevant data from past OpenTelemetry logs). This uses a fork of MLFlow that can be deployed as a static website, https://github.com/composable-logs/mlflow.
 
   [![Screenshot](https://composable-logs.github.io/composable-logs/live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png)](https://composable-logs.github.io/mnist-digits-demo-pipeline/)
 
 - Codes for pipeline (MIT): https://github.com/composable-logs/mnist-digits-demo-pipeline
 
-### Roadmap and project planning
+#### Public roadmap and planning
 - https://github.com/orgs/composable-logs/projects/2/views/3
 
-### Install via PyPI
+#### Install via PyPI
 
-#### Latest release
+##### Latest release
 - `pip install composable-logs`
 - https://pypi.org/project/composable-logs
 
-#### Snapshot of latest commit to main branch
+##### Snapshot of latest commit to main branch
 - `pip install composable-logs-snapshot`
 - https://pypi.org/project/composable-logs-snapshot
 
@@ -49,3 +56,5 @@ Any feedback/ideas welcome!
 
 ## License
 (c) Matias Dahl 2021-2022, MIT, see [LICENSE.md](./LICENSE.md).
+
+(Note: As of 1/2023 this project was renamed from `pynb-dag-runner` to `composable-logs`.)
