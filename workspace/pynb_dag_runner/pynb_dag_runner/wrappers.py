@@ -20,8 +20,6 @@ from pynb_dag_runner.tasks.task_opentelemetry_logging import ComposableLogsLogge
 
 # --- schemas ---
 
-A = TypeVar("A")
-
 
 class TaskResult(p.BaseModel):
     """

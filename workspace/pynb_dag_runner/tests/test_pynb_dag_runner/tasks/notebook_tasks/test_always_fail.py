@@ -1,7 +1,6 @@
-#
 import pytest
 
-#
+# -
 from pynb_dag_runner.helpers import one
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
@@ -9,10 +8,10 @@ from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
 from pynb_dag_runner.tasks.tasks import make_jupytext_task
 from pynb_dag_runner.wrappers import run_dag
 
-#
+# -
 from .nb_test_helpers import get_test_jupytext_nb
 
-#
+# -
 TEST_NOTEBOOK: JupytextNotebookContent = get_test_jupytext_nb("notebook_always_fail.py")
 TASK_PARAMETERS = {
     "task.injected_parameter": 123123,

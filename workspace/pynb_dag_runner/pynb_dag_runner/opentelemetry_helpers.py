@@ -16,13 +16,14 @@ from typing import (
 import glob, time
 from pathlib import Path
 
+# -
 # Note eg "from opentelemetry import trace" fails mypy
 import opentelemetry as otel
 from opentelemetry.trace.span import format_span_id, Span
 import dateutil.parser as dp  # type: ignore
 from opentelemetry import context, baggage  # type: ignore
 
-#
+# -
 from pynb_dag_runner.helpers import pairs, flatten, read_jsonl
 
 AttributesDict = Mapping[str, Any]

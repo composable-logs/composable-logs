@@ -1,17 +1,17 @@
 from typing import Optional, Mapping
 from pathlib import Path
 
-#
+# -
 import opentelemetry as otel
 from opentelemetry.trace.propagation.tracecontext import (
     TraceContextTextMapPropagator,
 )
 
-#
+# -
 from pynb_dag_runner.opentelemetry_helpers import AttributesDict
 from pynb_dag_runner.tasks.task_opentelemetry_logging import _log_named_value
 
-#
+# -
 from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
 from ..wrappers import task
 
