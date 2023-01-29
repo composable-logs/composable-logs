@@ -45,9 +45,6 @@ def extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
 
 # --- span parser ---
 
-PipelineDict = Mapping[str, Any]
-TaskDict = Mapping[str, Any]
-RunDict = Mapping[str, Any]
 ArtifactDict = Mapping[str, Any]  # {name, type, content} in decoded form
 
 
@@ -357,11 +354,11 @@ class PipelineSummary(p.BaseModel):
 
 
 def _task_run_iterator(
-    top_span_id: str, pipeline_attributes: Mapping[str, Any], spans: Spans
+    top_span_id: str, workflow_attributes: Mapping[str, Any], spans: Spans
 ) -> Iterable[TaskRunSummary]:
     for task_top_span in spans.filter(["name"], "execute-task").sort_by_start_time():
         task_attributes: Mapping[str, Any] = {
-            **pipeline_attributes,  # inherited attributes from pipeline
+            **workflow_attributes,  # inherited attributes from pipeline
             **(
                 spans.bound_inclusive(task_top_span)
                 # -
@@ -400,12 +397,12 @@ def _task_run_iterator(
 
 def parse_spans(spans: Spans) -> PipelineSummary:
     """
-    Parse spans into an easy to use object summarising outcomes of pipeline and
-    individual tasks.
+    Parse spans into an easy to use object that summarises a workflow run and
+    individual tasks in the workflow.
 
-    Input is all OpenTelemetry spans logged for one pipeline run.
+    Input is all OpenTelemetry spans logged for a workflow run.
     """
-    pipeline_attributes = spans.get_attributes(allowed_prefixes={"workflow."})
+    workflow_attributes = spans.get_attributes(allowed_prefixes={"workflow."})
 
     # TODO 1:
     # - potentially (top) span_id could also be passed into function as argument
@@ -415,19 +412,19 @@ def parse_spans(spans: Spans) -> PipelineSummary:
     # - Move to have a top span for every workflow, and use that for span ID
     #   to determine the time-ranges. Currently we determine the time range
     #   dynamically for now, see below.
-    if "workflow.pipeline_run_id" in pipeline_attributes:
-        top_span_id = pipeline_attributes["workflow.workflow_run_id"]
+    if "workflow.pipeline_run_id" in workflow_attributes:
+        top_span_id = workflow_attributes["workflow.workflow_run_id"]
     else:
         top_span_id = "NO-TOP-SPAN--TEMP" + str(uuid.uuid4())
 
     return PipelineSummary(
         span_id=top_span_id,
         task_dependencies=extract_task_dependencies(spans),
-        attributes=pipeline_attributes,
+        attributes=workflow_attributes,
         # TODO: get time range from top span
         timing=Timing(
             start_time_iso8601=min(span["start_time"] for span in spans),
             end_time_iso8601=max(span["end_time"] for span in spans),
         ),
-        task_runs=list(_task_run_iterator(top_span_id, pipeline_attributes, spans)),
+        task_runs=list(_task_run_iterator(top_span_id, workflow_attributes, spans)),
     )

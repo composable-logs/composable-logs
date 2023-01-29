@@ -135,7 +135,7 @@ def test__jupytext__otel_logging_from_notebook__validate_cli_tool(
     assert len(set(filenames)) == len(filenames) - 1
 
     assert set(filenames) == {
-        # --- one task in pipeline run ---
+        # --- one task is executed in this workflow run ---
         "run-time-metadata.json",
         # --- files for single run of task ---
         "run-time-metadata.json",  # same as above, not ideal

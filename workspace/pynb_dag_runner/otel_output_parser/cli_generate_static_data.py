@@ -76,7 +76,7 @@ def process(spans: Spans, www_root: Path):
     workflow_summary = parse_spans(spans)
     print("> processing workflow run", workflow_summary.span_id)
 
-    pipeline_artifact_relative_root = (
+    workflow_artifact_relative_root = (
         Path("artifacts") / "workflow" / workflow_summary.span_id
     )
 
@@ -114,7 +114,8 @@ def process(spans: Spans, www_root: Path):
     ]
 
     # TODO: The below dict:s are optimised for UI/reporting. They are slightly
-    # different from the summary dict created at pipeline runtime.
+    # different from the generic summary dict:s created when parsing workflow
+    # runtime logs.
     yield {
         "parent_span_id": None,
         "span_id": workflow_summary.span_id,
@@ -125,7 +126,7 @@ def process(spans: Spans, www_root: Path):
         "artifacts": [
             artifact.metadata_as_dict()
             for artifact in _write_artifacts(
-                output_path=www_root / pipeline_artifact_relative_root,
+                output_path=www_root / workflow_artifact_relative_root,
                 artifacts=reporting_artifacts,
             )
         ],
