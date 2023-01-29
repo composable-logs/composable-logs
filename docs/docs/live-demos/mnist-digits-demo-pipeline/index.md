@@ -6,9 +6,9 @@ hide:
 
 A main goal of `pynb-dag-runner` is to make it easy to deploy data/ml pipelines with no (or with minimal) cloud infrastructure.
 
-Currently there is one live demo pipeline `mnist-digits-demo-pipeline` illustrating this in practice.
+Currently there is one live demo `mnist-digits-demo-pipeline` illustrating this in practice.
 
-## Demo pipeline: `mnist-digits-demo-pipeline`
+## Demo ML training pipeline: `mnist-digits-demo-pipeline`
 
 **Public experiment tracker (hosted on Github Pages):** [https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline<sup><sup><sub>:material-launch:</sub></sup></sup>](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
 
@@ -29,7 +29,7 @@ Currently there is one live demo pipeline `mnist-digits-demo-pipeline` illustrat
 - [x] Outcomes of pipeline runs (both scheduled- and PR- pipeline runs) can be inspected in the Experiment tracker (see above, this is hosted as a static website and build using a fork of MLFlow).
 
 This setup could be used to run public open source -- open data pipelines using only a free personal Github account.
-### Pipeline task DAG
+### Task DAG
 
 This pipeline trains a model for recognizing hand written digits from a toy MNIST data set included in sklearn library.
 
@@ -70,7 +70,7 @@ graph LR
 ### Architecture and use of Github services
 
 A special feature of the below architecture is that each run of the pipeline can be executed serverless using ephemeral compute resources.
-So, after a pipeline has run, we only need to persist the (OpenTelemetry) logs of that run, and those are stored as one immutable JSON file per pipeline run.
+So, after a pipeline has run, we only need to persist the (OpenTelemetry) logs of that run, and those are stored as one immutable JSON-file per pipeline run.
 
 In other words, the architecture does not include any tracking servers that need to run 24/7 (eg. for task execution, like Airflow) or for experiment tracking (eg. for ML tracking, like an MLFlow backend).
 In particular, the architecture does not include any databases.
@@ -79,7 +79,7 @@ In particular, the architecture does not include any databases.
 graph BT;
 
 subgraph "Laptop"
-    laptop[Local pipeline <br> development]
+    laptop[Local development]
 end
 
 subgraph "Github services"
@@ -88,7 +88,7 @@ subgraph "Github services"
        subgraph "Github hosted actions runner (2 CPU, 7 GB RM, 14 GB SSD)"
           subgraph "Ray cluster"
             tests[Tests <br> Unit, Type checks, Formatting]
-            run_pipeline["Run pynb-dag-runner pipeline"]
+            run_pipeline["Run pynb-dag-runner workflow"]
             otel_logs["OpenTelemetry logged spans<br>(inc. logged notebooks, images, metrics, and artifacts)"]
           end
        end
@@ -122,8 +122,19 @@ Internet --> web_static_mlflow
 !!! info
     The demo does not deploy the trained model as an REST API, but the trained model is saved in ONNX format. Thus, it could eg. be included into a website.
 
+#### Notes and possible limitations
+- Compute resources provided for free by Github are limited. This could be improved with a more powerful self-hosted runner.
+- The logs from the demo training pipeline are published as build artifacts to a public repo.
+    - Thus, if any secrets are used in the pipeline, this require special care.
+    - For public Github repos, build artifacts have maximum retention period of 90 days.
+- The Experiment tracker UI is deployed as a public website. Making this private is possible. Either with a custom service. Github Pages can also be made private with a premium [Github subscription](https://docs.github.com/en/enterprise-cloud@latest/pages/getting-started-with-github-pages/changing-the-visibility-of-your-github-pages-site).
 
-### Run the pipeline locally
+These limitations could be addressed by introducing cloud infrastructure and customization.
+
+### Run locally
+
+#### From command line
+The training pipeline can be run either from the command line (as done in CI automation):
 
 ``` bash
 git clone --recurse-submodules git@github.com:pynb-dag-runner/mnist-digits-demo-pipeline.git
@@ -139,19 +150,11 @@ make clean
 make test-and-run-pipeline
 ```
 
-**Notes**
+#### VS Code setup
+For development, the training workflow (and associated unit tests and type checking) can run in watch mode in VS Code. See the repo for further [instructions](https://github.com/composable-logs/mnist-digits-demo-pipeline).
 
-- After the pipeline has run, results and outputs can be inspected in the `pipeline-outputs`-directory.
+*/insert screenshot/*
+
+###### Notes
+- After the training pipeline has run, results and outputs can be inspected in the `pipeline-outputs`-directory.
 - For further details, please see the [mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline) repo.
-- In the above, `make test-and-run-pipeline` is currently slow.
-  Please see [Next steps](../next-steps/) for plans to address this.
-
-### Notes and possible limitations
-- Compute resources provided for free by Github are limited. This could be improved with a more powerful self-hosted runner.
-- The demo pipeline run logs are published as build artifacts to a public repo.
-    - Thus, if any secrets are used in the pipeline, this require special care.
-    - For public Github repos, build artifacts have maximum retention period of 90 days.
-- The Experiment tracker UI is a public website. Making the website private requires a premium [Github subscription](https://docs.github.com/en/enterprise-cloud@latest/pages/getting-started-with-github-pages/changing-the-visibility-of-your-github-pages-site).
-
-These limitations could be addressed by introducing cloud infrastructure and customization.
-On the other hand, in that case there are also many other options.

@@ -13,9 +13,6 @@
 
 !!! info
     As motivation for supporting notebooks, there are already Python libraries like [Evidently<sup><sup><sub>:material-launch:</sub></sup></sup>](https://evidentlyai.com/) and [Pandas profiling<sup><sup><sub>:material-launch:</sub></sup></sup>](https://pandas-profiling.ydata.ai) that generate interactive dashboards/UIs inside Jupyter.
-    Thus, deploying a public notebook pipeline (as made possible by `pynb-dag-runner`) can be seen as a first step towards a public dashboard.
+    Thus, deploying a public pipeline using `pynb-dag-runner` can be used to deploy a first version of a public dashboard.
 
-    A few developments further motivate this direction:
-
-    - JupyterLite make it possible to run Jupyter server in the browser; see [Possible Futures for Jupyter, PyData 7/2022 (YouTube, 20 mins)](https://www.youtube.com/watch?v=4041pEGsW6w). JupyterLite does not yet seem to be supported by existing Jupyter dashboard libraries, but there are initial work in this direction, see eg [link](https://github.com/holoviz/panel/issues/3605).
-    - Since Python 3.11 (released 7/2022) includes experimental support for [WebAssembly<sup><sup><sub>:material-launch:</sub></sup></sup>](https://docs.python.org/3.11/whatsnew/3.11.html), it might  in the future become easier to do front-end development directly in Python.
+    Further: JupyterLite make it possible to run Jupyter server in the browser; see [Possible Futures for Jupyter, PyData 7/2022 (YouTube, 20 mins)](https://www.youtube.com/watch?v=4041pEGsW6w). JupyterLite does not yet seem to be supported by existing Jupyter dashboard libraries, but there are initial work in this direction, see eg [link](https://github.com/holoviz/panel/issues/3605). This could make it possible to deploy interactive dashboards using `pynb-dag-runner`.

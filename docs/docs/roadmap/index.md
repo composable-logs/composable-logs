@@ -1,7 +1,12 @@
 # Roadmap
 
-**A current main themes (9/2022) is to simplify usage (and reduce the code base).**
+Main topics (as of 1/2023)
 
-For more details, please see the public [Github project<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/orgs/pynb-dag-runner/projects/2/views/3) tracker with planned upcoming tasks. Input welcome.
+- Major refactoring recently completed to use Ray Workflows. Thus some cleanup and reorgs to be expected.
+- Support logging using ML Flow client.
 
-If you interested in contributing or using this, see also [Contact](../contact).
+For more details, please see the [public roadmap<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/orgs/pynb-dag-runner/projects/2/views/3) planning upcoming tasks.
+
+Any input or feedback is welcome.
+
+If you interested in contributing, see also [Contact](../contact).
