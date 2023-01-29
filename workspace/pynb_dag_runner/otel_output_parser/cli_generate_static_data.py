@@ -73,11 +73,11 @@ def _write_artifacts(output_path: Path, artifacts):
 
 
 def process(spans: Spans, www_root: Path):
-    pipeline_summary = parse_spans(spans)
-    print("> processing workflow run", pipeline_summary.span_id)
+    workflow_summary = parse_spans(spans)
+    print("> processing workflow run", workflow_summary.span_id)
 
-    pipeline_artifact_relative_root = (
-        Path("artifacts") / "workflow" / pipeline_summary.span_id
+    workflow_artifact_relative_root = (
+        Path("artifacts") / "workflow" / workflow_summary.span_id
     )
 
     # The below are not real artifacts logged during workflow execution.
@@ -109,35 +109,36 @@ def process(spans: Spans, www_root: Path):
         ArtifactContent(
             name="run-time-metadata.json",
             type="utf-8",
-            content=json.dumps(pipeline_summary.as_dict(), indent=2),
+            content=json.dumps(workflow_summary.as_dict(), indent=2),
         ),
     ]
 
     # TODO: The below dict:s are optimised for UI/reporting. They are slightly
-    # different from the summary dict created at pipeline runtime.
+    # different from the generic summary dict:s created when parsing workflow
+    # runtime logs.
     yield {
         "parent_span_id": None,
-        "span_id": pipeline_summary.span_id,
+        "span_id": workflow_summary.span_id,
         "type": "workflow",
-        **dict_prefix_keys("timing_", pipeline_summary.timing.as_dict()),
-        "is_success": pipeline_summary.is_success(),
-        "attributes": pipeline_summary.attributes,
+        **dict_prefix_keys("timing_", workflow_summary.timing.as_dict()),
+        "is_success": workflow_summary.is_success(),
+        "attributes": workflow_summary.attributes,
         "artifacts": [
             artifact.metadata_as_dict()
             for artifact in _write_artifacts(
-                output_path=www_root / pipeline_artifact_relative_root,
+                output_path=www_root / workflow_artifact_relative_root,
                 artifacts=reporting_artifacts,
             )
         ],
     }
 
-    for task_run_summary in pipeline_summary.task_runs:
+    for task_run_summary in workflow_summary.task_runs:
         task_artifact_relative_root = (
             Path("artifacts") / "task" / task_run_summary.span_id
         )
         print(" - task", task_artifact_relative_root)
         yield {
-            "parent_span_id": pipeline_summary.span_id,
+            "parent_span_id": workflow_summary.span_id,
             "span_id": task_run_summary.span_id,
             "type": "task",
             "task_id": task_run_summary.task_id,

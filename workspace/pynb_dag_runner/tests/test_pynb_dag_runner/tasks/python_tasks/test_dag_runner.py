@@ -39,10 +39,10 @@ def test_opentelemetry_baggage_convert_into_strings():
             )
 
     assert len(rec.spans.exception_events()) == 0
-    pipeline_summary = parse_spans(rec.spans)
+    workflow_summary = parse_spans(rec.spans)
 
     # baggage does not modify paramters
-    assert pipeline_summary.attributes == workflow_parameters_out
+    assert workflow_summary.attributes == workflow_parameters_out
 
 
 # --- Check the following DAG ---
@@ -90,16 +90,16 @@ def cl__can_compose_spans() -> Spans:
 
 
 def test__cl__can_compose(cl__can_compose_spans: Spans):
-    pipeline_summary = parse_spans(cl__can_compose_spans)
+    workflow_summary = parse_spans(cl__can_compose_spans)
 
-    assert pipeline_summary.attributes == {"workflow.env": "xyz"}
+    assert workflow_summary.attributes == {"workflow.env": "xyz"}
 
-    assert len(pipeline_summary.task_runs) == 3
+    assert len(workflow_summary.task_runs) == 3
 
     span_id_to_task_id: Dict[str, str] = {}
 
     # check logged workflow and task attributes
-    for task_summary in pipeline_summary.task_runs:  # type: ignore
+    for task_summary in workflow_summary.task_runs:  # type: ignore
         assert task_summary.is_success()
 
         # assert that task has expected attributes logged
@@ -117,8 +117,8 @@ def test__cl__can_compose(cl__can_compose_spans: Spans):
         span_id_to_task_id[task_summary.span_id] = task_id
 
     # check logged task dependencies
-    assert len(pipeline_summary.task_dependencies) == 2
-    for span_id_from, span_id_to in pipeline_summary.task_dependencies:
+    assert len(workflow_summary.task_dependencies) == 2
+    for span_id_from, span_id_to in workflow_summary.task_dependencies:
         task_id_from = span_id_to_task_id[span_id_from]
         task_id_to = span_id_to_task_id[span_id_to]
 

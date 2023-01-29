@@ -45,13 +45,13 @@ def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
     """
     print(" - Writing tasks in spans to ", out_basepath)
 
-    pipeline_summary = parse_spans(spans)
+    workflow_summary = parse_spans(spans)
 
     write_json(
-        safe_path(out_basepath / "run-time-metadata.json"), pipeline_summary.as_dict()
+        safe_path(out_basepath / "run-time-metadata.json"), workflow_summary.as_dict()
     )
 
-    for task_run_summary in pipeline_summary.task_runs:
+    for task_run_summary in workflow_summary.task_runs:
         # -- write json with task-specific data --
         if task_run_summary.attributes["task.task_type"] == "jupytext":
             task_dir: str = "--".join(

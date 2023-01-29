@@ -35,10 +35,10 @@ def spans() -> Spans:
 
 
 def test__jupytext__always_fail__parse_spans(spans: Spans):
-    pipeline_summary = parse_spans(spans)
+    workflow_summary = parse_spans(spans)
 
     # assert there is one task
-    task_summary = one(pipeline_summary.task_runs)
+    task_summary = one(workflow_summary.task_runs)
 
     # assert that exception is logged
     assert not task_summary.is_success()

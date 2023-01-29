@@ -159,9 +159,9 @@ def spans_to_test_otel_loggging() -> Spans:
 def test__task_logger__parse_logged_values_from_three_python_tasks(
     spans_to_test_otel_loggging: Spans,
 ):
-    pipeline_summary = parse_spans(spans_to_test_otel_loggging)
+    workflow_summary = parse_spans(spans_to_test_otel_loggging)
 
-    for task_summary in pipeline_summary.task_runs:  # type: ignore
+    for task_summary in workflow_summary.task_runs:  # type: ignore
 
         def check_logged_value(value_name, value_type, value):
             assert task_summary.logged_values[value_name] == LoggedValueContent(

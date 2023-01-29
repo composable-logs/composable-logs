@@ -60,12 +60,12 @@ def test__python_task__parallel_tasks_are_queued_based_on_available_ray_worker_c
     spans: Spans,
 ):
 
-    pipeline_summary = parse_spans(spans)
-    assert len(pipeline_summary.task_runs) == 4
+    workflow_summary = parse_spans(spans)
+    assert len(workflow_summary.task_runs) == 4
 
     task_runtime_ranges = []
 
-    for task_summary in pipeline_summary.task_runs:  # type: ignore
+    for task_summary in workflow_summary.task_runs:  # type: ignore
         assert task_summary.is_success()
         assert len(task_summary.logged_artifacts) == 0
         assert len(task_summary.logged_values) == 0
@@ -79,7 +79,7 @@ def test__python_task__parallel_tasks_are_queued_based_on_available_ray_worker_c
 
     # Check 1: with only 2 CPU:s (reserved for unit tests, see ray.init call)
     # running the above tasks with no constraints should take > 1 secs.
-    assert pipeline_summary.timing.get_duration_s() > 1.0
+    assert workflow_summary.timing.get_duration_s() > 1.0
 
     # Check 2: since only 2 CPU:s are reserved (for unit tests, see above)
     # the intersection of three runtime ranges should always be empty.
