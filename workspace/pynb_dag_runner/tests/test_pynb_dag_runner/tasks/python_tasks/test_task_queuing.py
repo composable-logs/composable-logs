@@ -36,7 +36,7 @@ def spans() -> Spans:
     #
     # TODO
     #  - is this still correct with new Ray workflow based execution?
-    #  - replace with the pynb-dag-runner logger?
+    #  - replace with the composable-logs logger?
 
     def f():
         tracer = ot.trace.get_tracer(__name__)

@@ -35,7 +35,7 @@ def get_github_env_variables() -> Mapping[str, str]:
         # ===== repository level metadata =====
         #
         "GITHUB_REPOSITORY",
-        # eg. "pynb-dag-runner/mnist-digits-demo-pipeline"
+        # eg. "composable-logs/mnist-digits-demo-pipeline"
         #
         #
         # ===== gha job level metadata =====

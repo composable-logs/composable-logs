@@ -1,4 +1,4 @@
-- `pynb-dag-runner` supports tasks defined in Jupyter Python notebooks, but can also run pure Python tasks (to verify)
+- Composable Logs supports tasks defined in Jupyter Python notebooks, but can also run pure Python tasks (to verify)
 - All tasks in the [demo pipeline](/live-demos/mnist-digits-demo-pipeline/) are notebooks.
 - In git, notebooks source files (with code) are assumed to be in the [Jupytext<sup><sup><sub>:material-launch:</sub></sup></sup>](https://jupytext.readthedocs.io/en/latest/) format.
 - Jupytext notebook source files:
@@ -13,6 +13,6 @@
 
 !!! info
     As motivation for supporting notebooks, there are already Python libraries like [Evidently<sup><sup><sub>:material-launch:</sub></sup></sup>](https://evidentlyai.com/) and [Pandas profiling<sup><sup><sub>:material-launch:</sub></sup></sup>](https://pandas-profiling.ydata.ai) that generate interactive dashboards/UIs inside Jupyter.
-    Thus, deploying a public pipeline using `pynb-dag-runner` can be used to deploy a first version of a public dashboard.
+    Thus, deploying a public pipeline using Composable Logs can be used to deploy a first version of a public dashboard.
 
-    Further: JupyterLite make it possible to run Jupyter server in the browser; see [Possible Futures for Jupyter, PyData 7/2022 (YouTube, 20 mins)](https://www.youtube.com/watch?v=4041pEGsW6w). JupyterLite does not yet seem to be supported by existing Jupyter dashboard libraries, but there are initial work in this direction, see eg [link](https://github.com/holoviz/panel/issues/3605). This could make it possible to deploy interactive dashboards using `pynb-dag-runner`.
+    Further: JupyterLite make it possible to run Jupyter server in the browser; see [Possible Futures for Jupyter, PyData 7/2022 (YouTube, 20 mins)](https://www.youtube.com/watch?v=4041pEGsW6w). JupyterLite does not yet seem to be supported by existing Jupyter dashboard libraries, but there are initial work in this direction, see eg [link](https://github.com/holoviz/panel/issues/3605). This could make it possible to deploy interactive dashboards using Composable Logs.

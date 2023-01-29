@@ -1,7 +1,7 @@
-## Set up local dev environment for local development the main `pynb-dag-runner`library.
+## Set up local dev environment for local development the main `composable-logs` library.
 
 ### In VS Code
-- Open the root of the `pynb-dag-runner` repository in VS Code.
+- Open the root of the `composable-logs` repository in VS Code.
 - In the repo root run `make build-docker-images`.
 - Ensure that the extension "Remote - Containers" (`ms-vscode-remote.remote-containers` published by Microsoft) is installed.
 - Press the `><`-button in the lower left VS Code window corner. Select "Reopen in container".

@@ -1,5 +1,5 @@
-site_name: pynb-dag-runner
-site_url: https://pynb-dag-runner.github.io/pynb-dag-runner/
+site_name: Composable Logs
+site_url: https://composable-logs.github.io/composable-logs/
 
 markdown_extensions:
   # --- below from ---
@@ -72,8 +72,8 @@ theme:
   # https://squidfunk.github.io/mkdocs-material/setup/changing-the-logo-and-icons/#__tabbed_1_2
   #
 
-repo_url: https://github.com/pynb-dag-runner/pynb-dag-runner
-repo_name: pynb-dag-runner
+repo_url: https://github.com/composable-logs/composable-logs
+repo_name: composable-logs
 
 # Disable "Edit" button linking to Github, see
 # https://www.mkdocs.org/user-guide/configuration/

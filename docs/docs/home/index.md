@@ -4,37 +4,37 @@ hide:
   - toc
 ---
 
-# What is `pynb-dag-runner`?
+# What is `Composable Logs`?
 
-**`pynb-dag-runner`** is an open source Python framework for running Python ML/data workflows.
+**Composable Logs** is an open source Python framework for running Python ML/data workflows.
 
-A main feature of `pynb-dag-runner` is that workflows can execute on stateless compute infrastructure (that may be ephemeral, serverless).
+A main feature of Composable Logs is that workflows can execute on stateless compute infrastructure (that may be ephemeral, serverless).
 So, a 24/7 running database or service to record past runs or metrics is not needed.
-Rather, when `pynb-dag-runner` executes a workflow, all key events (and logged artifacts) are emitted using the [OpenTelemetry standard<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io/).
+Rather, when Composable Logs executes a workflow, all key events (and logged artifacts) are emitted using the [OpenTelemetry standard<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io/).
 Thus, after a workflow has completed, an immutable record of the run can be persisted as a JSON file to a data lake (as one storage option).
 
 For reporting and experiment tracking, the structured logs can be converted into various formats.
-Currently, `pynb-dag-runner` can convert logs into a static website that can be deployed eg. to Github Pages.
+Currently, Composable Logs can convert logs into a static website that can be deployed eg. to Github Pages.
 
-`pynb-dag-runner` is distributed under the terms of the MIT license, see [repo](https://github.com/composable-logs/composable-logs) for details.
+## Open source
 
-## `pynb-dag-runner` is open source
+Composable Logs is distributed under the terms of the MIT license, see [repo](https://github.com/composable-logs/composable-logs) for details.
 
-The two main dependencies are:
+There are two main dependencies:
 
 #### The [Ray framework<sup><sup><sub>:material-launch:</sub></sup></sup>](https://www.ray.io/ray-core) for parallel execution of Python tasks (open source)
 Ray makes it possible to develop and test code locally on a laptop. And the same code also scales up to large Ray clusters with multiple nodes. Ray natively supports cluster setup on AWS, Azure, GCP and Kubernetes, see  [details<sup><sup><sub>:material-launch:</sub></sup></sup>](https://docs.ray.io/en/latest/cluster/deploy.html).
 
-More in detail, `pynb-dag-runner` uses Ray Workflows. These are essentially DAG:s of Python tasks, but
+More in detail, Composable Logs uses Ray Workflows. These are essentially DAG:s of Python tasks, but
 Ray Workflows also support more advanced patterns like computational DAG:s being created dynamically at runtime, or task recursion. As of 1/2023, Ray Workflows is still an alpha feature, see [documentation](https://docs.ray.io/en/latest/workflows/index.html).
 
 
 !!! info
-    Currently, all example usages of `pynb-dag-runner` are static DAG:s and in this documentation we use pipeline and workflow almost interchangeably. However, with workflow we emphasize that a pipeline is implemented (or executed) as a Ray workflow and could potentially be more involved than a static DAG.
+    Currently, all example usages of Composable Logs are static DAG:s and in this documentation we use pipeline and workflow almost interchangeably. However, with workflow we emphasize that a pipeline is implemented (or executed) as a Ray workflow and could potentially be more involved than a static DAG.
 
-    As of 1/2023: some modifications would be expected for `pynb-dag-runner` to execute workflows on multinode clusters, or to implement non-static DAGs.
+    As of 1/2023: some modifications would be expected for Composable Logs to execute workflows on multinode clusters, or to implement non-static DAGs.
 
-#### The [OpenTelemetry open standard<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io) for observability and logging task execution details
+#### The [OpenTelemetry<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io) for observability and logging task execution details (open standard)
 
 
 - OpenTelemetry is an open standard and an CNCF incubating project.
@@ -103,7 +103,7 @@ end
 
 ## Demo ML training workflow
 
-One motivation for developing `pynb-dag-runner` is to have a framework to run workflows on limited or no cloud infrastructure.
+One motivation for developing Composable Logs is to have a framework to run workflows on limited or no cloud infrastructure.
 The [Demo workflow](../live-demos/mnist-digits-demo-pipeline/)-section in this documentation describe in more detail
 how one eg. deploy and run a workflow using only services provided with a (free, personal) Github account.
 
@@ -122,7 +122,7 @@ how one eg. deploy and run a workflow using only services provided with a (free,
 
 ## Use cases and scope
 
-- `pynb-dag-runner` can currently run public data/ML pipelines using only services provided with a (free, personal) Github account.
+- Composable Logs can currently run public data/ML pipelines using only services provided with a (free, personal) Github account.
   Since this can be scheduled to run daily, one could:
 
     - Run (smaller scale) public data pipelines that process and report on open data.

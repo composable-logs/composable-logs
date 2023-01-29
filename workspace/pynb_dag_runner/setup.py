@@ -98,7 +98,7 @@ setup(
             "generate_static_data = otel_output_parser.cli_generate_static_data:entry_point",
         ],
     },
-    url="https://github.com/pynb-dag-runner/pynb-dag-runner",
+    url="https://github.com/composable-logs/composable-logs",
     install_requires=(Path("/home/host_user/requirements.txt").read_text().split("\n")),
     packages=find_packages(exclude=["tests", "tests.*"]),
 )

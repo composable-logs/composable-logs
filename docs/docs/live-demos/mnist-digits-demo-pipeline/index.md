@@ -4,19 +4,19 @@ hide:
   - toc
 ---
 
-A main goal of `pynb-dag-runner` is to make it easy to deploy data/ml pipelines with no (or with minimal) cloud infrastructure.
+One goal of Composable Logs is to make it easy to deploy data/ml pipelines with no (or with minimal) cloud infrastructure.
 
 Currently there is one live demo `mnist-digits-demo-pipeline` illustrating this in practice.
 
 ## Demo ML training pipeline: `mnist-digits-demo-pipeline`
 
-**Public experiment tracker (hosted on Github Pages):** [https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline<sup><sup><sub>:material-launch:</sub></sup></sup>](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+**Public experiment tracker (hosted on Github Pages):** [https://composable-logs.github.io/mnist-digits-demo-pipeline<sup><sup><sub>:material-launch:</sub></sup></sup>](https://composable-logs.github.io/mnist-digits-demo-pipeline/)
 
 <figure markdown>
-  [![screenshot-task-list.png](screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+  [![screenshot-task-list.png](screenshot-task-list.png){ width="800"}](https://composable-logs.github.io/mnist-digits-demo-pipeline/)
 </figure>
 
-**Code repo:** [https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline)
+**Code repo:** [https://github.com/composable-logs/mnist-digits-demo-pipeline<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/composable-logs/mnist-digits-demo-pipeline)
 
 ### Main features
 
@@ -88,7 +88,7 @@ subgraph "Github services"
        subgraph "Github hosted actions runner (2 CPU, 7 GB RM, 14 GB SSD)"
           subgraph "Ray cluster"
             tests[Tests <br> Unit, Type checks, Formatting]
-            run_pipeline["Run pynb-dag-runner workflow"]
+            run_pipeline["Run composable-logs workflow"]
             otel_logs["OpenTelemetry logged spans<br>(inc. logged notebooks, images, metrics, and artifacts)"]
           end
        end
@@ -137,7 +137,7 @@ These limitations could be addressed by introducing cloud infrastructure and cus
 The training pipeline can be run either from the command line (as done in CI automation):
 
 ``` bash
-git clone --recurse-submodules git@github.com:pynb-dag-runner/mnist-digits-demo-pipeline.git
+git clone --recurse-submodules git@github.com:composable-logs/mnist-digits-demo-pipeline.git
 
 cd mnist-digits-demo-pipeline
 make build-docker-images
@@ -157,4 +157,4 @@ For development, the training workflow (and associated unit tests and type check
 
 ###### Notes
 - After the training pipeline has run, results and outputs can be inspected in the `pipeline-outputs`-directory.
-- For further details, please see the [mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline) repo.
+- For further details, please see the [mnist-digits-demo-pipeline](https://github.com/composable-logs/mnist-digits-demo-pipeline) repo.
