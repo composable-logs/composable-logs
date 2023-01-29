@@ -10,7 +10,6 @@ from pynb_dag_runner.notebooks_helpers import (
     JupyterIpynbNotebook,
     convert_ipynb_to_html,
     JupytextNotebookContent,
-    JupyterIpynbNotebookContent,
 )
 from pynb_dag_runner.helpers import read_json
 
