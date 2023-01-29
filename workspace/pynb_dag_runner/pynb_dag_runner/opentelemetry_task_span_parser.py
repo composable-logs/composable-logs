@@ -321,10 +321,10 @@ class TaskRunSummary(p.BaseModel):
         }
 
 
-# --- Data structure to represent: workflow (of multiple tasks) run summary ---
+# --- Data structure to represent summary of an executed workflow (of multiple tasks) ---
 
 
-class PipelineSummary(p.BaseModel):
+class WorkflowSummary(p.BaseModel):
     span_id: OpenTelemetrySpanId
 
     timing: Timing
@@ -395,7 +395,7 @@ def _task_run_iterator(
         )
 
 
-def parse_spans(spans: Spans) -> PipelineSummary:
+def parse_spans(spans: Spans) -> WorkflowSummary:
     """
     Parse spans into an easy to use object that summarises a workflow run and
     individual tasks in the workflow.
@@ -412,12 +412,12 @@ def parse_spans(spans: Spans) -> PipelineSummary:
     # - Move to have a top span for every workflow, and use that for span ID
     #   to determine the time-ranges. Currently we determine the time range
     #   dynamically for now, see below.
-    if "workflow.pipeline_run_id" in workflow_attributes:
+    if "workflow.workflow_run_id" in workflow_attributes:
         top_span_id = workflow_attributes["workflow.workflow_run_id"]
     else:
         top_span_id = "NO-TOP-SPAN--TEMP" + str(uuid.uuid4())
 
-    return PipelineSummary(
+    return WorkflowSummary(
         span_id=top_span_id,
         task_dependencies=extract_task_dependencies(spans),
         attributes=workflow_attributes,
