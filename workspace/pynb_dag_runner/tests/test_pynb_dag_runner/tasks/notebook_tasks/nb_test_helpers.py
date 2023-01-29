@@ -1,8 +1,6 @@
 from pathlib import Path
 
-#
-from pynb_dag_runner.tasks.tasks import make_jupytext_task_ot
-from pynb_dag_runner.notebooks_helpers import JupytextNotebook
+# -
 from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
 
 
