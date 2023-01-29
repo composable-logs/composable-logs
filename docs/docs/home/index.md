@@ -16,11 +16,11 @@ Thus, after a workflow has completed, an immutable record of the run can be pers
 For reporting and experiment tracking, the structured logs can be converted into various formats.
 Currently, Composable Logs can convert logs into a static website that can be deployed eg. to Github Pages.
 
+## Open source
+
 Composable Logs is distributed under the terms of the MIT license, see [repo](https://github.com/composable-logs/composable-logs) for details.
 
-## Composable Logs is open source
-
-The two main dependencies are:
+There are two main dependencies:
 
 #### The [Ray framework<sup><sup><sub>:material-launch:</sub></sup></sup>](https://www.ray.io/ray-core) for parallel execution of Python tasks (open source)
 Ray makes it possible to develop and test code locally on a laptop. And the same code also scales up to large Ray clusters with multiple nodes. Ray natively supports cluster setup on AWS, Azure, GCP and Kubernetes, see  [details<sup><sup><sub>:material-launch:</sub></sup></sup>](https://docs.ray.io/en/latest/cluster/deploy.html).
@@ -34,7 +34,7 @@ Ray Workflows also support more advanced patterns like computational DAG:s being
 
     As of 1/2023: some modifications would be expected for Composable Logs to execute workflows on multinode clusters, or to implement non-static DAGs.
 
-#### The [OpenTelemetry open standard<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io) for observability and logging task execution details
+#### The [OpenTelemetry<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io) for observability and logging task execution details (open standard)
 
 
 - OpenTelemetry is an open standard and an CNCF incubating project.
