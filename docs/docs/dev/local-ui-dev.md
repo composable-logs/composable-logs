@@ -37,8 +37,8 @@ export GITHUB_TOKEN="<see above>"
 generate_static_data --help
 ```
 
-#### 2a. Download pipeline (zip) artifacts into local cache directory
-The below will download available build artifacts from past pipeline runs into a `./cache` directory.
+#### 2a. Download workflow (zip) artifacts into local cache directory
+The below will download available build artifacts from past workflow runs into a `./cache` directory.
 ```bash
 rm -rf ./cache    # <-- !!
 generate_static_data \

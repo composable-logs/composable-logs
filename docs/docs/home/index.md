@@ -6,36 +6,47 @@ hide:
 
 # What is `pynb-dag-runner`?
 
-**`pynb-dag-runner`** is an open source Python framework for running Python (notebook) ML/data pipelines.
+**`pynb-dag-runner`** is an open source Python framework for running Python ML/data workflows.
 
-A main feature of `pynb-dag-runner` is that pipelines can execute on stateless compute infrastructure (that may be ephemeral, serverless).
+A main feature of `pynb-dag-runner` is that workflows can execute on stateless compute infrastructure (that may be ephemeral, serverless).
 So, a 24/7 running database or service to record past runs or metrics is not needed.
-Rather, when `pynb-dag-runner` executes a pipeline, all key events (and logged artifacts) are emitted using the [OpenTelemetry standard<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io/).
-Thus, after a pipeline has completed, an immutable record of the run can be persisted as a JSON file to a data lake (as one storage option).
+Rather, when `pynb-dag-runner` executes a workflow, all key events (and logged artifacts) are emitted using the [OpenTelemetry standard<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io/).
+Thus, after a workflow has completed, an immutable record of the run can be persisted as a JSON file to a data lake (as one storage option).
 
 For reporting and experiment tracking, the structured logs can be converted into various formats.
 Currently, `pynb-dag-runner` can convert logs into a static website that can be deployed eg. to Github Pages.
 
-## Demo ML training pipeline
+`pynb-dag-runner` is distributed under the terms of the MIT license, see [repo](https://github.com/composable-logs/composable-logs) for details.
 
-A main motivation for developing `pynb-dag-runner` is to have a framework to run pipelines on limited or no cloud infrastructure.
-The [Demo pipeline](../live-demos/mnist-digits-demo-pipeline/)-section in this documentation describe in more detail
-how one eg. deploy and run a pipeline using only services provided with a (free, personal) Github account.
+## `pynb-dag-runner` is open source
 
-<figure markdown>
-  [![screenshot-task-list.png](../live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
-  <figcaption>
-  <b><a href="https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/">
-  https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/
-  </a></b>
-  </figcaption>
-  <figcaption>
-  Demo pipeline: Public task and experiment tracker on Github Pages.
-  The UI is based on a modified version of the MLFlow.
-  </figcaption>
-</figure>
+The two main dependencies are:
 
-## Architecture for `pynb-dag-runner` pipelines
+#### The [Ray framework<sup><sup><sub>:material-launch:</sub></sup></sup>](https://www.ray.io/ray-core) for parallel execution of Python tasks (open source)
+Ray makes it possible to develop and test code locally on a laptop. And the same code also scales up to large Ray clusters with multiple nodes. Ray natively supports cluster setup on AWS, Azure, GCP and Kubernetes, see  [details<sup><sup><sub>:material-launch:</sub></sup></sup>](https://docs.ray.io/en/latest/cluster/deploy.html).
+
+More in detail, `pynb-dag-runner` uses Ray Workflows. These are essentially DAG:s of Python tasks, but
+Ray Workflows also support more advanced patterns like computational DAG:s being created dynamically at runtime, or task recursion. As of 1/2023, Ray Workflows is still an alpha feature, see [documentation](https://docs.ray.io/en/latest/workflows/index.html).
+
+
+!!! info
+    Currently, all example usages of `pynb-dag-runner` are static DAG:s and in this documentation we use pipeline and workflow almost interchangeably. However, with workflow we emphasize that a pipeline is implemented (or executed) as a Ray workflow and could potentially be more involved than a static DAG.
+
+    As of 1/2023: some modifications would be expected for `pynb-dag-runner` to execute workflows on multinode clusters, or to implement non-static DAGs.
+
+#### The [OpenTelemetry open standard<sup><sup><sub>:material-launch:</sub></sup></sup>](https://opentelemetry.io) for observability and logging task execution details
+
+
+- OpenTelemetry is an open standard and an CNCF incubating project.
+- Broad support from various vendors, [list](https://opentelemetry.io/ecosystem/vendors/). In particular, the main clouds (Azure, AWS, Google Cloud) all support ingestion of OpenTelemetry logs (with different levels of support of the standard).
+- OpenTelemetry [steering group](https://github.com/open-telemetry/community/blob/main/community-members.md) include broad industry representation.
+
+A motivation to use an open standard to ingest ML/data log data is that this opens option to potentially correlate this data with system metrics (is this feasible?). Eg.,
+
+- To troubleshoot a failed data ingestion task, it can be useful to view its network input/output.
+- Before deploying a long running ML-training job, it might be useful to monitor GPU/CPU loads. Eg. is it 10% or 90%.
+
+## Example architecture
 
 ``` mermaid
 graph TB;
@@ -51,9 +62,9 @@ Developer --> Git
     end
 
     subgraph "<b>Execution backend</b> (Ray cluster)"
-        run_1[Pipeline run 1]
-        run_2[Pipeline run 2]
-        run_3[Pipeline run 3]
+        run_1[Workflow run 1]
+        run_2[Workflow run 2]
+        run_3[Workflow run 3]
     end
 
     Code --> run_1
@@ -89,35 +100,39 @@ Developer --> Git
 end
 ```
 
-!!! info
-    The task execution framework for `pynb-dag-runner` is built using the [Ray framework<sup><sup><sub>:material-launch:</sub></sup></sup>](https://www.ray.io/ray-core), and pipeline tasks can run in parallel.
-    Ray does have support for larger clusters (with support for public clouds and Kubernetes, [details<sup><sup><sub>:material-launch:</sub></sup></sup>](https://docs.ray.io/en/latest/cluster/deploy.html)).
-    However, execution on multi-node Ray clusters is not supported by `pynb-dag-runner` (at least yet).
 
-!!! info
-    On use of OpenTelemetry: When pipelines are logged with OpenTelemetry, they could potentially be correlated with other (system) metrics. Eg.
+## Demo ML training workflow
 
-    - To troubleshoot a failed data ingestion task, it can be useful to view its network input/output.
-    - Before deploying a long running ML-training job, it might be useful to monitor GPU/CPU loads. Eg. is it 10% or 90%.
+One motivation for developing `pynb-dag-runner` is to have a framework to run workflows on limited or no cloud infrastructure.
+The [Demo workflow](../live-demos/mnist-digits-demo-pipeline/)-section in this documentation describe in more detail
+how one eg. deploy and run a workflow using only services provided with a (free, personal) Github account.
 
-    Details on this would need to be investigated, tbd. Is this feasible?
-
+<figure markdown>
+  [![screenshot-task-list.png](../live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+  <figcaption>
+  <b><a href="https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/">
+  https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/
+  </a></b>
+  </figcaption>
+  <figcaption>
+  Demo workflow: Public task and experiment tracker on Github Pages.
+  The UI is based on a forked version of the MLFlow that can be deployed as a static website.
+  </figcaption>
+</figure>
 
 ## Use cases and scope
 
-- `pynb-dag-runner` can currently run public pipelines using only services provided with a (free, personal) Github account.
+- `pynb-dag-runner` can currently run public data/ML pipelines using only services provided with a (free, personal) Github account.
   Since this can be scheduled to run daily, one could:
 
     - Run (smaller scale) public data pipelines that process and report on open data.
     - Showcase how to use a library with a publicly running pipeline.
 
-- Improve the tooling to collaborate on notebooks and public open source pipelines.
-- Offer example pipeline(s) exploring how MLOps can scale down to minimum "free tier" setups.
+- Improve the tooling to collaborate on notebooks and public open source data and ML pipelines.
+- Offer example pipeline(s) exploring how ML Ops can scale down to minimum "free tier" setups.
 - Reproducible science: schedule the analysis for a paper to run eg. every month, potentially with updated dependencies.
 
 ## Status
-
-This is work in progress (and even the name `pynb-dag-runner` might change :smile:).
 
 The project is already usable, but not for critical workloads.
 

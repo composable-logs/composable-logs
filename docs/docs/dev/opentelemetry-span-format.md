@@ -7,11 +7,11 @@
     Similar to MLFlow, `pynb-dag-runner` can log metrics, images and other artifacts.
     In addition, `pynb-dag-runner` logs run data like:
 
-    - what tasks ran in the pipeline,
+    - what tasks ran in the workflow,
     - runtimes for each task,
     - task outcomes (success, failure),
     - if tasks fail, information about exceptions, retries and timeouts.
 
-    By documenting the log format `pynb-dag-runner` one could add OpenTelemetry support to other pipeline execution backends.
+    By documenting the log format `pynb-dag-runner` one could add OpenTelemetry support to other workflow execution backends.
 
     TODO
