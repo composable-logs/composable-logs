@@ -1,11 +1,11 @@
 import time, datetime
 import itertools as it
 
-#
+# -
 import pytest
 import opentelemetry as ot
 
-#
+# -
 from pynb_dag_runner.helpers import range_intersection, range_is_empty
 from pynb_dag_runner.opentelemetry_helpers import (
     Spans,
@@ -13,8 +13,6 @@ from pynb_dag_runner.opentelemetry_helpers import (
     iso8601_range_to_epoch_us_range,
 )
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans
-
-#
 from pynb_dag_runner.wrappers import task, run_dag
 
 

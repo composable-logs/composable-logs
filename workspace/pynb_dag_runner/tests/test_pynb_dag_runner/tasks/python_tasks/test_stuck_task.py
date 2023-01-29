@@ -1,9 +1,9 @@
 import time
 
-#
+# -
 import pytest
 
-#
+# -
 from pynb_dag_runner.helpers import one, Failure
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
 from pynb_dag_runner.opentelemetry_task_span_parser import parse_spans

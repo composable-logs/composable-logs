@@ -1,8 +1,11 @@
-import opentelemetry as ot
 from pathlib import Path
 from typing import List
 
-#
+# -
+import pytest
+import opentelemetry as ot
+
+# -
 from pynb_dag_runner.wrappers import task, run_dag, TaskContext
 from pynb_dag_runner.opentelemetry_helpers import Spans, SpanRecorder
 from pynb_dag_runner.helpers import one, Success, Failure
@@ -18,9 +21,6 @@ from pynb_dag_runner.opentelemetry_task_span_parser import (
     LoggedValueContent,
     ArtifactContent,
 )
-
-# --
-import pytest
 
 # ---- test SerializedData encoding and decoding ----
 

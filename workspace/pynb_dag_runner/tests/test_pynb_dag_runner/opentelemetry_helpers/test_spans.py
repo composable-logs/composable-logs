@@ -1,13 +1,13 @@
 import time
 from typing import Any, Dict
 
-#
+# -
 import pytest
 
-#
+# -
 import opentelemetry as ot
 
-#
+# -
 from pynb_dag_runner.opentelemetry_helpers import (
     read_key,
     is_parent_child,

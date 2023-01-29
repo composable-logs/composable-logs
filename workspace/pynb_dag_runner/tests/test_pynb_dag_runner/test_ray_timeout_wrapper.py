@@ -7,7 +7,7 @@ import pytest, ray
 #
 from pynb_dag_runner.helpers import Success, Failure, one, Try
 from pynb_dag_runner.wrappers import timeout_guard_wrapper
-from pynb_dag_runner.opentelemetry_helpers import SpanDict, read_key, SpanRecorder
+from pynb_dag_runner.opentelemetry_helpers import read_key, SpanRecorder
 
 
 A = TypeVar("A")
@@ -25,7 +25,7 @@ class StateActor:
         return self._state
 
 
-### --- tests for try_f_with_timeout_guard wrapper ---
+### --- tests for timeout_guard_wrapper wrapper ---
 
 
 @pytest.mark.parametrize("timeout_s", [None, 10.0])

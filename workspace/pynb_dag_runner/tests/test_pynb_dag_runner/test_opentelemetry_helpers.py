@@ -1,27 +1,19 @@
-import time
 from typing import Set, Tuple, Dict, List
 
 #
 import pytest
 
 #
-import opentelemetry as ot
-
-#
 from pynb_dag_runner.opentelemetry_helpers import (
     get_span_id,
     has_keys,
     read_key,
-    is_parent_child,
     get_duration_s,
     iso8601_to_epoch_s,
     get_duration_range_us,
     get_span_exceptions,
-    Spans,
-    SpanRecorder,
     UDT,
 )
-from pynb_dag_runner.helpers import one
 
 
 def test_nested_dict_helpers():

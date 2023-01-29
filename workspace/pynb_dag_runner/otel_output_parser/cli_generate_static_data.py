@@ -1,6 +1,5 @@
 import io, json
 from zipfile import ZipFile
-from typing import Any
 
 from pathlib import Path
 from functools import lru_cache
@@ -12,7 +11,6 @@ from pynb_dag_runner.helpers import dict_prefix_keys
 from pynb_dag_runner.opentelemetry_helpers import Spans
 from pynb_dag_runner.opentelemetry_task_span_parser import (
     parse_spans,
-    ArtifactName,
     ArtifactContent,
 )
 

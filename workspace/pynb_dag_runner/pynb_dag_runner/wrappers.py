@@ -1,4 +1,4 @@
-from typing import Any, Dict, TypeVar, List, Mapping, Union, Sequence, Optional
+from typing import Any, TypeVar, List, Mapping, Union, Sequence, Optional
 import inspect
 import collections
 
@@ -19,8 +19,6 @@ from pynb_dag_runner.helpers import one, Try, Failure, Success
 from pynb_dag_runner.tasks.task_opentelemetry_logging import ComposableLogsLogger
 
 # --- schemas ---
-
-A = TypeVar("A")
 
 
 class TaskResult(p.BaseModel):
@@ -177,7 +175,7 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
        on the execution node in the Ray cluster.
 
     Notes:
-     - we a Ray actor since this can be kill (unlike ordinary Ray remote functions).
+     - we use a Ray actor since this can be kill (unlike ordinary Ray remote functions).
 
         https://docs.ray.io/en/latest/actors.html#terminating-actors
 

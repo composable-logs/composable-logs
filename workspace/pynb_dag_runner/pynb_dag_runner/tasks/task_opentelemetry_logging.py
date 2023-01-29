@@ -1,14 +1,14 @@
 import base64, json, tempfile, os
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Mapping, Union
+from typing import Any, Callable, Optional, Mapping, Union
 from dataclasses import dataclass
 
-#
+# -
+import ray
+
 import opentelemetry as otel
 from opentelemetry.trace.span import Span
 from opentelemetry.trace import StatusCode, Status  # type: ignore
-
-import ray
 from opentelemetry.trace.propagation.tracecontext import (
     TraceContextTextMapPropagator,
 )
