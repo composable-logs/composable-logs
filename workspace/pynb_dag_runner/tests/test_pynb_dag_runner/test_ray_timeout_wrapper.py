@@ -25,7 +25,7 @@ class StateActor:
         return self._state
 
 
-### --- tests for try_f_with_timeout_guard wrapper ---
+### --- tests for timeout_guard_wrapper wrapper ---
 
 
 @pytest.mark.parametrize("timeout_s", [None, 10.0])
