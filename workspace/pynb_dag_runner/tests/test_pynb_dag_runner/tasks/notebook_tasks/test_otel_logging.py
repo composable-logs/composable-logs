@@ -46,11 +46,11 @@ def spans() -> Spans:
 
 
 def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans: Spans):
-    pipeline_summary = parse_spans(spans)
+    workflow_summary = parse_spans(spans)
 
-    assert pipeline_summary.is_success()
+    assert workflow_summary.is_success()
 
-    task_summary = one(pipeline_summary.task_runs)
+    task_summary = one(workflow_summary.task_runs)
     assert task_summary.is_success()
 
     # Check: artifact logged from the evaluated notebook

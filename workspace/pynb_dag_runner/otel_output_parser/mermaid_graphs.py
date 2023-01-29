@@ -60,7 +60,7 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
         "    %%",
     ]
 
-    pipeline_summary = parse_spans(spans)
+    workflow_summary = parse_spans(spans)
 
     def dag_node_id(span_id: str) -> str:
         # span_id:s are of form "0x<hex>" and can not be used as Mermaid node_ids as-is.
@@ -94,7 +94,7 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
         else:
             return desc
 
-    for task_summary in pipeline_summary.task_runs:
+    for task_summary in workflow_summary.task_runs:
         if task_summary.attributes["task.task_type"] != "jupytext":
             raise Exception(f"Unknown task type for {task_summary}")
 
@@ -106,7 +106,7 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
         ]
 
     # add links between noded in graph
-    for span_id_from, span_id_to in pipeline_summary.task_dependencies:
+    for span_id_from, span_id_to in workflow_summary.task_dependencies:
         output_lines += [
             f"    {dag_node_id(span_id_from)} --> {dag_node_id(span_id_to)}"
         ]
@@ -130,9 +130,9 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
         "    dateFormat x",
         "    %%",
     ]
-    pipeline_summary = parse_spans(spans)
+    workflow_summary = parse_spans(spans)
 
-    for task_run_summary in pipeline_summary.task_runs:
+    for task_run_summary in workflow_summary.task_runs:
         attributes = task_run_summary.attributes
 
         if attributes["task.task_type"] != "jupytext":

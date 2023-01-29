@@ -35,10 +35,10 @@ def spans_once() -> Spans:
 
 
 def test__jupytext__ok_notebook__parse_spans(spans_once: Spans):
-    pipeline_summary = parse_spans(spans_once)
+    workflow_summary = parse_spans(spans_once)
 
     # assert there is one successful task
-    task_summary = one(pipeline_summary.task_runs)
+    task_summary = one(workflow_summary.task_runs)
     assert task_summary.is_success()
 
     assert task_summary.attributes == {
@@ -72,7 +72,7 @@ def test__jupytext__ok_notebook__parse_spans(spans_once: Spans):
     for name in ["notebook.ipynb", "notebook.html"]:
         validate(one(a for a in task_summary.logged_artifacts if a.name == name))
 
-    assert len(pipeline_summary.task_dependencies) == 0
+    assert len(workflow_summary.task_dependencies) == 0
 
 
 @pytest.fixture(scope="module")
@@ -95,13 +95,13 @@ def spans_run_twice() -> Spans:
 
 
 def test__jupytext__ok_notebook__run_twice(spans_run_twice: Spans):
-    pipeline_summary = parse_spans(spans_run_twice)
+    workflow_summary = parse_spans(spans_run_twice)
 
     # assert there is one successful task
-    assert len(pipeline_summary.task_runs) == 2
+    assert len(workflow_summary.task_runs) == 2
 
-    for task_summary in pipeline_summary.task_runs:
+    for task_summary in workflow_summary.task_runs:
         assert task_summary.is_success()
         assert task_summary.task_id == str(TEST_NOTEBOOK.filepath)
 
-    assert len(pipeline_summary.task_dependencies) == 1
+    assert len(workflow_summary.task_dependencies) == 1

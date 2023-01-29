@@ -52,19 +52,19 @@ def test_spans_a_failed_task_is_not_retried(spans_a_failed_task_is_not_retried: 
     )
 
     # Check parsed spans
-    pipeline_summary = parse_spans(spans_a_failed_task_is_not_retried)
+    workflow_summary = parse_spans(spans_a_failed_task_is_not_retried)
 
-    assert pipeline_summary.attributes == {}
+    assert workflow_summary.attributes == {}
 
-    assert len(pipeline_summary.task_runs) == 1
+    assert len(workflow_summary.task_runs) == 1
 
-    for task_summary in pipeline_summary.task_runs:  # type: ignore
+    for task_summary in workflow_summary.task_runs:  # type: ignore
         assert not task_summary.is_success()
         assert len(task_summary.exceptions) == 1
         assert "BOOM-2000" in str(task_summary.exceptions)
 
     # check logged task dependencies
-    assert len(pipeline_summary.task_dependencies) == 0
+    assert len(workflow_summary.task_dependencies) == 0
 
 
 # --- error handling in case middle task fails in workflow ---
@@ -105,13 +105,13 @@ def test_spans_middle_task_fails(spans_middle_task_fails: Spans):
     assert "this should never be executed" not in str(spans_middle_task_fails.spans)
 
     # Check parsed spans
-    pipeline_summary = parse_spans(spans_middle_task_fails)
+    workflow_summary = parse_spans(spans_middle_task_fails)
 
-    assert pipeline_summary.attributes == {}
+    assert workflow_summary.attributes == {}
 
-    assert len(pipeline_summary.task_runs) == 2
+    assert len(workflow_summary.task_runs) == 2
 
-    for task_summary in pipeline_summary.task_runs:  # type: ignore
+    for task_summary in workflow_summary.task_runs:  # type: ignore
         if task_summary.task_id == "mid-task-f":
             assert task_summary.is_success()
         elif task_summary.task_id == "mid-task-g":
@@ -122,4 +122,4 @@ def test_spans_middle_task_fails(spans_middle_task_fails: Spans):
             raise Exception("Unknown task-id")
 
     # check logged task dependencies
-    assert len(pipeline_summary.task_dependencies) == 1
+    assert len(workflow_summary.task_dependencies) == 1

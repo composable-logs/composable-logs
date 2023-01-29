@@ -35,10 +35,10 @@ def spans() -> Spans:
 
 
 def test__jupytext__stuck_notebook__validate_spans(spans: Spans):
-    pipeline_summary = parse_spans(spans)
-    assert pipeline_summary.is_failure()
+    workflow_summary = parse_spans(spans)
+    assert workflow_summary.is_failure()
 
-    for task_summary in [one(pipeline_summary.task_runs)]:  # type: ignore
+    for task_summary in [one(workflow_summary.task_runs)]:  # type: ignore
         assert task_summary.is_failure()
         assert "timeout" in str(one(task_summary.exceptions)).lower()
 
@@ -59,4 +59,4 @@ def test__jupytext__stuck_notebook__validate_spans(spans: Spans):
 
         assert task_summary.timing.get_duration_s() > TASK_TIMEOUT_S
 
-    assert len(pipeline_summary.task_dependencies) == 0
+    assert len(workflow_summary.task_dependencies) == 0

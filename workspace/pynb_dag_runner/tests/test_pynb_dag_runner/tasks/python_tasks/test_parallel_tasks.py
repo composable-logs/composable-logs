@@ -36,13 +36,13 @@ def spans_ok() -> Spans:
 
 
 def test__python_task__parallel_tasks__success(spans_ok: Spans):
-    pipeline_summary = parse_spans(spans_ok)
+    workflow_summary = parse_spans(spans_ok)
 
     # check attributes
     ids = []
 
     ranges = []
-    for task_summary in pipeline_summary.task_runs:  # type: ignore
+    for task_summary in workflow_summary.task_runs:  # type: ignore
         assert task_summary.is_success()
         assert len(task_summary.logged_artifacts) == 0
         assert len(task_summary.logged_values) == 0
@@ -86,13 +86,13 @@ def spans_fail() -> Spans:
 
 
 def test__python_task__parallel_tasks__fail(spans_fail: Spans):
-    pipeline_summary = parse_spans(spans_fail)
+    workflow_summary = parse_spans(spans_fail)
 
-    assert pipeline_summary.attributes == {}
+    assert workflow_summary.attributes == {}
 
-    assert len(pipeline_summary.task_runs) == 3
+    assert len(workflow_summary.task_runs) == 3
 
-    for task_summary in pipeline_summary.task_runs:  # type: ignore
+    for task_summary in workflow_summary.task_runs:  # type: ignore
         if task_summary.task_id in ["par-task-f", "par-task-h"]:
             assert task_summary.is_success()
         elif task_summary.task_id == "par-task-g":
@@ -102,7 +102,7 @@ def test__python_task__parallel_tasks__fail(spans_fail: Spans):
         else:
             raise Exception(f"Unknown task-id={task_summary.task_id}")
 
-    assert len(pipeline_summary.task_dependencies) == 0
+    assert len(workflow_summary.task_dependencies) == 0
 
 
 # --- 5 node test dag ---
@@ -166,11 +166,11 @@ def test_5dag_outputs_with_no_errors():
     )
 
     # --- check spans
-    pipeline_summary = parse_spans(spans)
+    workflow_summary = parse_spans(spans)
 
-    assert len(pipeline_summary.task_runs) == 5
-    assert pipeline_summary.is_success()
-    assert len(pipeline_summary.task_dependencies) == 4
+    assert len(workflow_summary.task_runs) == 5
+    assert workflow_summary.is_success()
+    assert len(workflow_summary.task_dependencies) == 4
 
 
 def test_5dag_when_first_node_fails():
@@ -184,13 +184,13 @@ def test_5dag_when_first_node_fails():
     assert expected_result == result
 
     # --- check spans
-    pipeline_summary = parse_spans(spans)
+    workflow_summary = parse_spans(spans)
 
     # Nodes 0 and 1 are executed before computation is short-cirtuited, they sould
     # be in logs
-    assert len(pipeline_summary.task_runs) == 2
-    assert pipeline_summary.is_failure()
-    assert len(pipeline_summary.task_dependencies) == 0
+    assert len(workflow_summary.task_runs) == 2
+    assert workflow_summary.is_failure()
+    assert len(workflow_summary.task_dependencies) == 0
 
 
 def test_5dag_when_first_two_nodes_fail():
@@ -208,11 +208,11 @@ def test_5dag_when_first_two_nodes_fail():
     assert expected_result == result
 
     # --- check spans
-    pipeline_summary = parse_spans(spans)
+    workflow_summary = parse_spans(spans)
 
-    assert len(pipeline_summary.task_runs) == 2
-    assert pipeline_summary.is_failure()
-    assert len(pipeline_summary.task_dependencies) == 0
+    assert len(workflow_summary.task_runs) == 2
+    assert workflow_summary.is_failure()
+    assert len(workflow_summary.task_dependencies) == 0
 
 
 def test_python_task_input_node_may_execute_once_or_separately_for_each_downstream_node():
