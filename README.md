@@ -12,11 +12,11 @@
 
 > ***Composable Logs** is a Python library to run ML/data workflows on stateless compute infrastructure (that may be ephemeral or serverless).*
 
-This means that Composable Logs can do ML experiment tracking, does it not need a tracking server (or database) to record ML metrics, models or artifacts.
+In particular, Composable Logs supports ML experiment tracking without a dedicated tracking server (and database) to record ML metrics, models or artifacts.
 Instead, these are emitted using the **[OpenTelemetry standard](https://opentelemetry.io/)** for logging.
 This is an open standard in software engineering with growing support.
 
-For example, log events emitted from Composable Logs can be directed to a JSON-file, or sent to any log storage supporting OpenTelemetry (span) events. In either case, one does not need a custom tracking service separate for ML experiments.
+For example, log events emitted from Composable Logs can be directed to a JSON-file, or sent to any log storage supporting OpenTelemetry (span) events. In either case, this means that one does not need a separate tracking service only for ML experiments.
 
 Composable Logs uses the **[Ray framework](https://www.ray.io/ray-core)** for parallel task execution.
 
@@ -27,9 +27,9 @@ Composable Logs uses the **[Ray framework](https://www.ray.io/ray-core)** for pa
 
 #### Live demo
 - Using Composable Logs one can run a ML training pipeline using only a free Github account. This uses:
-   - Github actions: trigger the ML pipeline daily and for each PR.
-   - Build artifacts: to store OpenTelemetry logs of past runs.
-   - Github Pages: to host static website for reporting on past runs.
+   - **Github actions**: trigger the ML pipeline daily and for each PR.
+   - **Build artifacts**: to store OpenTelemetry logs of past runs.
+   - **Github Pages**: to host static website for reporting on past runs.
 
    The static website is rebuilt after each pipeline run (by extracting relevant data from past OpenTelemetry logs). This uses a fork of MLFlow that can be deployed as a static website, https://github.com/composable-logs/mlflow.
 
