@@ -1,5 +1,5 @@
 SHELL              := /bin/bash
-DOCKER_IMAGE_NAME  := pynb-dag-runner-docs
+DOCKER_IMAGE_NAME  := composable-logs-docs
 
 .PHONY: *
 

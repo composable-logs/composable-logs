@@ -13,7 +13,7 @@ This is work in progress, and any contributions/ideas are welcome, eg.
 
 See also [Roadmap](../roadmap).
 
-Contact info: [https://github.com/matiasdahl<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/matiasdahl), or submit an issue: [link<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/pynb-dag-runner/pynb-dag-runner/issues/new).
+Contact info: [https://github.com/matiasdahl<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/matiasdahl), or submit an issue: [link<sup><sup><sub>:material-launch:</sub></sup></sup>](https://github.com/composable-logs/composable-logs/issues/new).
 
 ---
 

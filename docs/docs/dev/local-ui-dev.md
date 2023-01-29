@@ -5,17 +5,17 @@ The below are (high level) steps for doing local ui development of the static ve
 ```bash
 cd /some-work-dir/
 
-# the pynb-dag-runner repo is needed to
+# the composable-logs repo is needed to
 #  - download build artifacts/run logs from demo pipeline
 #  - convert these into format that can be compiled into static website
-git clone git@github.com:pynb-dag-runner/pynb-dag-runner.git
+git clone git@github.com:composable-logs/composable-logs.git
 
 # The mlflow clone repo contains a fork of the official mlflow project.
 # This fork supports building static websites.
-git clone git@github.com:pynb-dag-runner/mlflow.git --branch static_mlflow
+git clone git@github.com:composable-logs/mlflow.git --branch static_mlflow
 ```
 
-The below steps will also use test pipeline run logs produced from the [mnist-demo-pipeline repo](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline), but this repo does not need to be cloned locally.
+The below steps will also use test pipeline run logs produced from the [mnist-demo-pipeline repo](https://github.com/composable-logs/mnist-digits-demo-pipeline), but this repo does not need to be cloned locally.
 
 ## Download test data
 Here we download test data using a PAT (Personal Access Token), see [docs<sup><sup><sub>:material-launch:</sub></sup></sup>](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) if these are not familar. A (safer) approach (that avoids using a PAT) would be to manually download artifacts from the Github UI.
@@ -27,7 +27,7 @@ Here we download test data using a PAT (Personal Access Token), see [docs<sup><s
    - delete the PAT when no longer needed (step 2b below).
 
 ### 2. Start and set up Docker container with dependencies
-Eg. start VS Code dev container in the pynb-dag-runner repo's `otel_output_parse` directory.
+Eg. start VS Code dev container in the composable-logs repo's `otel_output_parse` directory.
 
 ```bash
 pip install -e .
@@ -42,7 +42,7 @@ The below will download available build artifacts from past workflow runs into a
 ```bash
 rm -rf ./cache    # <-- !!
 generate_static_data \
-   --github_repository pynb-dag-runner/mnist-digits-demo-pipeline \
+   --github_repository composable-logs/mnist-digits-demo-pipeline \
    --zip_cache_dir ./cache
 ```
 #### 2b. Delete the token created above in the Github UI
@@ -71,11 +71,11 @@ rm -rf mlflow/mlflow/server/js/public/pipeline-artifacts    # <-- !!
 
 # TODO: review details for the below commands.
 cp -r \
-   pynb-dag-runner/otel_output_parser/workspace/static_output/static-data.json \
+   composable-logs/otel_output_parser/workspace/static_output/static-data.json \
    mlflow/mlflow/server/js/public/
 
 cp -r \
-   pynb-dag-runner/otel_output_parser/workspace/static_output/pipeline-artifacts \
+   composable-logs/otel_output_parser/workspace/static_output/pipeline-artifacts \
    mlflow/mlflow/server/js/public/
 
 ```

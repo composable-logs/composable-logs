@@ -1,8 +1,8 @@
-# Projects with similarity to `pynb-dag-runner`
+# Projects with similarity to `composable-logs`
 
 ML pipeline deployment tools (part of MLOps) are now actively developed.
 
-This list is not complete. Additions and corrections are welcome ([eg here](https://github.com/pynb-dag-runner/pynb-dag-runner/issues/122)).
+This list is not complete. Additions and corrections are welcome ([eg here](https://github.com/composable-logs/composable-logs/issues/122)).
 
 ## Open source projects
 
