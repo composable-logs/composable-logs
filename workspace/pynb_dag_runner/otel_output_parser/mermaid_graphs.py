@@ -62,7 +62,7 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
         return f"TASK_SPAN_ID_{span_id}"
 
     def dag_node_description(attributes) -> Tuple[str, List[str]]:
-        assert attributes["task.type"] == "jupytext"
+        assert attributes["task.type"] in ["jupytext", "python"]
 
         out_lines = []
         for k, v in attributes.items():
@@ -72,7 +72,7 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
         # here one could potentially also add total length of task w.
         # outcome status (success/failure)
         return (
-            attributes["task.id"] + " (jupytext task)",
+            f"""{attributes["task.id"]} ({attributes["task.type"]} task)""",
             list(sorted(out_lines)),
         )
 
@@ -90,9 +90,6 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
             return desc
 
     for task_summary in workflow_summary.task_runs:
-        if task_summary.attributes["task.type"] != "jupytext":
-            raise Exception(f"Unknown task type for {task_summary}")
-
         linkify = lambda x, ys: make_link(x, ys, task_summary)
 
         output_lines += [
@@ -130,7 +127,7 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     for task_run_summary in workflow_summary.task_runs:
         attributes = task_run_summary.attributes
 
-        if attributes["task.type"] != "jupytext":
+        if attributes["task.type"] not in ["jupytext", "python"]:
             raise Exception(f"Unknown task type for {task_run_summary.attributes}")
 
         output_lines += [f"""    section {attributes["task.id"]}"""]

@@ -1,3 +1,4 @@
+import glob
 from pathlib import Path
 from typing import List
 
@@ -15,11 +16,16 @@ from pynb_dag_runner.tasks.task_opentelemetry_logging import (
     SerializedData,
     LoggableTypes,
 )
-
 from pynb_dag_runner.opentelemetry_task_span_parser import (
     parse_spans,
     LoggedValueContent,
     ArtifactContent,
+)
+
+from otel_output_parser.cli_pynb_log_parser import (
+    write_spans_to_output_directory_structure,
+    make_mermaid_gantt_inputfile,
+    make_mermaid_dag_inputfile,
 )
 
 # ---- test SerializedData encoding and decoding ----
@@ -203,6 +209,32 @@ def test__task_logger__parse_logged_values_from_three_python_tasks(
                 check_logged_value(*args)
         else:
             raise Exception(f"Unknown task-id: {task_summary.task_id}")
+
+
+def test__python_task__validate_cli_tool(
+    spans_to_test_otel_loggging: Spans, tmp_path: Path
+):
+    # check: rendering Mermaid input file contents does not crash
+    assert (
+        len(
+            make_mermaid_dag_inputfile(
+                spans_to_test_otel_loggging, generate_links=False
+            )
+        )
+        > 10
+    )
+    assert len(make_mermaid_gantt_inputfile(spans_to_test_otel_loggging)) > 10
+
+    write_spans_to_output_directory_structure(spans_to_test_otel_loggging, tmp_path)
+
+    files = glob.glob(f"{tmp_path}/**/*", recursive=True)
+    filenames = [Path(f).name for f in files if Path(f).is_file()]
+
+    assert set(filenames) == {
+        "mock-matplot-lib-figure.png",
+        "read-first",
+        "run-time-metadata.json",
+    }
 
 
 def test__task_logger__values_are_logged_also_for_failed_tasks():

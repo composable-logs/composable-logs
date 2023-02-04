@@ -53,20 +53,21 @@ def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
 
     for task_run_summary in workflow_summary.task_runs:
         # -- write json with task-specific data --
-        if task_run_summary.attributes["task.type"] == "jupytext":
-            task_dir: str = "--".join(
-                [
-                    "jupytext-task",
+        if not task_run_summary.attributes["task.type"] in ["python", "jupytext"]:
+            raise Exception(f"Unknown task type for {task_run_summary.attributes}")
+
+        task_dir: str = "--".join(
+            [
+                f"""{task_run_summary.attributes["task.type"]}-task""",
+                (
                     task_run_summary.attributes["task.id"]  # type: ignore
                     .replace("/", "-")  # type: ignore
-                    .replace(".", "-"),  # type: ignore
-                    task_run_summary.span_id,
-                    outcome(task_run_summary.is_success()),
-                ]
-            )
-
-        else:
-            raise Exception(f"Unknown task type for {task_run_summary.attributes}")
+                    .replace(".", "-")  # type: ignore
+                ),
+                task_run_summary.span_id,
+                outcome(task_run_summary.is_success()),
+            ]
+        )
 
         write_json(
             safe_path(out_basepath / task_dir / "run-time-metadata.json"),
