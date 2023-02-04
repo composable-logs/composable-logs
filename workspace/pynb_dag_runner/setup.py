@@ -49,7 +49,7 @@ def get_name_and_version():
 
     elif PYTHON_PACKAGE_RELEASE_TARGET is None:
         # Package is installed in edit mode for local dev using "pip -e install ."
-        PYTHON_PACKAGE_VERSION += f"+local-install-in-edit-mode"
+        PYTHON_PACKAGE_VERSION += f"+locally-installed-in-edit-mode-with-pip-install-e"
     else:
         raise ValueError(f"Unknown release target {PYTHON_PACKAGE_RELEASE_TARGET}")
 
