@@ -38,6 +38,14 @@ def make_link_to_task_run(task_summary) -> str:
     return f"{host}/#/experiments/{task_id}/runs/{task_summary.span_id}"
 
 
+def make_header(attributes):
+    # Return a header for task, eg
+    #   "ingest (Python task)""
+    #   "eda (Jupytext task)"
+    #
+    return f"""{attributes["task.id"]} ({attributes["task.type"].capitalize()} task)"""
+
+
 def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
     """
     Generate input file for Mermaid diagram generator for creating dependency diagram
@@ -72,7 +80,7 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
         # here one could potentially also add total length of task w.
         # outcome status (success/failure)
         return (
-            f"""{attributes["task.id"]} ({attributes["task.type"]} task)""",
+            make_header(attributes),
             list(sorted(out_lines)),
         )
 
@@ -130,7 +138,7 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
         if attributes["task.type"] not in ["jupytext", "python"]:
             raise Exception(f"Unknown task type for {task_run_summary.attributes}")
 
-        output_lines += [f"""    section {attributes["task.id"]}"""]
+        output_lines += [f"""    section {make_header(attributes)}"""]
 
         if task_run_summary.is_success():
             description = "OK"
