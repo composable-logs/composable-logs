@@ -6,8 +6,11 @@ FROM pynb-dag-runner-base
 COPY requirements.txt /home/host_user/
 
 # Notes on constraints:
-#  jupyter-client==7.3.5 (1/2023), see https://github.com/nteract/papermill/issues/711
-#
+#  jupyter-client==7.4.9 (1/2023)
+#   - to avoid papermill get stuck on tasks
+#   - https://github.com/nteract/papermill/issues/711
+#  jsonschema[format-nongpl]==4.17.3
+#   - avoid dependency errors for python cli:s
 RUN pip3 install --user -r /home/host_user/requirements.txt
 
 RUN pip3 install --quiet --user \

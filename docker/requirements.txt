@@ -11,4 +11,4 @@ ghapi==0.1.19
 requests==2.27.1
 python-dateutil==2.8.2
 pydantic==1.10.4
-jsonschema[format-nongpl]==4.10.0
+jsonschema[format-nongpl]==4.17.3
