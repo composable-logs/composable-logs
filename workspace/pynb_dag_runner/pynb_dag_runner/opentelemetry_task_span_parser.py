@@ -366,17 +366,10 @@ def _task_run_iterator(
             ),
         }
 
-        # TODO: task_id should be provided when creating a task.
-        # For now determine task_id using the below heuristic
-        task_id: str = "not-available"
-        if "task.task_id" in task_attributes:
-            task_id = task_attributes["task.task_id"]
-        elif "task.notebook" in task_attributes:
-            task_id = (
-                task_attributes["task.notebook"]
-                # -
-                .replace(".py", "").split("/")[-1]
-            )
+        assert "task.id" in task_attributes and isinstance(
+            task_attributes["task.id"], str
+        )
+        task_id: str = task_attributes["task.id"]
 
         yield TaskRunSummary(
             span_id=task_top_span["context"]["span_id"],

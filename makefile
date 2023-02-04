@@ -1,5 +1,6 @@
 .PHONY: *
-SHELL := /bin/bash
+SHELL     := /bin/bash
+MAKEFLAGS += --no-print-directory
 
 # --- Helper tasks ---
 
@@ -19,8 +20,9 @@ build-docker-images:
 clean:
 	@(cd workspace/pynb_dag_runner; ${MAKE} clean)
 
-in-ci-docker/build: | env_GITHUB_SHA env_PYTHON_PACKAGE_RELEASE_TARGET env_LAST_COMMIT_UNIX_EPOCH
-	# TODO: allow local run
+in-ci-docker/build: | env_GITHUB_SHA \
+                      env_PYTHON_PACKAGE_RELEASE_TARGET \
+					  env_LAST_COMMIT_UNIX_EPOCH
 	cd docker; \
 	${MAKE} in-ci-docker/run-command \
 	    DOCKER_ARGS=" \
@@ -65,3 +67,14 @@ in-dev-docker/tmux-watch-all-tests:
 	        make tmux-watch-all-tests \
 	            PYTEST_FILTER=\"${PYTEST_FILTER}\" \
 	    )"
+
+in-ci-docker/build-local: | clean
+	@# Build wheel file for local use (in in demo pipeline dev)
+	@${MAKE} in-ci-docker/build \
+	    GITHUB_SHA="$$(git rev-parse HEAD)" \
+	    PYTHON_PACKAGE_RELEASE_TARGET="snapshot-release" \
+	    LAST_COMMIT_UNIX_EPOCH="100000"
+
+	@echo "-------- wheel files ---------"
+	@find . | grep "whl"
+	@echo "------------------------------"

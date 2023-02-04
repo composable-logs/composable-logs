@@ -231,8 +231,9 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     return make_call_with_timeout_guard
 
 
-def task(
+def _task(
     task_id: str,
+    task_type: str,
     task_parameters: Mapping[str, Any] = {},
     num_cpus: int = 1,
     timeout_s: Optional[float] = None,
@@ -243,6 +244,8 @@ def task(
 
     Unlike the default Ray Workflow API we return f.bind and not f.
     """
+    assert task_type in ["python", "jupytext"]
+
     if not (timeout_s is None or timeout_s > 0):
         raise ValueError("timeout_s should be positive of None (no timeout)")
 
@@ -282,7 +285,8 @@ def task(
                 augmented_task_parameters: Mapping[str, Any] = {
                     **otel.baggage.get_all(),
                     **task_parameters,
-                    "task.task_id": task_id,
+                    "task.id": task_id,
+                    "task.type": task_type,
                     "task.num_cpus": num_cpus,
                     "task.timeout_s": -1 if timeout_s is None else timeout_s,
                 }
@@ -354,6 +358,21 @@ def task(
         return wrapped_f.bind
 
     return decorator
+
+
+def task(
+    task_id: str,
+    task_parameters: Mapping[str, Any] = {},
+    num_cpus: int = 1,
+    timeout_s: Optional[float] = None,
+):
+    return _task(
+        task_type="python",
+        task_id=task_id,
+        task_parameters=task_parameters,
+        num_cpus=num_cpus,
+        timeout_s=timeout_s,
+    )
 
 
 def run_dag(

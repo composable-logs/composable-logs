@@ -33,14 +33,17 @@ def make_link_to_task_run(task_summary) -> str:
     else:
         host = "."
 
-    # Determine experiment name, eg 'notebooks/summary.py' -> 'summary'
-    task_id = task_summary.attributes["task.notebook"].split("/")[-1].replace(".py", "")
+    task_id = task_summary.attributes["task.id"]  # eg "ingest"
 
-    # Breaking change 12/2022:
-    #    previously last span was id for run of task. This is now changed to the
-    #    span-id of the task (and we hereafter assume that there is only one run
-    #    per task).
     return f"{host}/#/experiments/{task_id}/runs/{task_summary.span_id}"
+
+
+def make_header(attributes):
+    # Return a header for task, eg
+    #   "ingest (Python task)""
+    #   "eda (Jupytext task)"
+    #
+    return f"""{attributes["task.id"]} ({attributes["task.type"].capitalize()} task)"""
 
 
 def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
@@ -67,17 +70,17 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
         return f"TASK_SPAN_ID_{span_id}"
 
     def dag_node_description(attributes) -> Tuple[str, List[str]]:
-        assert attributes["task.task_type"] == "jupytext"
+        assert attributes["task.type"] in ["jupytext", "python"]
 
         out_lines = []
         for k, v in attributes.items():
-            if k.startswith("task.") and k not in ["task.task_type", "task.notebook"]:
+            if k.startswith("task.") and k != "task.type":
                 out_lines += [f"{k}={v}"]
 
         # here one could potentially also add total length of task w.
         # outcome status (success/failure)
         return (
-            attributes["task.notebook"] + " (jupytext task)",
+            make_header(attributes),
             list(sorted(out_lines)),
         )
 
@@ -95,9 +98,6 @@ def make_mermaid_dag_inputfile(spans: Spans, generate_links: bool) -> str:
             return desc
 
     for task_summary in workflow_summary.task_runs:
-        if task_summary.attributes["task.task_type"] != "jupytext":
-            raise Exception(f"Unknown task type for {task_summary}")
-
         linkify = lambda x, ys: make_link(x, ys, task_summary)
 
         output_lines += [
@@ -135,10 +135,10 @@ def make_mermaid_gantt_inputfile(spans: Spans) -> str:
     for task_run_summary in workflow_summary.task_runs:
         attributes = task_run_summary.attributes
 
-        if attributes["task.task_type"] != "jupytext":
+        if attributes["task.type"] not in ["jupytext", "python"]:
             raise Exception(f"Unknown task type for {task_run_summary.attributes}")
 
-        output_lines += [f"""    section {attributes["task.notebook"]}"""]
+        output_lines += [f"""    section {make_header(attributes)}"""]
 
         if task_run_summary.is_success():
             description = "OK"

@@ -41,7 +41,8 @@ def test__python_task__stuck_tasks__parse_spans(spans: Spans):
         assert len(task_summary.logged_values) == 0
 
         assert task_summary.attributes == {
-            "task.task_id": "f-sleep-task",
+            "task.id": "f-sleep-task",
+            "task.type": "python",
             "task.num_cpus": 1,
             "task.timeout_s": TASK_TIMEOUT_S,
         }

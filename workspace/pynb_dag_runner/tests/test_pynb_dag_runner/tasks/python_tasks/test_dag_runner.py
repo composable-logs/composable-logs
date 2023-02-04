@@ -103,11 +103,12 @@ def test__cl__can_compose(cl__can_compose_spans: Spans):
         assert task_summary.is_success()
 
         # assert that task has expected attributes logged
-        task_id: str = task_summary.attributes["task.task_id"]  # type: ignore
+        task_id: str = task_summary.attributes["task.id"]  # type: ignore
         assert task_id in TEST_TASK_ATTRIBUTES
 
         assert task_summary.attributes == {
-            "task.task_id": task_id,
+            "task.id": task_id,
+            "task.type": "python",
             **TEST_TASK_ATTRIBUTES[task_id],
             "workflow.env": "xyz",
             "task.num_cpus": 1,
@@ -142,7 +143,8 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
     with SpanRecorder() as rec:
         assert run_dag(dag=f(), workflow_parameters=workflow_parameters) == Success(
             {
-                "task.task_id": "test_function",
+                "task.id": "test_function",
+                "task.type": "python",
                 "task.num_cpus": 1,
                 "task.timeout_s": 12.78,
                 **task_parameters,
