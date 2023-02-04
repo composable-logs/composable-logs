@@ -53,11 +53,11 @@ def write_spans_to_output_directory_structure(spans: Spans, out_basepath: Path):
 
     for task_run_summary in workflow_summary.task_runs:
         # -- write json with task-specific data --
-        if task_run_summary.attributes["task.task_type"] == "jupytext":
+        if task_run_summary.attributes["task.type"] == "jupytext":
             task_dir: str = "--".join(
                 [
-                    "jupytext-notebook-task",
-                    task_run_summary.attributes["task.notebook"]  # type: ignore
+                    "jupytext-task",
+                    task_run_summary.attributes["task.id"]  # type: ignore
                     .replace("/", "-")  # type: ignore
                     .replace(".", "-"),  # type: ignore
                     task_run_summary.span_id,
@@ -114,6 +114,7 @@ def args():
 
 def entry_point():
     print(f"--- pynb_log_parser cli {version_string()} ---")
+    print(f"--- Expand a log into a local directory tree to inspect log output")
 
     spans: Spans = Spans(read_json(args().input_span_file))
     print(f"Number of spans loaded {len(spans)}")

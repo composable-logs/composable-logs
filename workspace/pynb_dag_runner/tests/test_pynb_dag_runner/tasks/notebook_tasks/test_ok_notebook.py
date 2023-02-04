@@ -44,9 +44,8 @@ def test__jupytext__ok_notebook__parse_spans(spans_once: Spans):
     assert task_summary.attributes == {
         **TASK_PARAMETERS,
         "task.num_cpus": 1,
-        "task.task_id": str(TEST_NOTEBOOK.filepath),
-        "task.notebook": str(TEST_NOTEBOOK.filepath),  # <-- to be deleted
-        "task.task_type": "jupytext",
+        "task.id": "notebook_ok",
+        "task.type": "jupytext",
         "task.timeout_s": -1,
         # None converted into -1 since OpenTelemetry attributes should be non-null
     }
@@ -79,7 +78,7 @@ def test__jupytext__ok_notebook__parse_spans(spans_once: Spans):
 def spans_run_twice() -> Spans:
     # Return spans for running DAG with two nodes
     #
-    #      "notebook_ok.py"    --->       "notebook_ok.py"
+    #      "notebook_ok"    --->       "notebook_ok"
     #
 
     with SpanRecorder() as rec:
@@ -102,6 +101,6 @@ def test__jupytext__ok_notebook__run_twice(spans_run_twice: Spans):
 
     for task_summary in workflow_summary.task_runs:
         assert task_summary.is_success()
-        assert task_summary.task_id == str(TEST_NOTEBOOK.filepath)
+        assert task_summary.task_id == "notebook_ok"
 
     assert len(workflow_summary.task_dependencies) == 1

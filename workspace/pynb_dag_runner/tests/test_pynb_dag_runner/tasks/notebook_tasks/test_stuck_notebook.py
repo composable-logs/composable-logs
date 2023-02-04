@@ -46,9 +46,8 @@ def test__jupytext__stuck_notebook__validate_spans(spans: Spans):
         assert len(task_summary.logged_values) == 0
 
         assert task_summary.attributes == {
-            "task.task_id": "notebook_stuck.py",
-            "task.task_type": "jupytext",
-            "task.notebook": "notebook_stuck.py",  # <-- to be deleted
+            "task.id": "notebook_stuck",
+            "task.type": "jupytext",
             "task.num_cpus": 1,
             "task.timeout_s": TASK_TIMEOUT_S,
             **TASK_PARAMETERS,

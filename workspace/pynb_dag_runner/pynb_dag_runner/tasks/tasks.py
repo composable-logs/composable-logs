@@ -13,7 +13,7 @@ from pynb_dag_runner.tasks.task_opentelemetry_logging import _log_named_value
 
 # -
 from pynb_dag_runner.notebooks_helpers import JupytextNotebookContent
-from ..wrappers import task
+from ..wrappers import _task
 
 
 def _get_traceparent() -> str:
@@ -53,14 +53,16 @@ def make_jupytext_task(
     """
     task_parameters: AttributesDict = {
         **parameters,
-        "task.task_type": "jupytext",
-        # TODO: Remove "task.notebook" and make tasks depend on task.task_id instead.
-        # This allows better suport for non-notebook tasks.
-        "task.notebook": str(notebook.filepath),
     }
 
-    @task(
-        task_id=str(notebook.filepath),
+    @_task(
+        # task_id:
+        # Set to notebook filename without an extension as string. Eg
+        # /path/to/ingestion-notebook.py -> ingestion-notebook
+        # The assumption is that we do not have notebooks with the same filenames in
+        # different directories
+        task_id=notebook.filepath.stem,
+        task_type="jupytext",
         task_parameters=task_parameters,
         timeout_s=timeout_s,
         num_cpus=num_cpus,

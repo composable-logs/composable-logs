@@ -47,8 +47,8 @@ def test__python_task__parallel_tasks__success(spans_ok: Spans):
         assert len(task_summary.logged_artifacts) == 0
         assert len(task_summary.logged_values) == 0
 
-        assert task_summary.task_id == task_summary.attributes["task.task_id"]
-        ids.append(task_summary.attributes["task.task_id"])
+        assert task_summary.task_id == task_summary.attributes["task.id"]
+        ids.append(task_summary.attributes["task.id"])
         ranges.append(task_summary.timing.get_task_timestamp_range_us_epoch())
 
     assert set(ids) == {"f-#1", "f-#2"}

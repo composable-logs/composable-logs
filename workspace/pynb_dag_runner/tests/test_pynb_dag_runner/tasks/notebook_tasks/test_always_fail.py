@@ -45,15 +45,10 @@ def test__jupytext__always_fail__parse_spans(spans: Spans):
     assert len(task_summary.exceptions) == 1
     assert "This notebook always fails" in str(task_summary.exceptions)
 
-    # asset attributes are logged
-    # (str needed to avoid mypy validation error)
-    assert "notebook_always_fail.py" in str(task_summary.attributes["task.notebook"])
-
     assert task_summary.attributes == {
         **TASK_PARAMETERS,
         "task.num_cpus": 1,
-        "task.task_type": "jupytext",
-        "task.task_id": "notebook_always_fail.py",
-        "task.notebook": "notebook_always_fail.py",
+        "task.type": "jupytext",
+        "task.id": "notebook_always_fail",
         "task.timeout_s": TASK_TIMEOUT_S,
     }
