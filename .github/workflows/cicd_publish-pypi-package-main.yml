@@ -2,7 +2,7 @@ name: "ci/cd: publish package to PyPI"
 
 # On commits to main that update the PYTHON_PACKAGE_VERSION file
 #  - Run automated tests
-#  - Build and publish pynb-dag-runner release (version <current-package-version>)
+#  - Build and publish composable-logs release (version <current-package-version>)
 #  - Also persist package as Github artifact for short-term debugging
 #  - Tag release commit to version in PYTHON_PACKAGE_VERSION
 
@@ -13,7 +13,7 @@ on:
     branches:
       - main
     paths:
-      - workspace/pynb_dag_runner/PYTHON_PACKAGE_VERSION
+      - workspace/composable_logs/PYTHON_PACKAGE_VERSION
 
 jobs:
   ci-run-tests-and-build-python-pacakge:
@@ -49,7 +49,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           echo "PYTHON_PACKAGE_VERSION=$( \
-            cat ./workspace/pynb_dag_runner/PYTHON_PACKAGE_VERSION | head -n 1 - \
+            cat ./workspace/composable_logs/PYTHON_PACKAGE_VERSION | head -n 1 - \
           )" >> $GITHUB_ENV
 
           echo "PYTHON_PACKAGE_VERSION = ${PYTHON_PACKAGE_VERSION}"

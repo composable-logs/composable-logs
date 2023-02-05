@@ -1,7 +1,7 @@
-# Docker image for testing and building pynb-dag-runner library
+# Docker image for testing and building composable-logs library
 # Used by ci/cd (automated tests and build process) in Github.
 
-FROM pynb-dag-runner-base
+FROM composable-logs-base
 
 COPY requirements.txt /home/host_user/
 

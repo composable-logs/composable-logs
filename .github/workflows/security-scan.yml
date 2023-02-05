@@ -49,10 +49,10 @@ jobs:
       #
       # Trivy (and the below Trivy action) are Apache 2 licensed.
 
-      - name: "Trivy: Scan 'pynb-dag-runner-dev' Docker image"
+      - name: "Trivy: Scan 'composable-logs-dev' Docker image"
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: pynb-dag-runner-dev
+          image-ref: composable-logs-dev
           format: template
           template: '@/contrib/sarif.tpl'
           output: trivy-results.sarif

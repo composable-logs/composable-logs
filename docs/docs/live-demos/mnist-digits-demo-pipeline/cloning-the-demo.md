@@ -1,4 +1,4 @@
-The demo pipeline [mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline) uses only services associated with a free personal Github account, but no other cloud infrastructure.
+The demo pipeline [mnist-digits-demo-pipeline](https://github.com/composable-logs/mnist-digits-demo-pipeline) uses only services associated with a free personal Github account, but no other cloud infrastructure.
 
 This means that anyone can create their own demo pipeline (with scheduled pipeline runs and ci/cd automation) by just cloning the above Github repository.
 
@@ -12,7 +12,7 @@ The below describes how to enable scheduled runs and ci/cd automation after the 
 
 #### Steps to clone the demo pipeline
 
-##### 1. Fork the demo pipeline repo [mnist-digits-demo-pipeline](https://github.com/pynb-dag-runner/mnist-digits-demo-pipeline):
+##### 1. Fork the demo pipeline repo [mnist-digits-demo-pipeline](https://github.com/composable-logs/mnist-digits-demo-pipeline):
 
 - Select "Copy the `main` branch only"
 

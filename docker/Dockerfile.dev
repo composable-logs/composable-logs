@@ -1,4 +1,4 @@
-FROM pynb-dag-runner-cicd
+FROM composable-logs-cicd
 
 # Docker image for
 #  - interactive Jupyter development

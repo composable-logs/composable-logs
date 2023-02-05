@@ -29,7 +29,7 @@ jobs:
 
       - name: Ensure repo has no data in dist-folder
         run: |
-          rm -rf ./workspace/pynb_dag_runner/dist
+          rm -rf ./workspace/composable_logs/dist
 
       - name: Build base-docker image
         run: |
@@ -38,27 +38,27 @@ jobs:
       - name: Download wheel file built in previously step
         uses: actions/download-artifact@v3
         with:
-          path: workspace/pynb_dag_runner/dist
-          name: pynb-dag-runner-wheel
+          path: workspace/composable_logs/dist
+          name: composable-logs-wheel
 
       - name: Check that wheel can be installed and imported
         run: |
           cd docker
           make in-base-docker/run-command \
             COMMAND="( \
-              pip install --quiet --user ./pynb_dag_runner/dist/*.whl; \
-              python3 -c 'import pynb_dag_runner' \
+              pip install --quiet --user ./composable_logs/dist/*.whl; \
+              python3 -c 'import composable_logs' \
             )"
 
       - name: Set package url (snapshot release)
         run: |
-          echo "PACKAGE_PYPI_URL=https://pypi.org/project/pynb-dag-runner-snapshot/" >> $GITHUB_ENV
+          echo "PACKAGE_PYPI_URL=https://pypi.org/project/composable-logs-snapshot/" >> $GITHUB_ENV
         if: |
           inputs.python-package-release-target == 'snapshot-release'
 
       - name: Set package url (main release)
         run: |
-          echo "PACKAGE_PYPI_URL=https://pypi.org/project/pynb-dag-runner/" >> $GITHUB_ENV
+          echo "PACKAGE_PYPI_URL=https://pypi.org/project/composable-logs/" >> $GITHUB_ENV
         if: |
           inputs.python-package-release-target == 'main-release'
 
@@ -69,18 +69,18 @@ jobs:
           echo ""
           echo "#### Built wheel file"                        >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
-          find ./workspace/pynb_dag_runner/dist/. -type f     >> $GITHUB_STEP_SUMMARY
+          find ./workspace/composable_logs/dist/. -type f     >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
 
           echo "#### Wheel file listing"                      >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
-          unzip -l ./workspace/pynb_dag_runner/dist/*.whl     >> $GITHUB_STEP_SUMMARY
+          unzip -l ./workspace/composable_logs/dist/*.whl     >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
 
           echo "#### content of ${BT}__version__.py${BT}"     >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
-          unzip -p ./workspace/pynb_dag_runner/dist/*.whl \
-                   pynb_dag_runner/__version__.py             >> $GITHUB_STEP_SUMMARY
+          unzip -p ./workspace/composable_logs/dist/*.whl \
+                   composable_logs/__version__.py             >> $GITHUB_STEP_SUMMARY
           echo "$THREE_BACKTICKS"                             >> $GITHUB_STEP_SUMMARY
 
         env:
@@ -97,11 +97,11 @@ jobs:
             " \
             COMMAND="( \
               pip install --quiet --user twine==4.0.1; \
-              twine check ./pynb_dag_runner/dist/*.whl; \
+              twine check ./composable_logs/dist/*.whl; \
               twine upload \
                   --verbose \
                   --disable-progress-bar \
-                  ./pynb_dag_runner/dist/*.whl \
+                  ./composable_logs/dist/*.whl \
             )"
 
         env:

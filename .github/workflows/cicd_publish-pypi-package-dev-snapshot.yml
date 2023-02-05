@@ -2,7 +2,7 @@ name: "ci/cd: publish snapshot to PyPI"
 
 # On all commits to main:
 #  - Run automated tests
-#  - Build and publish pynb-dag-runner snapshot release
+#  - Build and publish composable-logs snapshot release
 #    (its version is <current-package-version>.dev<unix epoch of latest commit>)
 #  - Also persist package as Github artifact for short-term debugging
 

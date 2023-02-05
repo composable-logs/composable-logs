@@ -8,7 +8,7 @@ This list is not complete. Additions and corrections are welcome ([eg here](http
 
 ### MLFlow 2.0
 - [Blog annoucement 6/2022<sup><sup><sub>:material-launch:</sub></sup></sup>](https://databricks.com/blog/2022/06/29/introducing-mlflow-pipelines-with-mlflow-2-0.html)
-- Includes workflow (pipeline)-level reporting (similar as done in `pynb-dag-runner`)
+- Includes workflow (pipeline)-level reporting (similar as done in `composable-logs`)
 
 ### ZenML
 - Also includes support for running pipelines on Github actions compute infra, [6/2022 blog post<sup><sup><sub>:material-launch:</sub></sup></sup>](https://blog.zenml.io/github-actions-orchestrator/). However, the setup seems to require cloud storage.
