@@ -39,12 +39,12 @@ jobs:
         run: |
           make build-docker-images
 
-      # ------
+      # v------
       # The below following instructions from here:
       #
       #  https://github.com/aquasecurity/trivy-action
       #
-      # Note that we build three docker images, but one scan the last one
+      # Note that we build three docker images, but we scan the last one
       # since each image is built based on the previous one.
       #
       # Trivy (and the below Trivy action) are Apache 2 licensed.
@@ -62,4 +62,4 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
-      # ------
+      # ^------

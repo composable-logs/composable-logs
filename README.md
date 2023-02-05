@@ -8,15 +8,18 @@
 
 </div>
 
-# `Composable Logs`
+# Composable Logs
 
-> ***Composable Logs** is a Python library to run ML/data workflows on stateless compute infrastructure (that may be ephemeral or serverless).*
+***Composable Logs** is a Python library to run ML/data workflows on stateless compute infrastructure (that may be ephemeral or serverless).*
 
-In particular, Composable Logs supports ML experiment tracking without a dedicated tracking server (and database) to record ML metrics, models or artifacts.
-Instead, these are emitted using the **[OpenTelemetry standard](https://opentelemetry.io/)** for logging.
-This is an open standard in software engineering with growing support.
+In particular, using Composable Logs one can do ML experiment tracking without a dedicated tracking server (and database) to record ML metrics, models or artifacts.
+Instead, these are emitted using the **[OpenTelemetry standard](https://opentelemetry.io/)** for logging. This is an open standard in software engineering with growing support.
+
+It can be useful to think of the logs emitted by Composable Logs as somewhat similar to logs emitted by unit test frameworks (like eg the JUnit format).
 
 For example, log events emitted from Composable Logs can be directed to a JSON-file, or sent to any log storage supporting OpenTelemetry (span) events. In either case, this means that one does not need a separate tracking service only for ML experiments.
+
+The below shows how a captured JSON log can be converted into a static website based on ML Flow.
 
 Composable Logs uses the **[Ray framework](https://www.ray.io/ray-core)** for parallel task execution.
 
@@ -55,6 +58,6 @@ Composable Logs uses the **[Ray framework](https://www.ray.io/ray-core)** for pa
 Any feedback/ideas welcome!
 
 ## License
-(c) Matias Dahl 2021-2022, MIT, see [LICENSE.md](./LICENSE.md).
+(c) Matias Dahl, MIT, see [LICENSE.md](./LICENSE.md).
 
 (Note: As of 1/2023 this project was renamed from `pynb-dag-runner` to `composable-logs`.)
