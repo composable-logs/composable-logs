@@ -19,6 +19,8 @@ It can be useful to think of the logs emitted by Composable Logs as somewhat sim
 
 For example, log events emitted from Composable Logs can be directed to a JSON-file, or sent to any log storage supporting OpenTelemetry (span) events. In either case, this means that one does not need a separate tracking service only for ML experiments.
 
+The below shows how a captured JSON log can be converted into a static website based on ML Flow.
+
 Composable Logs uses the **[Ray framework](https://www.ray.io/ray-core)** for parallel task execution.
 
 ### For more details:
