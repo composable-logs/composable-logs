@@ -57,7 +57,7 @@ Developer[Developer, <br />local development]
 
 Developer --> Git
   subgraph "<b>Stateless execution</b>"
-    subgraph "<b>Execution driver</b> (pynb-dag-runner)"
+    subgraph "<b>Execution driver</b> (composable-logs)"
         Code[Codes]
     end
 
@@ -108,10 +108,10 @@ The [Demo workflow](../live-demos/mnist-digits-demo-pipeline/)-section in this d
 how one eg. deploy and run a workflow using only services provided with a (free, personal) Github account.
 
 <figure markdown>
-  [![screenshot-task-list.png](../live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png){ width="800"}](https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/)
+  [![screenshot-task-list.png](../live-demos/mnist-digits-demo-pipeline/screenshot-task-list.png){ width="800"}](https://composable-logs.github.io/mnist-digits-demo-pipeline/)
   <figcaption>
-  <b><a href="https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/">
-  https://pynb-dag-runner.github.io/mnist-digits-demo-pipeline/
+  <b><a href="https://composable-logs.github.io/mnist-digits-demo-pipeline/">
+  https://composable-logs.github.io/mnist-digits-demo-pipeline/
   </a></b>
   </figcaption>
   <figcaption>

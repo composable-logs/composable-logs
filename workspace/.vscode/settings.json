@@ -29,5 +29,5 @@
     "remote.downloadExtensionsLocally": true,
     // Terminal settings
     "terminal.integrated.fontSize": 11,
-    "terminal.integrated.cwd": "/home/host_user/workspace/pynb_dag_runner/"
+    "terminal.integrated.cwd": "/home/host_user/workspace/composable_logs/"
 }

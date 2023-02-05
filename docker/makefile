@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-DOCKER_IMAGE_NAME       := pynb-dag-runner
+DOCKER_IMAGE_NAME       := composable-logs
 BUILT_DOCKER_LOCK_FILE  := ./.built-docker-images/${DOCKER_IMAGE_NAME}
 
 # --- Helper tasks ---
@@ -68,7 +68,7 @@ run-in-docker: | env_COMMAND env_DOCKER_IMG
 	    ${DOCKER_ARGS} \
 	    --volume $(shell pwd)/../workspace:/home/host_user/workspace \
 	    --workdir /home/host_user/workspace/ \
-	    pynb-dag-runner-${DOCKER_IMG} \
+	    composable-logs-${DOCKER_IMG} \
 	    "${COMMAND}"
 
 in-base-docker/run-command: | env_COMMAND

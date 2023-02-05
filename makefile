@@ -15,10 +15,10 @@ build-docker-images:
 	@(cd docker; ${MAKE} build-docker-images)
 
 
-# --- define main dockerized tasks for testing and building pynb-dag-runner Python package---
+# --- define main dockerized tasks for testing and building composable-logs Python package---
 
 clean:
-	@(cd workspace/pynb_dag_runner; ${MAKE} clean)
+	@(cd workspace/composable_logs; ${MAKE} clean)
 
 in-ci-docker/build: | env_GITHUB_SHA \
                       env_PYTHON_PACKAGE_RELEASE_TARGET \
@@ -32,7 +32,7 @@ in-ci-docker/build: | env_GITHUB_SHA \
 	        --volume $(shell pwd):/repo-root:ro \
 	    " \
 	    COMMAND="( \
-	        cd pynb_dag_runner; \
+	        cd composable_logs; \
 	        make build \
 	            README_FILEPATH=/repo-root/README.md; \
 		)"
@@ -47,7 +47,7 @@ in-dev-docker/watch-pytest:
 	cd docker; \
 	${MAKE} in-dev-docker/run-command \
 	    COMMAND="( \
-	        cd pynb_dag_runner; \
+	        cd composable_logs; \
 	        make watch-test-pytest \
 	            PYTEST_FILTER=\"${PYTEST_FILTER}\" \
 	    )"
@@ -63,7 +63,7 @@ in-dev-docker/tmux-watch-all-tests:
 	${MAKE} in-dev-docker/run-command \
 	    DOCKER_ARGS="-i" \
 	    COMMAND="( \
-	        cd pynb_dag_runner; \
+	        cd composable_logs; \
 	        make tmux-watch-all-tests \
 	            PYTEST_FILTER=\"${PYTEST_FILTER}\" \
 	    )"

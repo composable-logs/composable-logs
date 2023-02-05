@@ -34,19 +34,19 @@ jobs:
           cd docker
           make in-ci-docker/run-command \
               RUN_ENVIRONMENT="${{ env.RUN_ENVIRONMENT }}" \
-              COMMAND="(cd pynb_dag_runner; make test-pytest )"
+              COMMAND="(cd composable_logs; make test-pytest )"
 
       - name: Run mypy type checks
         run: |
           cd docker
           make in-ci-docker/run-command \
-              COMMAND="(cd pynb_dag_runner; make test-mypy )" \
+              COMMAND="(cd composable_logs; make test-mypy )" \
 
       - name: Check black formatting
         run: |
           cd docker
           make in-ci-docker/run-command \
-              COMMAND="(cd pynb_dag_runner; make test-black )"
+              COMMAND="(cd composable_logs; make test-black )"
 
       - name: Determining unix epoch time stamp of commit (to version snapshot releases)
         run: |
@@ -58,7 +58,7 @@ jobs:
             git show ${GITHUB_SHA} --no-patch --format=%ct \
           )" >> $GITHUB_ENV
 
-      - name: Build Python package for the pynb-dag-runner library
+      - name: Build Python package for the composable-logs library
         run: |
           make in-ci-docker/build
 
@@ -68,7 +68,7 @@ jobs:
       - name: Save Python package wheel-file as a Github build artefact
         uses: actions/upload-artifact@v2
         with:
-          name: pynb-dag-runner-wheel
-          path: ${{ github.workspace }}/workspace/pynb_dag_runner/dist/
+          name: composable-logs-wheel
+          path: ${{ github.workspace }}/workspace/composable_logs/dist/
           if-no-files-found: error
           retention-days: 1

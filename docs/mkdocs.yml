@@ -99,7 +99,7 @@ plugins:
 nav:
   - Home:
      - Intro:
-        - "What is pynb-dag-runner?": home/index.md
+        - "What is composable-logs?": home/index.md
         - Notebook support: home/notebook-support.md
         - Similar projects: home/similar-projects.md
      - Development:
