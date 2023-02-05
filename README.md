@@ -58,6 +58,6 @@ Composable Logs uses the **[Ray framework](https://www.ray.io/ray-core)** for pa
 Any feedback/ideas welcome!
 
 ## License
-(c) Matias Dahl 2021-2022, MIT, see [LICENSE.md](./LICENSE.md).
+(c) Matias Dahl, MIT, see [LICENSE.md](./LICENSE.md).
 
 (Note: As of 1/2023 this project was renamed from `pynb-dag-runner` to `composable-logs`.)
