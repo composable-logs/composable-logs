@@ -51,9 +51,6 @@ def make_jupytext_task(
        The solution would be to enable OpenTelemetry logging for Papermill on a
        per-cell level.
     """
-    task_parameters: AttributesDict = {
-        **parameters,
-    }
 
     @_task(
         # task_id:
@@ -63,7 +60,7 @@ def make_jupytext_task(
         # different directories
         task_id=notebook.filepath.stem,
         task_type="jupytext",
-        task_parameters=task_parameters,
+        task_parameters=parameters,
         timeout_s=timeout_s,
         num_cpus=num_cpus,
     )
@@ -86,7 +83,7 @@ def make_jupytext_task(
             parameters={
                 "P": {
                     **kwargs,
-                    **task_parameters,
+                    **parameters,
                     **baggage,
                     "_opentelemetry_traceparent": _get_traceparent(),
                 }
@@ -102,6 +99,7 @@ def make_jupytext_task(
         )
 
         if err is not None:
+            print(err)
             raise err
 
     return run_notebook_task

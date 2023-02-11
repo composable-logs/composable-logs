@@ -298,3 +298,7 @@ class ComposableLogsLogger:
             content_type="float",
             traceparent=self._traceparent,
         )
+
+
+def get_task_logging_context():
+    return ComposableLogsLogger(P={})

@@ -13,6 +13,9 @@ from composable_logs.opentelemetry_helpers import (
 from composable_logs.opentelemetry_task_span_parser import (
     parse_spans,
 )
+from composable_logs.tasks.task_opentelemetry_logging import (
+    get_task_logging_context,
+)
 from composable_logs.helpers import Success
 from composable_logs.wrappers import task, run_dag, TaskContext
 
@@ -67,7 +70,7 @@ def cl__can_compose_spans() -> Spans:
         return 10
 
     @task(task_id="input_2", task_parameters=TEST_TASK_ATTRIBUTES["input_2"])
-    def input_2(a_variable, C: TaskContext):
+    def input_2(a_variable):
         return a_variable + 20
 
     @task(task_id="process", task_parameters=TEST_TASK_ATTRIBUTES["process"])
@@ -137,7 +140,8 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
     task_parameters = {"task.X": 123, "task.Y": "indigo"}
 
     @task(task_id="test_function", task_parameters=task_parameters, timeout_s=12.78)
-    def f(C: TaskContext):
+    def f():
+        C = get_task_logging_context()
         return C.parameters
 
     with SpanRecorder() as rec:

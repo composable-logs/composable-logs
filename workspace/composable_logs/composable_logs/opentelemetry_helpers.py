@@ -513,6 +513,9 @@ class SpanRecorder:
 
     This below implementation assumes that spans are written using Ray's default to-file
     span logger. See ray.init for details of how this is enabled during unit testing.
+
+    This is source of transient errors (see sleep commands below) and needs to be
+    revised, a real OpenTelemetry collector?
     """
 
     def __init__(self):
@@ -527,8 +530,9 @@ class SpanRecorder:
         return self
 
     def __exit__(self, type, value, traceback):
-        time.sleep(0.25)
+        time.sleep(0.4)
         assert otel.trace.get_tracer_provider().force_flush()  # type: ignore
+        time.sleep(0.4)
 
         # get new spans after test has run
         self.spans = Spans(

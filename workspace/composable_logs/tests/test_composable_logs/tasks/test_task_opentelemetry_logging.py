@@ -7,7 +7,7 @@ import pytest
 import opentelemetry as ot
 
 # -
-from composable_logs.wrappers import task, run_dag, TaskContext
+from composable_logs.wrappers import task, run_dag
 from composable_logs.opentelemetry_helpers import Spans, SpanRecorder
 from composable_logs.helpers import one, Success, Failure
 from composable_logs.tasks.tasks import _get_traceparent
@@ -15,6 +15,7 @@ from composable_logs.tasks.task_opentelemetry_logging import (
     ComposableLogsLogger,
     SerializedData,
     LoggableTypes,
+    get_task_logging_context,
 )
 from composable_logs.opentelemetry_task_span_parser import (
     parse_spans,
@@ -126,20 +127,25 @@ def spans_to_test_otel_loggging() -> Spans:
     # values. This allows us to test that logging keeps track where a value was logged.
     #
     @task(task_id="task-f")
-    def f(C: TaskContext):
+    def f():
+        C = get_task_logging_context()
+
         C.log_artefact("read-first", "hello")
         C.log_int("read-first", 111)
         return 1000
 
     @task(task_id="task-g")
-    def g(C: TaskContext):
+    def g():
+        C = get_task_logging_context()
         C.log_artefact("read-first", TEST_BINARY_FILE)
         C.log_int("read-first", 222)
         return 2000
 
     @task(task_id="task-h")
-    def h(f_output, g_output, C: TaskContext):
+    def h(f_output, g_output):
         assert f_output == 1000 and g_output == 2000
+        C = get_task_logging_context()
+
         C.log_int("a-logged-int", 1020)
         C.log_float("a-logged-float", 12.3)
         # C.log_float("b-float", 12) will fail
@@ -241,11 +247,13 @@ def test__task_logger__values_are_logged_also_for_failed_tasks():
     test_exception = Exception("task-g failed")
 
     @task(task_id="task-f")
-    def f(C: TaskContext):
+    def f():
+        C = get_task_logging_context()
         C.log_int("log-a-value-in-first-task", 10000)
 
     @task(task_id="task-g")
-    def g(arg, C: TaskContext):
+    def g(arg):
+        C = get_task_logging_context()
         C.log_artefact("read-me", "123!")
         C.log_int("log-a-value-in-second-task-before-failing", 20000)
         raise test_exception

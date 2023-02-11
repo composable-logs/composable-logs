@@ -141,26 +141,6 @@ class TaskContext:
         self.logger.log_float(name, value)
 
 
-def inject_task_context_argument_wrapper(f, parameters: Mapping[str, Any]):
-    """
-    TODO Revise logic.
-
-     - Eg. inject only TaskContext for a variable that has this is type.
-     - Ensure that there is at most one TaskContext argument in f
-
-    """
-    if "C" in inspect.signature(f).parameters.keys():
-        extra = {"C": TaskContext(parameters=parameters)}
-
-        def wrapped(*args, **kwargs):
-            return f(*args, **extra, **kwargs)
-
-        return wrapped
-
-    else:
-        return f
-
-
 def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     """
     Return a wrapped function `f_wrapped(*args, **kwargs)` such that:
@@ -291,6 +271,7 @@ def _task(
                     "task.timeout_s": -1 if timeout_s is None else timeout_s,
                 }
 
+                # Record OpenTelemetry parameters for this task
                 for k, v in augmented_task_parameters.items():
                     if v is None:
                         # Behavior of NULL OpenTelemetry attributes is undefined.
@@ -318,25 +299,28 @@ def _task(
                     else:
                         args_unwrapped.append(arg)
 
-                for arg in args:
-                    if isinstance(arg, TaskResult):
-                        with tracer.start_as_current_span("task-dependency") as subspan:
-                            subspan.set_attribute("from_task_span_id", arg.span_id)
-                            subspan.set_attribute("to_task_span_id", this_task_span_id)
-
                 for _, v in kwargs.items():
                     if isinstance(v, TaskResult):
                         raise Exception(
                             "task composition not yet supported using kwargs"
                         )
 
+                # Log dependencies to upstream tasks into OpenTelemetry log
+                for arg in args:
+                    if isinstance(arg, TaskResult):
+                        with tracer.start_as_current_span("task-dependency") as subspan:
+                            subspan.set_attribute("from_task_span_id", arg.span_id)
+                            subspan.set_attribute("to_task_span_id", this_task_span_id)
+
                 del args
 
                 # ---
 
-                f_injected = inject_task_context_argument_wrapper(
-                    f, augmented_task_parameters
-                )
+                f_injected = f
+
+                # inject_task_context_argument_wrapper(
+                #    f, augmented_task_parameters
+                # )
 
                 f_timeout_guarded = timeout_guard_wrapper(
                     f_injected,

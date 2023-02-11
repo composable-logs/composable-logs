@@ -17,6 +17,8 @@ from composable_logs.tasks.task_opentelemetry_logging import ComposableLogsLogge
 
 # %%
 
+assert "_opentelemetry_traceparent" in P, str(P)
+
 logger = ComposableLogsLogger(P)
 
 # %%
