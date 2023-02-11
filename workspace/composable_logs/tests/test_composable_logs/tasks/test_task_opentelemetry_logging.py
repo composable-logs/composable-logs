@@ -12,7 +12,7 @@ from composable_logs.opentelemetry_helpers import Spans, SpanRecorder
 from composable_logs.helpers import one, Success, Failure
 from composable_logs.tasks.tasks import _get_traceparent
 from composable_logs.tasks.task_opentelemetry_logging import (
-    PydarLogger,
+    ComposableLogsLogger,
     SerializedData,
     LoggableTypes,
 )
@@ -75,7 +75,7 @@ def test__encode_decode_to_wire__exceptions_for_invalid_data():
         SerializedData("string", "utf8", "should be 'utf-8'").decode()
 
 
-# ---- test logging from PydarLogger ----
+# ---- test logging from ComposableLogsLogger ----
 
 
 def test__task_logger__logged_spans_are_nested():
@@ -84,7 +84,7 @@ def test__task_logger__logged_spans_are_nested():
             tracer = ot.trace.get_tracer(__name__)
             with tracer.start_as_current_span("parent-span") as t1:
                 with tracer.start_as_current_span("sub-span") as t2:
-                    logger = PydarLogger(
+                    logger = ComposableLogsLogger(
                         P={
                             "_opentelemetry_traceparent": _get_traceparent(),
                         }

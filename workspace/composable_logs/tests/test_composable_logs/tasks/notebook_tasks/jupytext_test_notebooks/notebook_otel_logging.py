@@ -13,11 +13,11 @@ P = {"task.variable_a": "value-used-during-interactive-development"}
 import sys
 
 sys.path.append("/home/host_user/workspace/composable_logs")
-from composable_logs.tasks.task_opentelemetry_logging import PydarLogger
+from composable_logs.tasks.task_opentelemetry_logging import ComposableLogsLogger
 
 # %%
 
-logger = PydarLogger(P)
+logger = ComposableLogsLogger(P)
 
 # %%
 # test logging of artefact with utf-8 content

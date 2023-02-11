@@ -298,6 +298,3 @@ class ComposableLogsLogger:
             content_type="float",
             traceparent=self._traceparent,
         )
-
-
-PydarLogger = ComposableLogsLogger  # keep old name for compatibility
