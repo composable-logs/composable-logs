@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Mapping, Union, Sequence, Optional
+from typing import Any, List, Mapping, Union, Sequence, Optional
 import collections
 
 # -
@@ -362,6 +362,78 @@ def task(
     )
 
 
+def _run_dag_in_top_span(
+    span,
+    dag: Union[FunctionNode, Sequence[FunctionNode]],
+    workflow_parameters: Mapping[str, Any] = {},
+) -> Try:
+    # ensure global parameters are logged and can be accessed from subspans
+    for k, v in workflow_parameters.items():
+        span.set_attribute(k, v)
+        otel_add_baggage(k, v)
+
+    if isinstance(dag, FunctionNode):
+        return _run_dag_in_top_span(span, [dag]).map_value(lambda xs: one(xs))
+
+    elif isinstance(dag, collections.Sequence):
+        # Execute DAG with multiple ends like:
+        #
+        #          ---> Node 2
+        #         /
+        #  Node 1 ----> Node 3
+        #         \
+        #          ---> Node 4
+        #
+        # Now dag_run([N2, N3, N4]) awaits the results for all end nodes,
+        # and returns a Try that:
+        #
+        #  - if all nodes ran successfully: return a Try(Success) with return values
+        #    of end nodes as a list.
+        #
+        #  - if any node(s) in the DAG fails: return a Try(Failure) with an
+        #    ExceptionGroup collecting all exceptions. Note that two nodes in the
+        #    DAG can fail independently in parallel.
+        #
+        # Notes:
+        #
+        #  - We do not want to [node.execute() for node in dag]. In the above DAG,
+        #    this would run Node 1 three times. Rather, we start execution on a
+        #    collect-node that waits for all upstream nodes.
+        #
+        #  - The collect node will not be seen in OpenTelemetry logs.
+        #
+        @workflow.options(task_id="collect-nodes")  # type: ignore
+        @ray.remote(retry_exceptions=False, num_cpus=0, max_retries=0)
+        def collect(*args):
+            return args
+
+        dag_results = ray.get(collect.bind(*dag).execute())  # type: ignore
+
+        # verify type of return values
+        for dag_result in dag_results:
+            if not (
+                isinstance(dag_result, Try)
+                and (
+                    dag_result.is_failure() or isinstance(dag_result.value, TaskResult)
+                )
+            ):
+                raise Exception(
+                    f"Expected a Try[TaskResult] got {str(dag_result)[:100]}."
+                )
+
+        dag_errors: List[Exception] = [
+            result.error for result in dag_results if result.is_failure()
+        ]
+
+        if len(dag_errors) > 0:
+            return Failure(flatten_exceptions(*dag_errors))
+        else:
+            return Success([dag_result.get().result for dag_result in dag_results])
+
+    else:
+        raise Exception(f"Unknown input to run_dag {type(dag)}")
+
+
 def run_dag(
     dag: Union[FunctionNode, Sequence[FunctionNode]],
     workflow_parameters: Mapping[str, Any] = {},
@@ -370,71 +442,5 @@ def run_dag(
     Run a Ray DAG with OpenTelemetry logging
     """
     tracer = otel.trace.get_tracer(__name__)
-
     with tracer.start_as_current_span("dag-top-span") as span:
-        # ensure global parameters are logged and can be accessed from subspans
-        for k, v in workflow_parameters.items():
-            span.set_attribute(k, v)
-            otel_add_baggage(k, v)
-
-        if isinstance(dag, FunctionNode):
-            return run_dag([dag]).map_value(lambda xs: one(xs))
-
-        elif isinstance(dag, collections.Sequence):
-            # Execute DAG with multiple ends like:
-            #
-            #          ---> Node 2
-            #         /
-            #  Node 1 ----> Node 3
-            #         \
-            #          ---> Node 4
-            #
-            # Now dag_run([N2, N3, N4]) awaits the results for all end nodes,
-            # and returns a Try that:
-            #
-            #  - if all nodes ran successfully: return a Try(Success) with return values
-            #    of end nodes as a list.
-            #
-            #  - if any node(s) in the DAG fails: return a Try(Failure) with an
-            #    ExceptionGroup collecting all exceptions. Note that two nodes in the
-            #    DAG can fail independently in parallel.
-            #
-            # Notes:
-            #
-            #  - We do not want to [node.execute() for node in dag]. In the above DAG,
-            #    this would run Node 1 three times. Rather, we start execution on a
-            #    collect-node that waits for all upstream nodes.
-            #
-            #  - The collect node will not be seen in OpenTelemetry logs.
-            #
-            @workflow.options(task_id="collect-nodes")  # type: ignore
-            @ray.remote(retry_exceptions=False, num_cpus=0, max_retries=0)
-            def collect(*args):
-                return args
-
-            dag_results = ray.get(collect.bind(*dag).execute())  # type: ignore
-
-            # verify type of return values
-            for dag_result in dag_results:
-                if not (
-                    isinstance(dag_result, Try)
-                    and (
-                        dag_result.is_failure()
-                        or isinstance(dag_result.value, TaskResult)
-                    )
-                ):
-                    raise Exception(
-                        f"Expected a Try[TaskResult] got {str(dag_result)[:100]}."
-                    )
-
-            dag_errors: List[Exception] = [
-                result.error for result in dag_results if result.is_failure()
-            ]
-
-            if len(dag_errors) > 0:
-                return Failure(flatten_exceptions(*dag_errors))
-            else:
-                return Success([dag_result.get().result for dag_result in dag_results])
-
-        else:
-            raise Exception(f"Unknown input to run_dag {type(dag)}")
+        return _run_dag_in_top_span(span, dag, workflow_parameters)

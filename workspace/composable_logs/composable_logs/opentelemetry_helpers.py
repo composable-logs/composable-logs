@@ -421,7 +421,9 @@ class Spans:
     def contains_path(self, *span_chain: Span) -> bool:
         """
         Return true/false depending on whether there is a parent-child relationship
-        link between the spans in span_chain.
+        path between the spans in span_chain.
+
+        The path may include intermediate spans not listed in chain_chain.
 
         Cycles in self are not detected.
         """

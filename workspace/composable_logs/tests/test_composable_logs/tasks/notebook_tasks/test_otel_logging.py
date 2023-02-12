@@ -47,6 +47,38 @@ def spans() -> Spans:
     return rec.spans
 
 
+def test__jupytext__otel_logging_from_notebook__nesting_of_spans(spans: Spans):
+
+    named_spans = []
+    for s in spans:
+        if "ray." not in s["name"].lower():
+            named_spans += [s["name"]]
+
+    assert set(named_spans) == {
+        "dag-top-span",
+        "execute-task",
+        "call-python-function",
+        "timeout-guard",
+        "artefact",
+        "named-value",
+    }
+
+    dag_top_span = one(spans.filter(["name"], "dag-top-span"))
+    execute_task_span = one(spans.filter(["name"], "execute-task"))
+    timeout_guard_span = one(spans.filter(["name"], "timeout-guard"))
+    python_call_span = one(spans.filter(["name"], "call-python-function"))
+
+    spans.contains_path(
+        dag_top_span, execute_task_span, timeout_guard_span, python_call_span
+    )
+
+    for span in spans.filter(["name"], "artefact"):
+        spans.contains_path(python_call_span, span)
+
+    for span in spans.filter(["name"], "named-value"):
+        spans.contains_path(python_call_span, span)
+
+
 def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans: Spans):
     workflow_summary = parse_spans(spans)
 
