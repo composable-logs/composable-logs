@@ -1,11 +1,8 @@
-from typing import Optional, Mapping
+from typing import Optional
 from pathlib import Path
 
 # -
 import opentelemetry as otel
-from opentelemetry.trace.propagation.tracecontext import (
-    TraceContextTextMapPropagator,
-)
 
 # -
 from composable_logs.opentelemetry_helpers import AttributesDict
@@ -14,21 +11,6 @@ from composable_logs.tasks.task_opentelemetry_logging import _log_named_value
 # -
 from composable_logs.notebooks_helpers import JupytextNotebookContent
 from ..wrappers import _task
-
-
-def _get_traceparent() -> str:
-    """
-    Get implicit OpenTelemetry span context for context propagation (eg. to notebooks)
-    """
-    carrier: Mapping[str, str] = {}
-    TraceContextTextMapPropagator().inject(carrier=carrier)
-
-    # check that context `carrier` dict is of type {"traceparent": <some string>}
-    assert isinstance(carrier, dict)
-    assert carrier.keys() == {"traceparent"}
-    assert isinstance(carrier["traceparent"], str)
-
-    return carrier["traceparent"]
 
 
 def make_jupytext_task(
@@ -67,8 +49,6 @@ def make_jupytext_task(
     def run_notebook_task(*dummy_args, **kwargs):
         # we accept positional args, but only so we can chain notebooks.
 
-        baggage = otel.baggage.get_all()
-
         for k in kwargs.keys():
             if not k.startswith("task."):
                 raise ValueError(
@@ -76,18 +56,13 @@ def make_jupytext_task(
                     "All task parameter names should start with 'task.'"
                 )
 
+        P = {"_parameters_actor_name": otel.baggage.get_all()["_parameters_actor_name"]}
+
         # The below return type is not a Try. Even in case of error, we would obtain
         # a partially evaluated notebook.
         err, evaluated_notebook = notebook.to_ipynb().evaluate(
             cwd=cwd,
-            parameters={
-                "P": {
-                    **kwargs,
-                    **parameters,
-                    **baggage,
-                    "_opentelemetry_traceparent": _get_traceparent(),
-                }
-            },
+            parameters={"P": {**parameters, **P}},
         )
 
         # this is not run if notebook is killed by timeout
@@ -99,7 +74,6 @@ def make_jupytext_task(
         )
 
         if err is not None:
-            print(err)
             raise err
 
     return run_notebook_task

@@ -13,13 +13,12 @@ P = {"task.variable_a": "value-used-during-interactive-development"}
 import sys
 
 sys.path.append("/home/host_user/workspace/composable_logs")
-from composable_logs.tasks.task_opentelemetry_logging import ComposableLogsLogger
+from composable_logs.tasks.task_opentelemetry_logging import TaskContext
 
 # %%
 
-assert "_opentelemetry_traceparent" in P, str(P)
 
-logger = ComposableLogsLogger(P)
+logger = TaskContext(P)
 
 # %%
 # test logging of artefact with utf-8 content

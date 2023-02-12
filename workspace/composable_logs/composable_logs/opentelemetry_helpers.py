@@ -530,9 +530,9 @@ class SpanRecorder:
         return self
 
     def __exit__(self, type, value, traceback):
-        time.sleep(0.4)
+        time.sleep(0.1)
         assert otel.trace.get_tracer_provider().force_flush()  # type: ignore
-        time.sleep(0.4)
+        time.sleep(0.1)
 
         # get new spans after test has run
         self.spans = Spans(

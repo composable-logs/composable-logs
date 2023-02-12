@@ -39,7 +39,9 @@ TEST_NOTEBOOK: JupytextNotebookContent = get_test_jupytext_nb(
 def spans() -> Spans:
     with SpanRecorder() as rec:
         run_dag(
-            make_jupytext_task(notebook=TEST_NOTEBOOK, parameters=TASK_PARAMETERS)()
+            make_jupytext_task(
+                notebook=TEST_NOTEBOOK, parameters=TASK_PARAMETERS, timeout_s=10.0
+            )()
         )
 
     return rec.spans

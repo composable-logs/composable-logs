@@ -1,5 +1,4 @@
-from typing import Any, TypeVar, List, Mapping, Union, Sequence, Optional
-import inspect
+from typing import Any, Dict, List, Mapping, Union, Sequence, Optional
 import collections
 
 # -
@@ -16,7 +15,11 @@ import opentelemetry as otel
 from composable_logs.opentelemetry_helpers import get_span_hexid, otel_add_baggage
 from composable_logs.opentelemetry_task_span_parser import OpenTelemetrySpanId
 from composable_logs.helpers import one, Try, Failure, Success
-from composable_logs.tasks.task_opentelemetry_logging import ComposableLogsLogger
+from composable_logs.tasks.task_opentelemetry_logging import (
+    TaskParameters,
+    ParameterActor,
+    log_parameters,
+)
 
 # --- schemas ---
 
@@ -103,44 +106,6 @@ def flatten_exceptions(
     )
 
 
-class TaskContext:
-    """
-    TaskContext
-
-    Same lifetime as the Python task (ie. task context has same lifetime as the task
-    OpenTelemetry span).
-    """
-
-    def __init__(self, parameters: Mapping[str, Any]):
-        self.parameters = parameters
-
-        # logging context determined by OpenTelemetry context propagation
-        self.logger = ComposableLogsLogger(parameters)
-
-    # --- forward log-methods to ComposableLogsLogger
-
-    def log_figure(self, name: str, fig):
-        self.logger.log_figure(name, fig)
-
-    def log_artefact(self, name: str, content: Union[bytes, str]):
-        self.logger.log_artefact(name, content)
-
-    def log_value(self, name: str, value: Any):
-        self.logger.log_value(name, value)
-
-    def log_string(self, name: str, value: str):
-        self.logger.log_string(name, value)
-
-    def log_int(self, name: str, value: int):
-        self.logger.log_int(name, value)
-
-    def log_boolean(self, name: str, value: bool):
-        self.logger.log_boolean(name, value)
-
-    def log_float(self, name: str, value: float):
-        self.logger.log_float(name, value)
-
-
 def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     """
     Return a wrapped function `f_wrapped(*args, **kwargs)` such that:
@@ -211,6 +176,26 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     return make_call_with_timeout_guard
 
 
+def _get_traceparent() -> str:
+    """
+    Get implicit OpenTelemetry span context for context propagation (eg. to notebooks)
+    """
+    from opentelemetry.trace.propagation.tracecontext import (
+        TraceContextTextMapPropagator,
+    )
+
+    carrier: Mapping[str, str] = {}
+    # carrier = {}
+    TraceContextTextMapPropagator().inject(carrier=carrier)
+
+    # check that context `carrier` dict is of type {"traceparent": <some string>}
+    assert isinstance(carrier, dict)
+    assert carrier.keys() == {"traceparent"}
+    assert isinstance(carrier["traceparent"], str)
+
+    return carrier["traceparent"]
+
+
 def _task(
     task_id: str,
     task_type: str,
@@ -262,23 +247,18 @@ def _task(
                 # Note that when task is defined, we know the task parameters, but
                 # we are not given the global workflow.* parameters. At task runtime,
                 # these are determined by the span's baggage.
-                augmented_task_parameters: Mapping[str, Any] = {
-                    **otel.baggage.get_all(),
-                    **task_parameters,
-                    "task.id": task_id,
-                    "task.type": task_type,
-                    "task.num_cpus": num_cpus,
-                    "task.timeout_s": -1 if timeout_s is None else timeout_s,
-                }
-
-                # Record OpenTelemetry parameters for this task
-                for k, v in augmented_task_parameters.items():
-                    if v is None:
-                        # Behavior of NULL OpenTelemetry attributes is undefined.
-                        # See
-                        # https://opentelemetry-python.readthedocs.io/en/latest/api/trace.span.html#opentelemetry.trace.span.Span.set_attributes
-                        raise ValueError("OpenTelemetry attributes should be non-null")
-                    span.set_attribute(k, v)
+                aug_task_parameters = TaskParameters(
+                    parameters={
+                        **otel.baggage.get_all(),
+                        **task_parameters,
+                        "task.id": task_id,
+                        "task.type": task_type,
+                        "task.num_cpus": num_cpus,
+                        # TODO: ideally the timeout data would be logged in the timeout span
+                        "task.timeout_s": -1 if timeout_s is None else timeout_s,
+                    }
+                )
+                log_parameters(span, aug_task_parameters)
 
                 # ---
                 # Input arguments to this task are wrapped using TaskResult that
@@ -316,14 +296,31 @@ def _task(
 
                 # ---
 
-                f_injected = f
+                def f_with_global_parameters(*args, **kwargs):
+                    # This function is pushed down to the innermost span.
+                    # Its traceparent is used for logging eg metrics and artifacts
+                    _inner_trace_parent = _get_traceparent()
+                    _parameters_actor_name = f"parameter_for_task_{this_task_span_id}"
 
-                # inject_task_context_argument_wrapper(
-                #    f, augmented_task_parameters
-                # )
+                    # keep parameter actor alive during function execution
+                    actor = (
+                        ParameterActor.options(name=_parameters_actor_name)  # type: ignore
+                        # -
+                        .remote(
+                            aug_task_parameters.add(
+                                {"_opentelemetry_traceparent": _inner_trace_parent}
+                            )
+                        )
+                    )
+                    ray.get(actor.get.remote())  # ensure Actor has started
+
+                    otel_add_baggage("_parameters_actor_name", _parameters_actor_name)
+                    ray.get_actor(_parameters_actor_name, namespace="pydar-ray-cluster")
+
+                    return f(*args, **kwargs)
 
                 f_timeout_guarded = timeout_guard_wrapper(
-                    f_injected,
+                    f_with_global_parameters,
                     timeout_s=timeout_s,
                     num_cpus=num_cpus,
                 )
@@ -335,9 +332,15 @@ def _task(
                 )
 
             # Wrap any successful result into TaskResult
-            return try_result.map_value(
+            r = try_result.map_value(
                 lambda x: TaskResult(result=x, span_id=this_task_span_id)
             )
+            assert otel.trace.get_tracer_provider().force_flush()  # type: ignore
+
+            if r.is_failure():
+                print("Task failed with error ::: ", r.error)
+
+            return r
 
         return wrapped_f.bind
 
@@ -394,7 +397,7 @@ def run_dag(
             #
             #  - if any node(s) in the DAG fails: return a Try(Failure) with an
             #    ExceptionGroup collecting all exceptions. Note that two nodes in the
-            #    DAG can fail in parallel.
+            #    DAG can fail independently in parallel.
             #
             # Notes:
             #
