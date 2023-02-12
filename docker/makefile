@@ -12,6 +12,9 @@ env_%:
 
 # --- Tasks to build Docker images ---
 
+clean:
+	rm -rf ./.built-docker-images
+
 ${BUILT_DOCKER_LOCK_FILE}-base: Dockerfile.base \
                                 makefile
 	docker build \

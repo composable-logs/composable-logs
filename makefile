@@ -11,6 +11,9 @@ env_%:
 
 # --- docker related tasks ---
 
+docker/clean:
+	@(cd docker; make clean)
+
 build-docker-images:
 	@(cd docker; ${MAKE} build-docker-images)
 

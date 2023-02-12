@@ -205,7 +205,12 @@ class Try(Generic[A]):
             try:
                 return cls(value=f(*args, **kwargs), error=None)
             except Exception as e:
+
+                # https://github.com/composable-logs/composable-logs/issues/229
                 print(e)
+                import traceback
+
+                print(traceback.format_exc())
                 return cls(value=None, error=e)
 
         return wrapped_f
