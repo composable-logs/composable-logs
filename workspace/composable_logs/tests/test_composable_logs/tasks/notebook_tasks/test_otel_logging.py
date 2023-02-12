@@ -81,11 +81,10 @@ def test__jupytext__otel_logging_from_notebook__nesting_of_spans(spans: Spans):
 
 def test__jupytext__otel_logging_from_notebook__validate_parsed_spans_new(spans: Spans):
     workflow_summary = parse_spans(spans)
-
-    # assert workflow_summary.is_success()
+    assert workflow_summary.is_success()
 
     task_summary = one(workflow_summary.task_runs)
-    # assert task_summary.is_success()
+    assert task_summary.is_success()
 
     # Check: artifact logged from the evaluated notebook
     artifacts = task_summary.logged_artifacts
