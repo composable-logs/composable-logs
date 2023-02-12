@@ -143,8 +143,8 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
 
     @task(task_id="test_function", task_parameters=task_parameters, timeout_s=12.78)
     def f():
-        C = get_task_context()
-        return C.parameters
+        ctx = get_task_context()
+        return ctx.parameters
 
     with SpanRecorder() as rec:
         assert run_dag(dag=f(), workflow_parameters=workflow_parameters) == Success(

@@ -127,37 +127,37 @@ def spans_to_test_otel_loggging() -> Spans:
     #
     @task(task_id="task-f")
     def f():
-        C = get_task_context()
+        ctx = get_task_context()
 
-        C.log_artefact("read-first", "hello")
-        C.log_int("read-first", 111)
+        ctx.log_artefact("read-first", "hello")
+        ctx.log_int("read-first", 111)
         return 1000
 
     @task(task_id="task-g")
     def g():
-        C = get_task_context()
-        C.log_artefact("read-first", TEST_BINARY_FILE)
-        C.log_int("read-first", 222)
+        ctx = get_task_context()
+        ctx.log_artefact("read-first", TEST_BINARY_FILE)
+        ctx.log_int("read-first", 222)
         return 2000
 
     @task(task_id="task-h")
     def h(f_output, g_output):
         assert f_output == 1000 and g_output == 2000
-        C = get_task_context()
+        ctx = get_task_context()
 
-        C.log_int("a-logged-int", 1020)
-        C.log_float("a-logged-float", 12.3)
+        ctx.log_int("a-logged-int", 1020)
+        ctx.log_float("a-logged-float", 12.3)
         # C.log_float("b-float", 12) will fail
-        C.log_boolean("a-logged-bool", True)
-        C.log_string("a-logged-string", "///")
-        C.log_value("a-logged-json-value", TEST_PYTHON_DICT)
+        ctx.log_boolean("a-logged-bool", True)
+        ctx.log_string("a-logged-string", "///")
+        ctx.log_value("a-logged-json-value", TEST_PYTHON_DICT)
 
         class _mock_fig:
             # dummy mock of matplotlib figure object for testing
             def savefig(self, file_name, **kw_args):
                 Path(file_name).write_bytes(TEST_MOCK_MATPLOTLIB_PNG)
 
-        C.log_figure("mock-matplot-lib-figure.png", _mock_fig())
+        ctx.log_figure("mock-matplot-lib-figure.png", _mock_fig())
 
         return 3000
 
@@ -247,14 +247,14 @@ def test__task_logger__values_are_logged_also_for_failed_tasks():
 
     @task(task_id="task-f")
     def f():
-        C = get_task_context()
-        C.log_int("log-a-value-in-first-task", 10000)
+        ctx = get_task_context()
+        ctx.log_int("log-a-value-in-first-task", 10000)
 
     @task(task_id="task-g")
     def g(arg):
-        C = get_task_context()
-        C.log_artefact("read-me", "123!")
-        C.log_int("log-a-value-in-second-task-before-failing", 20000)
+        ctx = get_task_context()
+        ctx.log_artefact("read-me", "123!")
+        ctx.log_int("log-a-value-in-second-task-before-failing", 20000)
         raise test_exception
 
     with SpanRecorder() as rec:
