@@ -1,9 +1,11 @@
 import base64, json, tempfile, os
 from pathlib import Path
-from typing import Any, Callable, Optional, Mapping, Union
+from typing import Any, Callable, Optional, Mapping, Union, Dict
 from dataclasses import dataclass
+import time
 
 # -
+import pydantic as p
 import ray
 
 import opentelemetry as otel
@@ -15,6 +17,38 @@ from opentelemetry.trace.propagation.tracecontext import (
 
 # -
 from composable_logs.opentelemetry_helpers import Spans
+
+
+class TaskParameters(p.BaseModel):
+    parameters: Dict[str, Any]
+
+    # values should not be null
+
+    def add(self, a_dict):
+        return TaskParameters(parameters={**self.parameters, **a_dict})
+
+
+def log_parameters(span, p: TaskParameters):
+    for k, v in p.parameters.items():
+        if v is None:
+            # Behavior of NULL OpenTelemetry attributes is undefined.
+            # See
+            # https://opentelemetry-python.readthedocs.io/en/latest/api/trace.span.html#opentelemetry.trace.span.Span.set_attributes
+            raise ValueError("OpenTelemetry attributes should be non-null")
+        span.set_attribute(k, v)
+
+
+@ray.remote(num_cpus=0)
+class ParameterActor:
+    """
+    Actor to hold parameters so they can be passed into task using named actor
+    """
+
+    def __init__(self, parameters: TaskParameters):
+        self._parameters: TaskParameters = parameters
+
+    def get(self) -> TaskParameters:
+        return self._parameters
 
 
 # --- The functions three functions should be revised (deleted) ---
@@ -192,12 +226,51 @@ def _log_named_value(
     )
 
 
+def get_task_parameters(P: Dict[str, Any]):
+    baggage = otel.baggage.get_all()
+
+    _parameters_actor_name: Optional[str] = None
+    if "_parameters_actor_name" in P and "_parameters_actor_name" in baggage:
+        raise Exception(
+            "Review logic. Parameter actor name found in both P and baggage"
+        )
+    elif "_parameters_actor_name" in P:
+        _parameters_actor_name = str(P["_parameters_actor_name"])
+    elif "_parameters_actor_name" in baggage:
+        _parameters_actor_name = str(baggage["_parameters_actor_name"])
+    else:
+        # no parameter actor found, return default parameters
+        return P
+
+    # This has failed randomly in unit tests (1/2023) with "actor not found" from
+    # notebooks.
+    #
+    #  - unit test works when run in isolation, but fails as part of whole test suite
+    #  - the below monitors if retry would be a solution, but fails to catch this.
+    parameter_actor = None
+    e = None
+    for _ in range(10):
+        try:
+            parameter_actor = ray.get_actor(
+                _parameters_actor_name, namespace="pydar-ray-cluster"
+            )
+        except Exception as _e:
+            e = _e
+            time.sleep(0.1)
+
+    if e is not None and parameter_actor is not None:
+        raise Exception("ray.get_actor first failed and then worked after retry!")
+
+    assert parameter_actor is not None
+    return ray.get(parameter_actor.get.remote()).parameters
+
+
 class ComposableLogsLogger:
     """
     Logger for writing artifacts/key-values as OpenTelemetry events
     """
 
-    def __init__(self, P: Mapping[str, Any]):
+    def __init__(self, P: Mapping[str, Any] = {}):
         assert isinstance(P, dict)
 
         # --- Check: should init of Ray cluster be done here?
@@ -215,9 +288,16 @@ class ComposableLogsLogger:
             ray.init(namespace="pydar-ray-cluster")
 
         # ---
+        parameters = get_task_parameters(P)
 
-        # Get context for Task that triggered notebook (for context propagation)
-        self._traceparent = P.get("_opentelemetry_traceparent", None)
+        # determine parent span where OpenTelemetry logs should be logged
+        if "_opentelemetry_traceparent" in parameters:
+            self._traceparent = parameters.get("_opentelemetry_traceparent")
+            del parameters["_opentelemetry_traceparent"]
+        else:
+            self._traceparent = None
+
+        self.parameters = {**P, **parameters}
 
     # --- log files ---
 
@@ -300,4 +380,8 @@ class ComposableLogsLogger:
         )
 
 
-PydarLogger = ComposableLogsLogger  # keep old name for compatibility
+TaskContext = ComposableLogsLogger
+
+
+def get_task_context(P={}):
+    return TaskContext(P=P)

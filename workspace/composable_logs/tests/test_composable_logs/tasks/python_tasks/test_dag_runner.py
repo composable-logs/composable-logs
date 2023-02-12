@@ -13,8 +13,11 @@ from composable_logs.opentelemetry_helpers import (
 from composable_logs.opentelemetry_task_span_parser import (
     parse_spans,
 )
+from composable_logs.tasks.task_opentelemetry_logging import (
+    get_task_context,
+)
 from composable_logs.helpers import Success
-from composable_logs.wrappers import task, run_dag, TaskContext
+from composable_logs.wrappers import task, run_dag
 
 # --- Check that we can propagate baggage into tasks ---
 # - note that baggage is converted into strings
@@ -23,11 +26,13 @@ from composable_logs.wrappers import task, run_dag, TaskContext
 def test_opentelemetry_baggage_convert_into_strings():
     @task(task_id="task-f")
     def f():
-        return otel.baggage.get_all()
+        baggage = dict(otel.baggage.get_all())
+        del baggage["_parameters_actor_name"]
+        return baggage
 
     dag = f()
 
-    workflow_parameters_in = {"workflow.env": "x123"}
+    workflow_parameters_in = {"workflow.env": "123"}
     workflow_parameters_out = {**workflow_parameters_in, "workflow.k": "123"}
 
     with SpanRecorder() as rec:
@@ -67,7 +72,7 @@ def cl__can_compose_spans() -> Spans:
         return 10
 
     @task(task_id="input_2", task_parameters=TEST_TASK_ATTRIBUTES["input_2"])
-    def input_2(a_variable, C: TaskContext):
+    def input_2(a_variable):
         return a_variable + 20
 
     @task(task_id="process", task_parameters=TEST_TASK_ATTRIBUTES["process"])
@@ -137,8 +142,9 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
     task_parameters = {"task.X": 123, "task.Y": "indigo"}
 
     @task(task_id="test_function", task_parameters=task_parameters, timeout_s=12.78)
-    def f(C: TaskContext):
-        return C.parameters
+    def f():
+        ctx = get_task_context()
+        return ctx.parameters
 
     with SpanRecorder() as rec:
         assert run_dag(dag=f(), workflow_parameters=workflow_parameters) == Success(

@@ -1,5 +1,4 @@
-from typing import Any, TypeVar, List, Mapping, Union, Sequence, Optional
-import inspect
+from typing import Any, List, Mapping, Union, Sequence, Optional
 import collections
 
 # -
@@ -16,7 +15,11 @@ import opentelemetry as otel
 from composable_logs.opentelemetry_helpers import get_span_hexid, otel_add_baggage
 from composable_logs.opentelemetry_task_span_parser import OpenTelemetrySpanId
 from composable_logs.helpers import one, Try, Failure, Success
-from composable_logs.tasks.task_opentelemetry_logging import ComposableLogsLogger
+from composable_logs.tasks.task_opentelemetry_logging import (
+    TaskParameters,
+    ParameterActor,
+    log_parameters,
+)
 
 # --- schemas ---
 
@@ -103,64 +106,6 @@ def flatten_exceptions(
     )
 
 
-class TaskContext:
-    """
-    TaskContext
-
-    Same lifetime as the Python task (ie. task context has same lifetime as the task
-    OpenTelemetry span).
-    """
-
-    def __init__(self, parameters: Mapping[str, Any]):
-        self.parameters = parameters
-
-        # logging context determined by OpenTelemetry context propagation
-        self.logger = ComposableLogsLogger(parameters)
-
-    # --- forward log-methods to ComposableLogsLogger
-
-    def log_figure(self, name: str, fig):
-        self.logger.log_figure(name, fig)
-
-    def log_artefact(self, name: str, content: Union[bytes, str]):
-        self.logger.log_artefact(name, content)
-
-    def log_value(self, name: str, value: Any):
-        self.logger.log_value(name, value)
-
-    def log_string(self, name: str, value: str):
-        self.logger.log_string(name, value)
-
-    def log_int(self, name: str, value: int):
-        self.logger.log_int(name, value)
-
-    def log_boolean(self, name: str, value: bool):
-        self.logger.log_boolean(name, value)
-
-    def log_float(self, name: str, value: float):
-        self.logger.log_float(name, value)
-
-
-def inject_task_context_argument_wrapper(f, parameters: Mapping[str, Any]):
-    """
-    TODO Revise logic.
-
-     - Eg. inject only TaskContext for a variable that has this is type.
-     - Ensure that there is at most one TaskContext argument in f
-
-    """
-    if "C" in inspect.signature(f).parameters.keys():
-        extra = {"C": TaskContext(parameters=parameters)}
-
-        def wrapped(*args, **kwargs):
-            return f(*args, **extra, **kwargs)
-
-        return wrapped
-
-    else:
-        return f
-
-
 def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     """
     Return a wrapped function `f_wrapped(*args, **kwargs)` such that:
@@ -231,6 +176,26 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     return make_call_with_timeout_guard
 
 
+def _get_traceparent() -> str:
+    """
+    Get implicit OpenTelemetry span context for context propagation (eg. to notebooks)
+    """
+    from opentelemetry.trace.propagation.tracecontext import (
+        TraceContextTextMapPropagator,
+    )
+
+    carrier: Mapping[str, str] = {}
+    # carrier = {}
+    TraceContextTextMapPropagator().inject(carrier=carrier)
+
+    # check that context `carrier` dict is of type {"traceparent": <some string>}
+    assert isinstance(carrier, dict)
+    assert carrier.keys() == {"traceparent"}
+    assert isinstance(carrier["traceparent"], str)
+
+    return carrier["traceparent"]
+
+
 def _task(
     task_id: str,
     task_type: str,
@@ -282,22 +247,18 @@ def _task(
                 # Note that when task is defined, we know the task parameters, but
                 # we are not given the global workflow.* parameters. At task runtime,
                 # these are determined by the span's baggage.
-                augmented_task_parameters: Mapping[str, Any] = {
-                    **otel.baggage.get_all(),
-                    **task_parameters,
-                    "task.id": task_id,
-                    "task.type": task_type,
-                    "task.num_cpus": num_cpus,
-                    "task.timeout_s": -1 if timeout_s is None else timeout_s,
-                }
-
-                for k, v in augmented_task_parameters.items():
-                    if v is None:
-                        # Behavior of NULL OpenTelemetry attributes is undefined.
-                        # See
-                        # https://opentelemetry-python.readthedocs.io/en/latest/api/trace.span.html#opentelemetry.trace.span.Span.set_attributes
-                        raise ValueError("OpenTelemetry attributes should be non-null")
-                    span.set_attribute(k, v)
+                aug_task_parameters = TaskParameters(
+                    parameters={
+                        **otel.baggage.get_all(),
+                        **task_parameters,
+                        "task.id": task_id,
+                        "task.type": task_type,
+                        "task.num_cpus": num_cpus,
+                        # TODO: ideally the timeout data would be logged in the timeout span
+                        "task.timeout_s": -1 if timeout_s is None else timeout_s,
+                    }
+                )
+                log_parameters(span, aug_task_parameters)
 
                 # ---
                 # Input arguments to this task are wrapped using TaskResult that
@@ -318,28 +279,48 @@ def _task(
                     else:
                         args_unwrapped.append(arg)
 
-                for arg in args:
-                    if isinstance(arg, TaskResult):
-                        with tracer.start_as_current_span("task-dependency") as subspan:
-                            subspan.set_attribute("from_task_span_id", arg.span_id)
-                            subspan.set_attribute("to_task_span_id", this_task_span_id)
-
                 for _, v in kwargs.items():
                     if isinstance(v, TaskResult):
                         raise Exception(
                             "task composition not yet supported using kwargs"
                         )
 
+                # Log dependencies to upstream tasks into OpenTelemetry log
+                for arg in args:
+                    if isinstance(arg, TaskResult):
+                        with tracer.start_as_current_span("task-dependency") as subspan:
+                            subspan.set_attribute("from_task_span_id", arg.span_id)
+                            subspan.set_attribute("to_task_span_id", this_task_span_id)
+
                 del args
 
                 # ---
 
-                f_injected = inject_task_context_argument_wrapper(
-                    f, augmented_task_parameters
-                )
+                def f_with_global_parameters(*args, **kwargs):
+                    # This function is pushed down to the innermost span.
+                    # Its traceparent is used for logging eg metrics and artifacts
+                    _inner_trace_parent = _get_traceparent()
+                    _parameters_actor_name = f"parameter_for_task_{this_task_span_id}"
+
+                    # keep parameter actor alive during function execution
+                    actor = (
+                        ParameterActor.options(name=_parameters_actor_name)  # type: ignore
+                        # -
+                        .remote(
+                            aug_task_parameters.add(
+                                {"_opentelemetry_traceparent": _inner_trace_parent}
+                            )
+                        )
+                    )
+                    ray.get(actor.get.remote())  # ensure Actor has started
+
+                    otel_add_baggage("_parameters_actor_name", _parameters_actor_name)
+                    ray.get_actor(_parameters_actor_name, namespace="pydar-ray-cluster")
+
+                    return f(*args, **kwargs)
 
                 f_timeout_guarded = timeout_guard_wrapper(
-                    f_injected,
+                    f_with_global_parameters,
                     timeout_s=timeout_s,
                     num_cpus=num_cpus,
                 )
@@ -351,9 +332,15 @@ def _task(
                 )
 
             # Wrap any successful result into TaskResult
-            return try_result.map_value(
+            r = try_result.map_value(
                 lambda x: TaskResult(result=x, span_id=this_task_span_id)
             )
+            assert otel.trace.get_tracer_provider().force_flush()  # type: ignore
+
+            if r.is_failure():
+                print("Task failed with error ::: ", r.error)
+
+            return r
 
         return wrapped_f.bind
 
@@ -375,6 +362,78 @@ def task(
     )
 
 
+def _run_dag_in_top_span(
+    span,
+    dag: Union[FunctionNode, Sequence[FunctionNode]],
+    workflow_parameters: Mapping[str, Any] = {},
+) -> Try:
+    # ensure global parameters are logged and can be accessed from subspans
+    for k, v in workflow_parameters.items():
+        span.set_attribute(k, v)
+        otel_add_baggage(k, v)
+
+    if isinstance(dag, FunctionNode):
+        return _run_dag_in_top_span(span, [dag]).map_value(lambda xs: one(xs))
+
+    elif isinstance(dag, collections.Sequence):
+        # Execute DAG with multiple ends like:
+        #
+        #          ---> Node 2
+        #         /
+        #  Node 1 ----> Node 3
+        #         \
+        #          ---> Node 4
+        #
+        # Now dag_run([N2, N3, N4]) awaits the results for all end nodes,
+        # and returns a Try that:
+        #
+        #  - if all nodes ran successfully: return a Try(Success) with return values
+        #    of end nodes as a list.
+        #
+        #  - if any node(s) in the DAG fails: return a Try(Failure) with an
+        #    ExceptionGroup collecting all exceptions. Note that two nodes in the
+        #    DAG can fail independently in parallel.
+        #
+        # Notes:
+        #
+        #  - We do not want to [node.execute() for node in dag]. In the above DAG,
+        #    this would run Node 1 three times. Rather, we start execution on a
+        #    collect-node that waits for all upstream nodes.
+        #
+        #  - The collect node will not be seen in OpenTelemetry logs.
+        #
+        @workflow.options(task_id="collect-nodes")  # type: ignore
+        @ray.remote(retry_exceptions=False, num_cpus=0, max_retries=0)
+        def collect(*args):
+            return args
+
+        dag_results = ray.get(collect.bind(*dag).execute())  # type: ignore
+
+        # verify type of return values
+        for dag_result in dag_results:
+            if not (
+                isinstance(dag_result, Try)
+                and (
+                    dag_result.is_failure() or isinstance(dag_result.value, TaskResult)
+                )
+            ):
+                raise Exception(
+                    f"Expected a Try[TaskResult] got {str(dag_result)[:100]}."
+                )
+
+        dag_errors: List[Exception] = [
+            result.error for result in dag_results if result.is_failure()
+        ]
+
+        if len(dag_errors) > 0:
+            return Failure(flatten_exceptions(*dag_errors))
+        else:
+            return Success([dag_result.get().result for dag_result in dag_results])
+
+    else:
+        raise Exception(f"Unknown input to run_dag {type(dag)}")
+
+
 def run_dag(
     dag: Union[FunctionNode, Sequence[FunctionNode]],
     workflow_parameters: Mapping[str, Any] = {},
@@ -383,71 +442,5 @@ def run_dag(
     Run a Ray DAG with OpenTelemetry logging
     """
     tracer = otel.trace.get_tracer(__name__)
-
     with tracer.start_as_current_span("dag-top-span") as span:
-        # ensure global parameters are logged and can be accessed from subspans
-        for k, v in workflow_parameters.items():
-            span.set_attribute(k, v)
-            otel_add_baggage(k, v)
-
-        if isinstance(dag, FunctionNode):
-            return run_dag([dag]).map_value(lambda xs: one(xs))
-
-        elif isinstance(dag, collections.Sequence):
-            # Execute DAG with multiple ends like:
-            #
-            #          ---> Node 2
-            #         /
-            #  Node 1 ----> Node 3
-            #         \
-            #          ---> Node 4
-            #
-            # Now dag_run([N2, N3, N4]) awaits the results for all end nodes,
-            # and returns a Try that:
-            #
-            #  - if all nodes ran successfully: return a Try(Success) with return values
-            #    of end nodes as a list.
-            #
-            #  - if any node(s) in the DAG fails: return a Try(Failure) with an
-            #    ExceptionGroup collecting all exceptions. Note that two nodes in the
-            #    DAG can fail in parallel.
-            #
-            # Notes:
-            #
-            #  - We do not want to [node.execute() for node in dag]. In the above DAG,
-            #    this would run Node 1 three times. Rather, we start execution on a
-            #    collect-node that waits for all upstream nodes.
-            #
-            #  - The collect node will not be seen in OpenTelemetry logs.
-            #
-            @workflow.options(task_id="collect-nodes")  # type: ignore
-            @ray.remote(retry_exceptions=False, num_cpus=0, max_retries=0)
-            def collect(*args):
-                return args
-
-            dag_results = ray.get(collect.bind(*dag).execute())  # type: ignore
-
-            # verify type of return values
-            for dag_result in dag_results:
-                if not (
-                    isinstance(dag_result, Try)
-                    and (
-                        dag_result.is_failure()
-                        or isinstance(dag_result.value, TaskResult)
-                    )
-                ):
-                    raise Exception(
-                        f"Expected a Try[TaskResult] got {str(dag_result)[:100]}."
-                    )
-
-            dag_errors: List[Exception] = [
-                result.error for result in dag_results if result.is_failure()
-            ]
-
-            if len(dag_errors) > 0:
-                return Failure(flatten_exceptions(*dag_errors))
-            else:
-                return Success([dag_result.get().result for dag_result in dag_results])
-
-        else:
-            raise Exception(f"Unknown input to run_dag {type(dag)}")
+        return _run_dag_in_top_span(span, dag, workflow_parameters)

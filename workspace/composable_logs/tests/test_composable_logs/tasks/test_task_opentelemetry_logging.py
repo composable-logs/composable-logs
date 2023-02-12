@@ -7,14 +7,14 @@ import pytest
 import opentelemetry as ot
 
 # -
-from composable_logs.wrappers import task, run_dag, TaskContext
+from composable_logs.wrappers import task, run_dag, _get_traceparent
 from composable_logs.opentelemetry_helpers import Spans, SpanRecorder
 from composable_logs.helpers import one, Success, Failure
-from composable_logs.tasks.tasks import _get_traceparent
 from composable_logs.tasks.task_opentelemetry_logging import (
-    PydarLogger,
+    TaskContext,
     SerializedData,
     LoggableTypes,
+    get_task_context,
 )
 from composable_logs.opentelemetry_task_span_parser import (
     parse_spans,
@@ -75,7 +75,7 @@ def test__encode_decode_to_wire__exceptions_for_invalid_data():
         SerializedData("string", "utf8", "should be 'utf-8'").decode()
 
 
-# ---- test logging from PydarLogger ----
+# ---- test logging from TaskContext ----
 
 
 def test__task_logger__logged_spans_are_nested():
@@ -84,7 +84,7 @@ def test__task_logger__logged_spans_are_nested():
             tracer = ot.trace.get_tracer(__name__)
             with tracer.start_as_current_span("parent-span") as t1:
                 with tracer.start_as_current_span("sub-span") as t2:
-                    logger = PydarLogger(
+                    logger = TaskContext(
                         P={
                             "_opentelemetry_traceparent": _get_traceparent(),
                         }
@@ -126,33 +126,38 @@ def spans_to_test_otel_loggging() -> Spans:
     # values. This allows us to test that logging keeps track where a value was logged.
     #
     @task(task_id="task-f")
-    def f(C: TaskContext):
-        C.log_artefact("read-first", "hello")
-        C.log_int("read-first", 111)
+    def f():
+        ctx = get_task_context()
+
+        ctx.log_artefact("read-first", "hello")
+        ctx.log_int("read-first", 111)
         return 1000
 
     @task(task_id="task-g")
-    def g(C: TaskContext):
-        C.log_artefact("read-first", TEST_BINARY_FILE)
-        C.log_int("read-first", 222)
+    def g():
+        ctx = get_task_context()
+        ctx.log_artefact("read-first", TEST_BINARY_FILE)
+        ctx.log_int("read-first", 222)
         return 2000
 
     @task(task_id="task-h")
-    def h(f_output, g_output, C: TaskContext):
+    def h(f_output, g_output):
         assert f_output == 1000 and g_output == 2000
-        C.log_int("a-logged-int", 1020)
-        C.log_float("a-logged-float", 12.3)
+        ctx = get_task_context()
+
+        ctx.log_int("a-logged-int", 1020)
+        ctx.log_float("a-logged-float", 12.3)
         # C.log_float("b-float", 12) will fail
-        C.log_boolean("a-logged-bool", True)
-        C.log_string("a-logged-string", "///")
-        C.log_value("a-logged-json-value", TEST_PYTHON_DICT)
+        ctx.log_boolean("a-logged-bool", True)
+        ctx.log_string("a-logged-string", "///")
+        ctx.log_value("a-logged-json-value", TEST_PYTHON_DICT)
 
         class _mock_fig:
             # dummy mock of matplotlib figure object for testing
             def savefig(self, file_name, **kw_args):
                 Path(file_name).write_bytes(TEST_MOCK_MATPLOTLIB_PNG)
 
-        C.log_figure("mock-matplot-lib-figure.png", _mock_fig())
+        ctx.log_figure("mock-matplot-lib-figure.png", _mock_fig())
 
         return 3000
 
@@ -241,13 +246,15 @@ def test__task_logger__values_are_logged_also_for_failed_tasks():
     test_exception = Exception("task-g failed")
 
     @task(task_id="task-f")
-    def f(C: TaskContext):
-        C.log_int("log-a-value-in-first-task", 10000)
+    def f():
+        ctx = get_task_context()
+        ctx.log_int("log-a-value-in-first-task", 10000)
 
     @task(task_id="task-g")
-    def g(arg, C: TaskContext):
-        C.log_artefact("read-me", "123!")
-        C.log_int("log-a-value-in-second-task-before-failing", 20000)
+    def g(arg):
+        ctx = get_task_context()
+        ctx.log_artefact("read-me", "123!")
+        ctx.log_int("log-a-value-in-second-task-before-failing", 20000)
         raise test_exception
 
     with SpanRecorder() as rec:

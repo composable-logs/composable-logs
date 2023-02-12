@@ -205,6 +205,7 @@ class Try(Generic[A]):
             try:
                 return cls(value=f(*args, **kwargs), error=None)
             except Exception as e:
+                print(e)
                 return cls(value=None, error=e)
 
         return wrapped_f
