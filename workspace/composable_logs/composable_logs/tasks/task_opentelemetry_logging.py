@@ -229,14 +229,15 @@ def _log_named_value(
 def get_task_parameters(P: Dict[str, Any]):
     baggage = otel.baggage.get_all()
 
+    _parameters_actor_name: Optional[str] = None
     if "_parameters_actor_name" in P and "_parameters_actor_name" in baggage:
         raise Exception(
             "Review logic. Parameter actor name found in both P and baggage"
         )
     elif "_parameters_actor_name" in P:
-        _parameters_actor_name: str = P["_parameters_actor_name"]
+        _parameters_actor_name = str(P["_parameters_actor_name"])
     elif "_parameters_actor_name" in baggage:
-        _parameters_actor_name: str = baggage["_parameters_actor_name"]
+        _parameters_actor_name = str(baggage["_parameters_actor_name"])
     else:
         # no parameter actor found, return default parameters
         return P
@@ -260,6 +261,7 @@ def get_task_parameters(P: Dict[str, Any]):
     if e is not None and parameter_actor is not None:
         raise Exception("ray.get_actor first failed and then worked after retry!")
 
+    assert parameter_actor is not None
     return ray.get(parameter_actor.get.remote()).parameters
 
 
