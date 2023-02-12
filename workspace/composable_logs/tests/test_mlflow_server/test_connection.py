@@ -5,6 +5,7 @@ import pytest
 
 
 # -
+from composable_logs.helpers import one
 from composable_logs.opentelemetry_helpers import Spans, SpanRecorder
 from composable_logs.opentelemetry_task_span_parser import parse_spans
 from composable_logs.wrappers import task, run_dag
@@ -16,6 +17,7 @@ from composable_logs.mlflow_server.server import (
     ensure_running,
     shutdown,
 )
+from composable_logs.opentelemetry_task_span_parser import LoggedValueContent
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -37,7 +39,7 @@ def test_mlflow_server_is_running_with_fixture(mlflow_server):
     }
 
 
-def get_test_spans():
+def get_test_spans_for_two_parallel_tasks():
     # Run two tasks in parallel and check that ML Flow data is not mixed up between
     # tasks.
 
@@ -67,8 +69,8 @@ def get_test_spans():
     return rec.spans
 
 
-def test_mlflow_data_from_parallel_tasks_are_split_correctly(mlflow_server):
-    spans: Spans = get_test_spans()
+def txxest_mlflow_data_from_parallel_tasks_are_split_correctly(mlflow_server):
+    spans: Spans = get_test_spans_for_two_parallel_tasks()
 
     workflow_summary = parse_spans(spans)
     assert workflow_summary.is_success()
@@ -86,6 +88,64 @@ def test_mlflow_data_from_parallel_tasks_are_split_correctly(mlflow_server):
             assert task_summary.logged_values.keys() == {
                 f"2-logged-key-{k}" for k in range(10)
             }
+
+
+LOG_PARAMETER_TEST_VALUES = {
+    # (What is logged into ML Flow client, what is expected in logs)
+    "a-string-string-x": ("x", "x"),
+    "a-string-int-123": (123, "123"),
+    "a-string-float-123.4": (123.4, "123.4"),
+    "a-string-int-list-1-2-3": ([1, 2, 3], "[1, 2, 3]"),
+}
+
+
+def get_test_spans_with_different_inputs():
+    @task(task_id="ml_flow_data_generator")
+    def ml_flow_data_generator():
+        configure_mlflow_connection_variables()
+
+        import mlflow
+
+        # --- generate data to mlflow.log_param API ---
+        for k, v in LOG_PARAMETER_TEST_VALUES.items():
+            logged_value, expected_value_in_logs = v
+            mlflow.log_param(k, logged_value)
+
+        # --- generate data to mlflow.log_params API ---
+        mlflow.log_params({"aaa": 123, "bbb": [1, 23]})
+
+        # --- generate data to mlflow.log_text API ---
+        mlflow.log_text("## Hello \nWorld 😊", "README.md")
+
+    with SpanRecorder() as rec:
+        run_dag(ml_flow_data_generator())
+
+    return rec.spans
+
+
+def test_mlflow_logging_for_different_endpoints_with_mix_test_data(mlflow_server):
+    spans: Spans = get_test_spans_with_different_inputs()
+
+    workflow_summary = parse_spans(spans)
+    assert workflow_summary.is_success()
+
+    for task_summary in [one(workflow_summary.task_runs)]:  # type: ignore
+        assert task_summary.task_id == "ml_flow_data_generator"
+
+        # --- check data logged to mlflow.log_param API ---
+        for k, v in LOG_PARAMETER_TEST_VALUES.items():
+            logged_value, expected_value_in_logs = v
+            assert task_summary.logged_values[k] == LoggedValueContent(
+                type="utf-8", content=expected_value_in_logs
+            )
+
+        # --- check data logged to mlflow.log_params API ---
+        assert task_summary.logged_values["aaa"] == LoggedValueContent(
+            type="utf-8", content="123"
+        )
+        assert task_summary.logged_values["bbb"] == LoggedValueContent(
+            type="utf-8", content="[1, 23]"
+        )
 
 
 # def _test_mlflow_logging_different_types():

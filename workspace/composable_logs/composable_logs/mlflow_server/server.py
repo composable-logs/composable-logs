@@ -43,29 +43,82 @@ def get_api():
         async def post_runs_create(
             self, request: Request, traceparent: str = Depends(_get_traceparent)
         ):
-            print(
-                "POST >>> /api/2.0/mlflow/runs/create :: reqs json = ",
-                await request.json(),
-            )
-            print("POST >>> /api/2.0/mlflow/runs/create :: creds = ", traceparent)
+            """
+            When client starts a new id, the server responds with id for that run.
 
-            # When client starts a new id, the server responds with id for that run.
-            # see https://mlflow.org/docs/latest/rest-api.html#mlflowruninfo
-            new_run_id = "a-new-run-id"
-            return {"run": {"info": {"run_id": new_run_id, "run_uuid": new_run_id}}}
+            API Documentation:
+            https://mlflow.org/docs/latest/rest-api.html#mlflowruninfo
+            """
+            print("CL: /api/2.0/mlflow/runs/create (post) REQ ", await request.json())
+            response = {
+                "run": {"info": {"run_id": traceparent, "run_uuid": traceparent}}
+            }
+            print("CL: /api/2.0/mlflow/runs/create : RESP ", response)
+            return response
 
         @app.post("/api/2.0/mlflow/runs/log-parameter")
         async def post_runs_log_parameter(
             self, request: Request, traceparent: str = Depends(_get_traceparent)
         ):
+            # https://mlflow.org/docs/latest/python_api/mlflow.html#mlflow.log_param
             request_json = await request.json()
-            print("POST >>> /api/2.0/mlflow/runs/log-parameter", request_json)
+            print("CL: /api/2.0/mlflow/runs/log-parameter (post) REQ ", request_json)
 
             assert request_json.keys() == {"run_uuid", "run_id", "key", "value"}
+            assert isinstance(request_json["key"], str)
+            assert isinstance(request_json["value"], str)
 
             ctx = get_task_context(P={"_opentelemetry_traceparent": traceparent})
+
+            # Logged as string; as noted in MLFlow log parameter accepts Any input
+            # but content is stringified before storage.
             ctx.log_string(request_json["key"], request_json["value"])
             return {}
+
+        @app.post("/api/2.0/mlflow/runs/log-batch")
+        async def post_runs_log_batch(
+            self, request: Request, traceparent: str = Depends(_get_traceparent)
+        ):
+            # Batch ingestion of key-value parameters and metrics
+            # https://mlflow.org/docs/latest/rest-api.html#log-batch
+            request_json = await request.json()
+            print("CL: /api/2.0/mlflow/runs/log-batch (post) REQ ", request_json)
+            ctx = get_task_context(P={"_opentelemetry_traceparent": traceparent})
+
+            assert request_json.keys() <= {"run_id", "metrics", "params"}
+
+            assert isinstance(request_json.get("params", []), list)
+            for param in request_json.get("params", []):
+                assert isinstance(param["key"], str)
+                assert isinstance(param["value"], str)
+                # Logged as string; as noted in MLFlow log parameter accepts Any input
+                # but content is stringified before storage.
+                ctx.log_string(param["key"], param["value"])
+
+            assert isinstance(request_json.get("metrics", []), list)
+            # metrics not yet supported.
+
+            return {}
+
+        @app.get("/api/2.0/mlflow/runs/get")
+        async def mlflow_runs_get(
+            self, request: Request, traceparent: str = Depends(_get_traceparent)
+        ):
+            assert await request.body() == b""
+            print("CL: /api/2.0/mlflow/runs/get (get)")
+            response = {
+                "run": {
+                    "info": {
+                        "run_id": traceparent,
+                        "run_uuid": traceparent,
+                        # strangely this seems to influence where client write temp
+                        # files on local file system before sending them to server (!)
+                        "artifact_uri": f"/tmp/{traceparent}/",
+                    }
+                }
+            }
+            print("CL: /api/2.0/mlflow/runs/create : RESP ", response)
+            return response
 
         @app.post("/api/2.0/mlflow/runs/update")
         async def post_runs_update(self, request: Request):
@@ -93,12 +146,12 @@ def get_api():
 def is_running() -> bool:
     try:
         deployments = serve.list_deployments()
+        return "ServerToCaptureMLFlowData" in deployments
     except:
-        deployments = {}
-    return "ServerToCaptureMLFlowData" in deployments
+        return False
 
 
-def ensure_running() -> bool:
+def ensure_running():
     if is_running():
         return
 
