@@ -162,6 +162,35 @@ def get_api(ftp_server_ip: str, ftp_server_port: int):
             ctx.log_string("tags." + request_json["key"], request_json["value"])
             return {}
 
+        # --- metrics ---
+
+        @app.post("/api/2.0/mlflow/runs/log-metric")
+        async def post_runs_log_metric(
+            self, request: Request, traceparent: str = Depends(_get_traceparent)
+        ):
+            # Server REST API:
+            # https://mlflow.org/docs/latest/rest-api.html#log-metric
+            #
+            # Client SDK API:
+            # https://mlflow.org/docs/latest/python_api/mlflow.html#mlflow.log_metric
+            request_json = await request.json()
+            print("CL: /api/2.0/mlflow/runs/log-metric (post) REQ ", request_json)
+
+            assert request_json.keys() == {
+                "run_uuid",
+                "run_id",
+                "key",
+                "value",
+                "timestamp",
+                "step",
+            }
+            assert isinstance(request_json["key"], str)
+            assert isinstance(request_json["value"], float)
+
+            ctx = get_task_context(P={"_opentelemetry_traceparent": traceparent})
+            ctx.log_float(request_json["key"], request_json["value"])
+            return {}
+
         # --- the below endpoints are not part of the API but useful for testing ---
 
         @app.get("/status")
@@ -171,18 +200,18 @@ def get_api(ftp_server_ip: str, ftp_server_port: int):
         @app.get("/{rest_of_path:path}")
         def catch_all_get(self, rest_of_path):
             print("Recieved unknown GET request", rest_of_path)
-            return HTTPException(
+            raise HTTPException(
                 status_code=501,
-                detail="query {rest_of_path} not supported in state-less "
+                detail=f"GET {rest_of_path} not supported in state-less "
                 "mlflow-to-opentelemetry log collector",
             )
 
         @app.post("/{rest_of_path:path}")
         def catch_all_post(self, rest_of_path):
             print("Recieved unknown POST request", rest_of_path)
-            return HTTPException(
+            raise HTTPException(
                 status_code=501,
-                detail="query {rest_of_path} not supported in state-less "
+                detail=f"POST {rest_of_path} not supported in state-less "
                 "mlflow-to-opentelemetry log collector",
             )
 

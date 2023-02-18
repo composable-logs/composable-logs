@@ -10,6 +10,7 @@ from composable_logs.opentelemetry_task_span_parser import ArtifactContent
 from composable_logs.opentelemetry_helpers import Spans, SpanRecorder
 from composable_logs.opentelemetry_task_span_parser import parse_spans
 from composable_logs.wrappers import task, run_dag
+from composable_logs.wrappers import _get_traceparent
 from composable_logs.mlflow_server.server import (
     MLFLOW_HOST,
     MLFLOW_PORT,
@@ -124,7 +125,9 @@ def get_test_spans_with_different_inputs():
 
         # --- generate data to mlflow.log_text API ---
         mlflow.log_text("## Hello \nWorld 😊", "README.md")
-        from composable_logs.wrappers import _get_traceparent
+
+        # --- log metrics ---
+        mlflow.log_metric("a-logged-metric", 12.900)
 
         # --- mlflow.active_run() should now is populated ---
         active_run_dict = mlflow.active_run().to_dictionary()
@@ -163,6 +166,11 @@ def test_mlflow_logging_for_different_endpoints_with_mix_test_data(mlflow_server
         )
         assert task_summary.logged_values["bbb"] == LoggedValueContent(
             type="utf-8", content="[1, 23]"
+        )
+
+        # --- metrics currently stored as parameters ---
+        assert task_summary.logged_values["a-logged-metric"] == LoggedValueContent(
+            type="float", content=12.900
         )
 
         # --- verify tag was recorded
