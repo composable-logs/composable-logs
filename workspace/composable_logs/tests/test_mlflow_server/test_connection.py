@@ -6,6 +6,7 @@ import pytest
 
 # -
 from composable_logs.helpers import one
+from composable_logs.opentelemetry_task_span_parser import ArtifactContent
 from composable_logs.opentelemetry_helpers import Spans, SpanRecorder
 from composable_logs.opentelemetry_task_span_parser import parse_spans
 from composable_logs.wrappers import task, run_dag
@@ -69,7 +70,7 @@ def get_test_spans_for_two_parallel_tasks():
     return rec.spans
 
 
-def txxest_mlflow_data_from_parallel_tasks_are_split_correctly(mlflow_server):
+def test_mlflow_data_from_parallel_tasks_are_split_correctly(mlflow_server):
     spans: Spans = get_test_spans_for_two_parallel_tasks()
 
     workflow_summary = parse_spans(spans)
@@ -112,10 +113,18 @@ def get_test_spans_with_different_inputs():
             mlflow.log_param(k, logged_value)
 
         # --- generate data to mlflow.log_params API ---
+        # uses batch ingestion API
         mlflow.log_params({"aaa": 123, "bbb": [1, 23]})
+
+        # --- tag run, loged as a parameter but with a tags. prefix ---
+        mlflow.set_tag("version", "2.3.4")
+
+        print("- ---- mlflow.log_tex ----")
 
         # --- generate data to mlflow.log_text API ---
         mlflow.log_text("## Hello \nWorld 😊", "README.md")
+
+        print("- ---- mlflow.log_tex ----")
 
     with SpanRecorder() as rec:
         run_dag(ml_flow_data_generator())
@@ -145,6 +154,16 @@ def test_mlflow_logging_for_different_endpoints_with_mix_test_data(mlflow_server
         )
         assert task_summary.logged_values["bbb"] == LoggedValueContent(
             type="utf-8", content="[1, 23]"
+        )
+
+        # --- verify tag was recorded
+        assert task_summary.logged_values["tags.version"] == LoggedValueContent(
+            type="utf-8", content="2.3.4"
+        )
+
+        print(100 * "/", task_summary.logged_artifacts)
+        assert task_summary.get_artifact("README.md") == ArtifactContent(
+            name="README.md", type="utf-8", content="## Hello \nWorld 😊"
         )
 
 

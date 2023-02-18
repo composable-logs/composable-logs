@@ -4,10 +4,10 @@ import os
 from fastapi import FastAPI, Request
 
 # ---- start ML Flow server to catch requests ----
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request, Depends, HTTPException
+
 from ray import serve
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-
 
 # -
 from composable_logs.tasks.task_opentelemetry_logging import get_task_context
@@ -39,6 +39,9 @@ def get_api():
     @serve.deployment(route_prefix="/")
     @serve.ingress(app)
     class ServerToCaptureMLFlowData:
+
+        # --- runs related endpoints ---
+
         @app.post("/api/2.0/mlflow/runs/create")
         async def post_runs_create(
             self, request: Request, traceparent: str = Depends(_get_traceparent)
@@ -55,6 +58,36 @@ def get_api():
             }
             print("CL: /api/2.0/mlflow/runs/create : RESP ", response)
             return response
+
+        @app.post("/api/2.0/mlflow/runs/update")
+        async def post_runs_update(self, request: Request):
+            print("POST >>> /api/2.0/mlflow/runs/update", await request.json())
+            return {}
+
+        @app.get("/api/2.0/mlflow/runs/get")
+        async def mlflow_runs_get(
+            self, request: Request, traceparent: str = Depends(_get_traceparent)
+        ):
+            # Implementing this seems necessary since the client uses this to fetch
+            # artifact_uri, and this determines storage location for temp files used
+            # by client.
+            assert await request.body() == b""
+            print("CL: /api/2.0/mlflow/runs/get (get)")
+            response = {
+                "run": {
+                    "info": {
+                        "run_id": traceparent,
+                        "run_uuid": traceparent,
+                        # strangely this seems to influence where client write temp
+                        # files on local file system before sending them to server (!)
+                        "artifact_uri": f"/tmp/{traceparent}/",
+                    }
+                }
+            }
+            print("CL: /api/2.0/mlflow/runs/create : RESP ", response)
+            return response
+
+        # --- experiment data ---
 
         @app.post("/api/2.0/mlflow/runs/log-parameter")
         async def post_runs_log_parameter(
@@ -100,30 +133,28 @@ def get_api():
 
             return {}
 
-        @app.get("/api/2.0/mlflow/runs/get")
+        @app.post("/api/2.0/mlflow/runs/set-tag")
         async def mlflow_runs_get(
             self, request: Request, traceparent: str = Depends(_get_traceparent)
         ):
-            assert await request.body() == b""
-            print("CL: /api/2.0/mlflow/runs/get (get)")
-            response = {
-                "run": {
-                    "info": {
-                        "run_id": traceparent,
-                        "run_uuid": traceparent,
-                        # strangely this seems to influence where client write temp
-                        # files on local file system before sending them to server (!)
-                        "artifact_uri": f"/tmp/{traceparent}/",
-                    }
-                }
-            }
-            print("CL: /api/2.0/mlflow/runs/create : RESP ", response)
-            return response
+            # Server REST API:
+            # https://mlflow.org/docs/latest/rest-api.html#set-tag
+            #
+            # Client SDK API:
+            # https://mlflow.org/docs/latest/python_api/mlflow.html#mlflow.set_tag
+            request_json = await request.json()
+            print("CL: /api/2.0/mlflow/runs/set-tag (post) REQ ", request_json)
+            ctx = get_task_context(P={"_opentelemetry_traceparent": traceparent})
 
-        @app.post("/api/2.0/mlflow/runs/update")
-        async def post_runs_update(self, request: Request):
-            print("POST >>> /api/2.0/mlflow/runs/update", await request.json())
+            assert request_json.keys() == {"run_uuid", "run_id", "key", "value"}
+            assert isinstance(request_json["key"], str)
+            assert isinstance(request_json["value"], str)
+            ctx.log_string("tags." + request_json["key"], request_json["value"])
             return {}
+
+        # --- tags ---
+
+        # --- the below endpoints are not part of the API but useful for testing ---
 
         @app.get("/status")
         def is_alive(self):
@@ -133,6 +164,12 @@ def get_api():
         @app.get("/{rest_of_path:path}")
         def catch_all_get(self, rest_of_path):
             print("Recieved GET query", rest_of_path)
+            # https://mlflow.org/docs/latest/rest-api.html#set-experiment-tag
+            return HTTPException(
+                status_code=501,
+                detail="query {rest_of_path} not supported in state-less "
+                "mlflow-to-opentelemetry log collector",
+            )
             return {}
 
         @app.post("/{rest_of_path:path}")

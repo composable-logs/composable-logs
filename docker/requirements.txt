@@ -14,3 +14,4 @@ pydantic==1.10.4
 jsonschema[format-nongpl]==4.17.3
 mlflow-skinny==2.1.1
 fastapi==0.91.0
+pyftpdlib==1.5.7

@@ -12,7 +12,7 @@ from typing import (
 )
 
 # -
-from composable_logs.helpers import del_key, dict_prefix_keys
+from composable_logs.helpers import del_key, dict_prefix_keys, one
 from composable_logs.opentelemetry_helpers import (
     Spans,
     SpanDict,
@@ -283,6 +283,10 @@ class TaskRunSummary(p.BaseModel):
     # keep track of values/artifacts logged *during run time*
     logged_values: Dict[LoggedValueName, LoggedValueContent]
     logged_artifacts: List[ArtifactContent]
+
+    def get_artifact(self, artifact_name) -> ArtifactContent:
+        # TODO switch artifact into dict as for logged values
+        return one([a for a in self.logged_artifacts if a.name == artifact_name])
 
     # --- input validation
     @p.validator("span_id")
