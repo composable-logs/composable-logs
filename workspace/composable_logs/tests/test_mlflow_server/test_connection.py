@@ -119,12 +119,8 @@ def get_test_spans_with_different_inputs():
         # --- tag run, loged as a parameter but with a tags. prefix ---
         mlflow.set_tag("version", "2.3.4")
 
-        print("- ---- mlflow.log_tex ----")
-
         # --- generate data to mlflow.log_text API ---
         mlflow.log_text("## Hello \nWorld 😊", "README.md")
-
-        print("- ---- mlflow.log_tex ----")
 
     with SpanRecorder() as rec:
         run_dag(ml_flow_data_generator())
@@ -163,7 +159,9 @@ def test_mlflow_logging_for_different_endpoints_with_mix_test_data(mlflow_server
 
         print(100 * "/", task_summary.logged_artifacts)
         assert task_summary.get_artifact("README.md") == ArtifactContent(
-            name="README.md", type="utf-8", content="## Hello \nWorld 😊"
+            name="README.md",
+            type="bytes",
+            content="## Hello \nWorld 😊".encode("utf-8"),
         )
 
 
