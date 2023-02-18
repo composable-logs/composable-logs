@@ -5,7 +5,7 @@ import pytest
 
 
 # -
-from composable_logs.helpers import one
+from composable_logs.helpers import one, Try
 from composable_logs.opentelemetry_task_span_parser import ArtifactContent
 from composable_logs.opentelemetry_helpers import Spans, SpanRecorder
 from composable_logs.opentelemetry_task_span_parser import parse_spans
@@ -186,17 +186,24 @@ def test_mlflow_logging_for_different_endpoints_with_mix_test_data(mlflow_server
         )
 
 
-# def _test_mlflow_logging_different_types():
-#     spans = []
+def test_mlflow_client_crashes_for_unsupported_api_calls(mlflow_server):
+    @task(task_id="test_unsupported_api_calls")
+    def test_unsupported_api_calls():
+        configure_mlflow_connection_variables()
 
-#     for s in spans:
-#         print(100 * "-")
-#         import json
+        import mlflow
 
-#         print(json.dumps(s, indent=2))
+        # TODO: Not sure why a try .. except is neded here. Without these we
+        # get a timeout exception (?!)
+        try:
+            mlflow.get_experiment(experiment_id="this-does-not-exist")
+            raise Exception("An exception should have been thrown")
 
-#     # assert task_summary.logged_values["logged-key"] == LoggedValueContent(
-#     #     type="utf-8", content="logged-value"
-#     # )
+        except Exception as e:
+            return str(e)
 
-#     # assert False
+    with SpanRecorder() as rec:
+        result: Try[str] = run_dag(test_unsupported_api_calls())
+
+        assert result.is_success()
+        assert "GET api/2.0/mlflow/experiments/get not supported" in str(result.value)
