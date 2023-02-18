@@ -107,6 +107,9 @@ def get_test_spans_with_different_inputs():
 
         import mlflow
 
+        # currently no run is active
+        assert mlflow.active_run() is None
+
         # --- generate data to mlflow.log_param API ---
         for k, v in LOG_PARAMETER_TEST_VALUES.items():
             logged_value, expected_value_in_logs = v
@@ -121,6 +124,16 @@ def get_test_spans_with_different_inputs():
 
         # --- generate data to mlflow.log_text API ---
         mlflow.log_text("## Hello \nWorld 😊", "README.md")
+        from composable_logs.wrappers import _get_traceparent
+
+        # --- mlflow.active_run() should now is populated ---
+        active_run_dict = mlflow.active_run().to_dictionary()
+        assert active_run_dict["info"]["run_id"] == _get_traceparent()
+
+        for api_uri in (active_run_dict["info"]["artifact_uri"],):
+            assert isinstance(api_uri, str)
+            assert api_uri.startswith("ftp://")
+            assert _get_traceparent() in api_uri
 
     with SpanRecorder() as rec:
         run_dag(ml_flow_data_generator())

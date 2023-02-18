@@ -47,6 +47,19 @@ def get_api(ftp_server_ip: str, ftp_server_port: int):
         # raise Exception("_get_traceparent" + traceparent)
         return traceparent
 
+    def _run_response_json(traceparent: str):
+        return {
+            "run": {
+                "info": {
+                    "run_id": traceparent,
+                    "run_uuid": traceparent,  # deprecated
+                    # We return endpoint to our ftp-server that will accept artifacts.
+                    # From the path we can deduce which task is the parent for the file.
+                    "artifact_uri": f"ftp://{ftp_server_ip}:{ftp_server_port}/{traceparent}/",
+                }
+            }
+        }
+
     @serve.deployment(route_prefix="/")
     @serve.ingress(app)
     class ServerToCaptureMLFlowData:
@@ -63,10 +76,8 @@ def get_api(ftp_server_ip: str, ftp_server_port: int):
             API Documentation:
             https://mlflow.org/docs/latest/rest-api.html#mlflowruninfo
             """
-            print("CL: /api/2.0/mlflow/runs/create (post) REQ ", await request.json())
-            response = {
-                "run": {"info": {"run_id": traceparent, "run_uuid": traceparent}}
-            }
+            print("CL: /api/2.0/mlflow/runs/create : POST REQ ", await request.json())
+            response = _run_response_json(traceparent)
             print("CL: /api/2.0/mlflow/runs/create : RESP ", response)
             return response
 
@@ -79,23 +90,9 @@ def get_api(ftp_server_ip: str, ftp_server_port: int):
         async def mlflow_runs_get(
             self, request: Request, traceparent: str = Depends(_get_traceparent)
         ):
-            # Implementing this seems necessary since the client uses this to fetch
-            # artifact_uri, and this determines storage location for temp files used
-            # by client.
-            assert await request.body() == b""
-            print("CL: /api/2.0/mlflow/runs/get (get)")
-            response = {
-                "run": {
-                    "info": {
-                        "run_id": traceparent,
-                        "run_uuid": traceparent,
-                        # strangely this seems to influence where client write temp
-                        # files on local file system before sending them to server (!)
-                        "artifact_uri": f"ftp://{ftp_server_ip}:{ftp_server_port}/{traceparent}/",
-                    }
-                }
-            }
-            print("CL: /api/2.0/mlflow/runs/create : RESP ", response)
+            print("CL: /api/2.0/mlflow/runs/get: GET")
+            response = _run_response_json(traceparent)
+            print("CL: /api/2.0/mlflow/runs/get: RESP ", response)
             return response
 
         # --- experiment data ---
@@ -144,6 +141,8 @@ def get_api(ftp_server_ip: str, ftp_server_port: int):
 
             return {}
 
+        # --- tags ---
+
         @app.post("/api/2.0/mlflow/runs/set-tag")
         async def mlflow_runs_set_tag(
             self, request: Request, traceparent: str = Depends(_get_traceparent)
@@ -162,8 +161,6 @@ def get_api(ftp_server_ip: str, ftp_server_port: int):
             assert isinstance(request_json["value"], str)
             ctx.log_string("tags." + request_json["key"], request_json["value"])
             return {}
-
-        # --- tags ---
 
         # --- the below endpoints are not part of the API but useful for testing ---
 
