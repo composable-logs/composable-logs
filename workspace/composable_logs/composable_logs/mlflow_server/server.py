@@ -1,15 +1,12 @@
 import os, uuid
-
-# -
-from fastapi import FastAPI, Request
+from pathlib import Path
 
 # -
 import ray
-from pathlib import Path
 
 from fastapi import FastAPI, Request, Depends, HTTPException
-
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
@@ -21,20 +18,26 @@ from composable_logs.wrappers import _get_traceparent
 
 # ---- start ML Flow server to catch requests ----
 
-MLFLOW_SERVER_ACTOR_NAME = "composable-logs-mlflow-server"
-
-# We set up one FTP server on some node in the Ray cluster
-COMPOSABLE_LOGS_MLFLOW_FTP_SERVER_PORT = 2449
-
-# And one MLFlow server on some (potentially other) node in the Ray cluster
-MLFLOW_PORT = 4942
+# MLFlow server runs on some node in the Ray cluster
+MLFLOW_PORT = 5001
 MLFLOW_HOST = "localhost"
 
-# Clients request the IP of the server from named actors in the cluster, with
-# ports are defined above.
+# OpenTelemetry context propagation to the MLFlow server is done using username and
+# password data. Thus, the below static password is not providing security. Rather it
+# ensures that requests are correctly configured. Similarly, the ftp server allow
+# anonymous write access.
+MLFLOW_SERVER_PASSWORD = "composable-logs-login"
+
+# Clients request the IP address to the MLFlow server from named actors in the
+# cluster, and port defined above.
+MLFLOW_SERVER_ACTOR_NAME = "composable-logs-mlflow-server"
+
+# The FTP server runs on potentially another node in the Ray cluster. Clients upload
+# artifacts to the ftp server as redirected by the MLFlow server.
+COMPOSABLE_LOGS_MLFLOW_FTP_SERVER_PORT = 5002
 
 
-def get_api(ftp_server_ip: str, ftp_server_port: int):
+def get_api(ftp_server_ip: str, ftp_server_port: int) -> FastAPI:
 
     app = FastAPI()
     _security = HTTPBasic()
@@ -49,6 +52,12 @@ def get_api(ftp_server_ip: str, ftp_server_port: int):
         """
         traceparent: str = credentials.username
         assert isinstance(traceparent, str)
+        if credentials.password != MLFLOW_SERVER_PASSWORD:
+            raise Exception(
+                "MLFlow client is not correctly set up! Please set environment "
+                "variables by calling configure_mlflow_connection_variables before "
+                "logging using the MLFlow client."
+            )
         return traceparent
 
     def _run_response_json(traceparent: str):
@@ -340,7 +349,7 @@ class MLFlowServer:
 # --- control functions ---
 
 
-def get_actor_ip(actor_id: str):
+def _get_actor_ip(actor_id: str):
 
     from ray.experimental.state.api import get_actor, get_node
 
@@ -349,7 +358,22 @@ def get_actor_ip(actor_id: str):
         raise Exception(f"Unable to find actor with id={actor}")
 
     node = get_node(actor["node_id"])
-    return node["node_ip"]
+    return node["node_ip"]  # type: ignore
+
+
+def get_actor_ip(actor_id: str):
+    # Ray reports internal API error without this retry logic
+    e = None
+    for _ in range(5):
+        try:
+            return _get_actor_ip(actor_id)
+        except BaseException as _e:
+            import time
+
+            time.sleep(1)
+            e = _e
+
+    raise e  # type: ignore
 
 
 def get_mlflow_server_ip() -> str:
@@ -376,7 +400,7 @@ def ensure_running():
     mlflow_server_actor = (
         MLFlowServer
         # -
-        .options(name=MLFLOW_SERVER_ACTOR_NAME)
+        .options(name=MLFLOW_SERVER_ACTOR_NAME)  # type: ignore
         # -
         .remote()  # type: ignore
     )
@@ -384,11 +408,6 @@ def ensure_running():
     # The below is non-blocking call to actor, but actor-method is blocking
     # and actor will no longer respond. But will server API requests.
     mlflow_server_actor.start_server.remote()
-
-    # Ray reports internal API error without a short delay here
-    import time
-
-    time.sleep(1)
 
     # Poll the ML Flow /status API until the server has started and starts to respond
     # See: https://stackoverflow.com/a/35504626
@@ -412,7 +431,7 @@ def ensure_running():
     )
 
 
-def shutdown() -> bool:
+def shutdown():
     ray.kill(ray.get_actor(MLFLOW_SERVER_ACTOR_NAME, namespace="pydar-ray-cluster"))
 
 
@@ -432,8 +451,10 @@ def configure_mlflow_connection_variables():
     os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 
     # Note this works assuming all tasks are run in different Python processes
+    #
+    # https://mlflow.org/docs/latest/tracking.html?highlight=mlflow_tracking_username#logging-to-a-tracking-server
     os.environ["MLFLOW_TRACKING_USERNAME"] = traceparent
-    os.environ["MLFLOW_TRACKING_PASSWORD"] = "no-password"
+    os.environ["MLFLOW_TRACKING_PASSWORD"] = MLFLOW_SERVER_PASSWORD
 
     # get IP to named actor running the MLFlow server on this Ray cluster.
     # So all clients connect to the same MLFlow server on the Ray cluster.

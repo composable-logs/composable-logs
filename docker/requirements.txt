@@ -16,3 +16,5 @@ mlflow-skinny==2.1.1
 fastapi==0.91.0
 pyftpdlib==1.5.7
 uvicorn==0.20.0
+types-requests==2.28.11.14
+types-urllib3==1.26.25.7
