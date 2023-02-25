@@ -36,7 +36,7 @@ def test_mlflow_server_is_running_without_fixture():
 def test_mlflow_server_is_running_with_fixture(mlflow_server):
     assert is_running()
 
-    assert requests.get(f"http://{MLFLOW_HOST}:{MLFLOW_PORT}/status").json() == {
+    assert requests.get(f"http://127.0.0.1:{MLFLOW_PORT}/status").json() == {
         "status": "OK"
     }
 
