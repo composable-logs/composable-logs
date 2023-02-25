@@ -11,6 +11,9 @@ COPY requirements.txt /home/host_user/
 #   - https://github.com/nteract/papermill/issues/711
 #  jsonschema[format-nongpl]==4.17.3
 #   - avoid dependency errors for python cli:s
+#
+# mypy types install, see
+#   https://github.com/python/mypy/issues/10600
 RUN pip3 install --user -r /home/host_user/requirements.txt
 
 RUN pip3 install --quiet --user \
