@@ -1,4 +1,5 @@
 import random, time
+from pathlib import Path
 
 # -
 import pytest
@@ -41,15 +42,17 @@ def get_test_spans_for_two_parallel_tasks():
         configure_mlflow_connection_variables()
 
         for k in range(10):
-            time.sleep(random.random() * 0.12)
-            mlflow.log_param(f"1-logged-key-{k}", "1-value-{k}")
+            time.sleep(random.random() * 0.10)
+            mlflow.log_param(f"1-logged-key-{k}", "some logged parameter value")
+            mlflow.log_text("some-file-content", f"1-file-{k}")
 
     @task(task_id="ml_flow_tester_2")
     def ml_flow_tester_2():
         configure_mlflow_connection_variables()
         for k in range(10):
-            time.sleep(random.random() * 0.08)
-            mlflow.log_param(f"2-logged-key-{k}", "2-value-{k}")
+            time.sleep(random.random() * 0.10)
+            mlflow.log_param(f"2-logged-key-{k}", "some logged parameter value")
+            mlflow.log_text("some-file-content", f"2-file-{k}")
 
     with SpanRecorder() as rec:
         run_dag([ml_flow_tester_1(), ml_flow_tester_2()])
@@ -57,24 +60,33 @@ def get_test_spans_for_two_parallel_tasks():
     return rec.spans
 
 
-def test_mlflow_data_from_parallel_tasks_are_split_correctly(mlflow_server):
+def test_mlflow_data_from_parallel_tasks_are_split_correctly():
     spans: Spans = get_test_spans_for_two_parallel_tasks()
+
+    nr_loops = 10
 
     workflow_summary = parse_spans(spans)
     assert workflow_summary.is_success()
 
     for task_summary in workflow_summary.task_runs:  # type: ignore
-        assert len(task_summary.logged_artifacts) == 0
-        assert len(task_summary.logged_values) == 10
+        assert len(task_summary.logged_artifacts) == nr_loops
+        assert len(task_summary.logged_values) == nr_loops
 
         assert task_summary.task_id in ["ml_flow_tester_1", "ml_flow_tester_2"]
         if task_summary.task_id == "ml_flow_tester_1":
             assert task_summary.logged_values.keys() == {
-                f"1-logged-key-{k}" for k in range(10)
+                f"1-logged-key-{k}" for k in range(nr_loops)
+            }
+            assert set([a.name for a in task_summary.logged_artifacts]) == {
+                f"1-file-{k}" for k in range(nr_loops)
             }
         if task_summary.task_id == "ml_flow_tester_2":
             assert task_summary.logged_values.keys() == {
-                f"2-logged-key-{k}" for k in range(10)
+                f"2-logged-key-{k}" for k in range(nr_loops)
+            }
+
+            assert set([a.name for a in task_summary.logged_artifacts]) == {
+                f"2-file-{k}" for k in range(nr_loops)
             }
 
 
@@ -87,7 +99,7 @@ LOG_PARAMETER_TEST_VALUES = {
 }
 
 
-def get_test_spans_with_different_inputs():
+def get_test_spans_with_different_inputs(tmp_path: Path):
     @task(task_id="ml_flow_data_generator")
     def ml_flow_data_generator():
         configure_mlflow_connection_variables()
@@ -110,17 +122,34 @@ def get_test_spans_with_different_inputs():
         # --- generate data to mlflow.log_text API ---
         mlflow.log_text("## Hello \nWorld 😊", "README.md")
 
+        # --- log files in local directory ---
+        (tmp_path / "stdout.txt").write_text("log-line")
+        (tmp_path / "vars.txt").write_text("x, y, t")
+        mlflow.log_artifacts(str(tmp_path), artifact_path="artifacts")
+
         # --- log metrics ---
         mlflow.log_metric("a-logged-metric", 12.900)
 
-        # --- mlflow.active_run() should now is populated ---
-        active_run_dict = mlflow.active_run().to_dictionary()
-        assert active_run_dict["info"]["run_id"] == _get_traceparent()
+        # Not tested, but the below SDK methods should work since they should call
+        # the same server endpoints as used above:
+        #
+        #  - mlflow.log_dict
+        #  - mlflow.log_artifact
+        #  - mlflow.log_figure
+        #  - mlflow.log_image
+        #  - mlflow.log_metrics (does not work if it calles batch metric ingestion API)
 
-        for api_uri in (active_run_dict["info"]["artifact_uri"],):
-            assert isinstance(api_uri, str)
-            assert api_uri.startswith("ftp://")
-            assert _get_traceparent() in api_uri
+        # --- mlflow.active_run() should now is populated ---
+        for run_dict in [
+            mlflow.active_run().to_dictionary(),
+            mlflow.last_active_run().to_dictionary(),
+        ]:
+            assert run_dict["info"]["run_id"] == _get_traceparent()
+
+            for api_uri in (run_dict["info"]["artifact_uri"],):
+                assert isinstance(api_uri, str)
+                assert api_uri.startswith("ftp://")
+                assert _get_traceparent() in api_uri
 
     with SpanRecorder() as rec:
         run_dag(ml_flow_data_generator())
@@ -128,8 +157,8 @@ def get_test_spans_with_different_inputs():
     return rec.spans
 
 
-def test_mlflow_logging_for_different_endpoints_with_mix_test_data(mlflow_server):
-    spans: Spans = get_test_spans_with_different_inputs()
+def test_mlflow_logging_for_different_endpoints_with_mix_test_data(tmp_path: Path):
+    spans: Spans = get_test_spans_with_different_inputs(tmp_path)
 
     workflow_summary = parse_spans(spans)
     assert workflow_summary.is_success()
@@ -168,8 +197,20 @@ def test_mlflow_logging_for_different_endpoints_with_mix_test_data(mlflow_server
             content="## Hello \nWorld 😊".encode("utf-8"),
         )
 
+        assert task_summary.get_artifact("artifacts/stdout.txt") == ArtifactContent(
+            name="artifacts/stdout.txt",
+            type="bytes",
+            content="log-line".encode("utf-8"),
+        )
 
-def test_mlflow_client_crashes_for_unsupported_api_calls(mlflow_server):
+        assert task_summary.get_artifact("artifacts/vars.txt") == ArtifactContent(
+            name="artifacts/vars.txt",
+            type="bytes",
+            content="x, y, t".encode("utf-8"),
+        )
+
+
+def test_mlflow_client_crashes_for_unsupported_api_calls():
     @task(task_id="test_unsupported_api_calls")
     def test_unsupported_api_calls():
         configure_mlflow_connection_variables()
