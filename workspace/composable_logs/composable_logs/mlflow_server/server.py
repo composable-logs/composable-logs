@@ -82,12 +82,20 @@ def get_api(ftp_server_ip: str, ftp_server_port: int) -> FastAPI:
         """
         When client starts a new id, the server responds with id for that run.
 
-        API Documentation:
+        REST API Documentation:
         https://mlflow.org/docs/latest/rest-api.html#mlflowruninfo
         """
-        print("CL: /api/2.0/mlflow/runs/create : POST REQ ", await request.json())
+        request_json = await request.json()
+        tags = request_json.get("tags", [])
+        if "mlflow.parentRunId" in [entry["key"] for entry in tags]:
+            raise HTTPException(
+                status_code=501,
+                detail=f"POST /api/2.0/mlflow/runs/create --- nested runs are not supported",
+            )
+
+        print("CL: /api/2.0/mlflow/runs/create : POST REQ ", request_json)
         response = _run_response_json(traceparent)
-        print("CL: /api/2.0/mlflow/runs/create : RESP ", response)
+        print("CL: /api/2.0/mlflow/runs/create : POST RESP ", response)
         return response
 
     @app.post("/api/2.0/mlflow/runs/update")
@@ -146,7 +154,7 @@ def get_api(ftp_server_ip: str, ftp_server_port: int) -> FastAPI:
             ctx.log_string(param["key"], param["value"])
 
         assert isinstance(request_json.get("metrics", []), list)
-        # metrics not yet supported.
+        # TODO: batch ingestion of metrics not yet supported.
 
         return {}
 
@@ -200,7 +208,7 @@ def get_api(ftp_server_ip: str, ftp_server_port: int) -> FastAPI:
         ctx.log_float(request_json["key"], request_json["value"])
         return {}
 
-    # --- the below endpoints are not part of the API but useful for testing ---
+    # --- the below endpoints are not part of the MLFlow API but useful for testing ---
 
     @app.get("/status")
     def status():
@@ -384,7 +392,7 @@ def get_mlflow_server_ip() -> str:
     return get_actor_ip(actor._actor_id.hex())
 
 
-def is_running() -> bool:
+def mlflow_server_is_running() -> bool:
     try:
         mlflow_ip = get_mlflow_server_ip()
         return True
@@ -392,8 +400,8 @@ def is_running() -> bool:
         return False
 
 
-def ensure_running():
-    if is_running():
+def ensure_mlflow_server_is_running():
+    if mlflow_server_is_running():
         return
 
     # --- start ML Flow server ---
@@ -431,7 +439,7 @@ def ensure_running():
     )
 
 
-def shutdown():
+def shutdown_mlflow_server():
     ray.kill(ray.get_actor(MLFLOW_SERVER_ACTOR_NAME, namespace="pydar-ray-cluster"))
 
 

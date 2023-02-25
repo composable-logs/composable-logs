@@ -1,7 +1,8 @@
-import random, time, requests
+import random, time
 
 # -
 import pytest
+import mlflow
 
 
 # -
@@ -12,33 +13,23 @@ from composable_logs.opentelemetry_task_span_parser import parse_spans
 from composable_logs.wrappers import task, run_dag
 from composable_logs.wrappers import _get_traceparent
 from composable_logs.mlflow_server.server import (
-    MLFLOW_HOST,
-    MLFLOW_PORT,
     configure_mlflow_connection_variables,
-    is_running,
-    ensure_running,
-    shutdown,
+    mlflow_server_is_running,
+    ensure_mlflow_server_is_running,
+    shutdown_mlflow_server,
 )
 from composable_logs.opentelemetry_task_span_parser import LoggedValueContent
 
 
 @pytest.fixture(scope="module", autouse=True)
 def mlflow_server():
-    ensure_running()
+    ensure_mlflow_server_is_running()
     yield
-    shutdown()
+    shutdown_mlflow_server()
 
 
-def test_mlflow_server_is_running_without_fixture():
-    assert is_running()
-
-
-def test_mlflow_server_is_running_with_fixture(mlflow_server):
-    assert is_running()
-
-    assert requests.get(f"http://127.0.0.1:{MLFLOW_PORT}/status").json() == {
-        "status": "OK"
-    }
+def test_mlflow_server_is_running():
+    assert mlflow_server_is_running()
 
 
 def get_test_spans_for_two_parallel_tasks():
@@ -49,8 +40,6 @@ def get_test_spans_for_two_parallel_tasks():
     def ml_flow_tester_1():
         configure_mlflow_connection_variables()
 
-        import mlflow
-
         for k in range(10):
             time.sleep(random.random() * 0.12)
             mlflow.log_param(f"1-logged-key-{k}", "1-value-{k}")
@@ -58,9 +47,6 @@ def get_test_spans_for_two_parallel_tasks():
     @task(task_id="ml_flow_tester_2")
     def ml_flow_tester_2():
         configure_mlflow_connection_variables()
-
-        import mlflow
-
         for k in range(10):
             time.sleep(random.random() * 0.08)
             mlflow.log_param(f"2-logged-key-{k}", "2-value-{k}")
@@ -105,8 +91,6 @@ def get_test_spans_with_different_inputs():
     @task(task_id="ml_flow_data_generator")
     def ml_flow_data_generator():
         configure_mlflow_connection_variables()
-
-        import mlflow
 
         # currently no run is active
         assert mlflow.active_run() is None
@@ -178,7 +162,6 @@ def test_mlflow_logging_for_different_endpoints_with_mix_test_data(mlflow_server
             type="utf-8", content="2.3.4"
         )
 
-        print(100 * "/", task_summary.logged_artifacts)
         assert task_summary.get_artifact("README.md") == ArtifactContent(
             name="README.md",
             type="bytes",
@@ -190,8 +173,6 @@ def test_mlflow_client_crashes_for_unsupported_api_calls(mlflow_server):
     @task(task_id="test_unsupported_api_calls")
     def test_unsupported_api_calls():
         configure_mlflow_connection_variables()
-
-        import mlflow
 
         # TODO: Not sure why a try .. except is neded here. Without these we
         # get a timeout exception (?!)
@@ -207,3 +188,51 @@ def test_mlflow_client_crashes_for_unsupported_api_calls(mlflow_server):
 
         assert result.is_success()
         assert "GET api/2.0/mlflow/experiments/get not supported" in str(result.value)
+
+
+@pytest.mark.parametrize("mlflow_logger", [0, 1, 2])
+def test_mlflow_different_call_approaches(mlflow_logger):
+    @task(task_id="mlflow-1")
+    def ml_flow_data_generator():
+        configure_mlflow_connection_variables()
+
+        if mlflow_logger == 0:
+            mlflow.log_param("abc", "123")
+        elif mlflow_logger == 1:
+            mlflow.start_run()
+            mlflow.log_param("abc", "123")
+            mlflow.end_run()
+        elif mlflow_logger == 2:
+            with mlflow.start_run() as run:
+                mlflow.log_param("abc", "123")
+
+    with SpanRecorder() as rec:
+        run_dag(ml_flow_data_generator())
+
+    workflow_summary = parse_spans(rec.spans)
+    assert workflow_summary.is_success()
+
+    for task_summary in [one(workflow_summary.task_runs)]:  # type: ignore
+        assert len(task_summary.logged_values) == 1
+
+        assert task_summary.logged_values.keys() == {"abc"}
+
+
+def test_mlflow_nested_runs_should_fail():
+    @task(task_id="nested-mlflow-runs")
+    def ml_flow_data_generator():
+        configure_mlflow_connection_variables()
+
+        with mlflow.start_run() as run1:
+            mlflow.log_param("pqr", "3000")
+            with mlflow.start_run(nested=True) as run2:
+                mlflow.log_param("rs", "4000")
+
+    with SpanRecorder() as rec:
+        run_dag(ml_flow_data_generator())
+
+    workflow_summary = parse_spans(rec.spans)
+    for task_summary in [one(workflow_summary.task_runs)]:  # type: ignore
+        assert len(task_summary.logged_values) == 1
+        assert task_summary.logged_values.keys() == {"pqr"}
+        assert "nested runs are not supported" in str(task_summary.exceptions)
