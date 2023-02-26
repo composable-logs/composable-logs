@@ -1,5 +1,6 @@
 import os, uuid
 from pathlib import Path
+from typing import Optional
 
 # -
 import ray
@@ -441,9 +442,6 @@ def ensure_mlflow_server_is_running():
 
 def shutdown_mlflow_server():
     ray.kill(ray.get_actor(MLFLOW_SERVER_ACTOR_NAME, namespace="pydar-ray-cluster"))
-
-
-from typing import Optional
 
 
 def configure_mlflow_connection_variables(traceparent: Optional[str] = None):
