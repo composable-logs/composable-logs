@@ -1,5 +1,6 @@
 import os, uuid
 from pathlib import Path
+from typing import Optional
 
 # -
 import ray
@@ -443,14 +444,15 @@ def shutdown_mlflow_server():
     ray.kill(ray.get_actor(MLFLOW_SERVER_ACTOR_NAME, namespace="pydar-ray-cluster"))
 
 
-def configure_mlflow_connection_variables():
+def configure_mlflow_connection_variables(traceparent: Optional[str] = None):
     """
     To be run inside Ray workflow.
 
     Set up ML Flow connection variables so client identifes as correct task,
     and ML Flow data is captured to the correct task.
     """
-    traceparent: str = _get_traceparent()
+    if traceparent is None:
+        traceparent = _get_traceparent()
 
     if not isinstance(traceparent, str):
         raise ValueError(
