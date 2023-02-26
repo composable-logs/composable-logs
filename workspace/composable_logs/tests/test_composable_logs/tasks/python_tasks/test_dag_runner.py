@@ -169,3 +169,14 @@ def test__cl__function_parameters_contain_task_and_system_and_global_parameters(
         )
 
     assert len(rec.spans.exception_events()) == 0
+
+
+def test__python_task_can_accept_constant_inputs():
+    @task(task_id="test")
+    def f(u):
+        return u + "123"
+
+    with SpanRecorder() as rec:
+        assert run_dag(dag=f(Success("u"))) == Success("u123")
+
+    assert len(rec.spans.exception_events()) == 0
