@@ -29,6 +29,23 @@ from composable_logs.opentelemetry_helpers import (
 import pydantic as p
 
 
+def new_extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
+    """
+    From recorded Spans, extract any logged task dependencies as a set of from-to
+    SpanID tuples.
+
+
+    """
+    result = []
+
+    for span in spans.filter(["name"], "execute-task"):
+        for link in span["links"]:
+            result.append((link["context"]["span_id"], span["context"]["span_id"]))
+
+    return set(result)
+
+
+# TODO: Switch to above function all data use link:s for storing task dependencies
 def extract_task_dependencies(spans: Spans) -> Set[Tuple[SpanId, SpanId]]:
     """
     From recorded Spans, extract any logged task dependencies as a set of from-to
