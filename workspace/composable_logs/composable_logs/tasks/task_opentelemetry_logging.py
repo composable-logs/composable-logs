@@ -383,5 +383,21 @@ class ComposableLogsLogger:
 TaskContext = ComposableLogsLogger
 
 
-def get_task_context(P={}):
-    return TaskContext(P=P)
+def get_task_context(P={}, use_mlflow: bool = False) -> TaskContext:
+    result = TaskContext(P=P)
+
+    # note: we need to first set up connection to Ray (above) before we can set
+    # up MLFlow server
+    if use_mlflow:
+        # Note: We only do imports inside this function if "use_mlflow" is set.
+        # Otherwise we get a circular dependency since this function is also used
+        # from the mlflow_server.server package.
+        from composable_logs.mlflow_server.server import (
+            configure_mlflow_connection_variables,
+            ensure_mlflow_server_is_running,
+        )
+
+        ensure_mlflow_server_is_running()
+        configure_mlflow_connection_variables(result._traceparent)
+
+    return result
