@@ -278,7 +278,7 @@ def _task(
             tracer = otel.trace.get_tracer(__name__)
             with tracer.start_as_current_span(
                 "execute-task",
-                links=[arg.to_link() for arg in args],  # type: ignore
+                links=[arg.to_link() for arg in args if isinstance(arg, TaskResult)],  # type: ignore
             ) as span:
                 this_task_span_id: str = get_span_hexid(span)
                 this_task_traceparent: str = _get_traceparent()
