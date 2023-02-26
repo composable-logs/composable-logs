@@ -6,6 +6,7 @@ import pytest
 
 # -
 import opentelemetry as ot
+from opentelemetry import trace
 
 # -
 from composable_logs.opentelemetry_helpers import (
@@ -17,6 +18,13 @@ from composable_logs.opentelemetry_helpers import (
     SpanRecorder,
 )
 from composable_logs.helpers import one
+
+
+def test__otel__spans__recorder():
+    with SpanRecorder() as rec:
+        pass
+
+    assert len(rec.spans) == 0
 
 
 @pytest.mark.parametrize("dummy_loop_parameter", range(3))
@@ -216,3 +224,31 @@ def test__otel__demo_context_propagation_mechanism():
         assert spans.contains_path(top_span, child_span)
 
     validate_spans(get_test_spans())
+
+
+def test__otel__spans__add_link():
+    # test how the OpenTelemetry link API works
+    test_attributes = {"a": "b"}
+    with SpanRecorder() as rec:
+        tracer = ot.trace.get_tracer(__name__)
+        with tracer.start_as_current_span("task-A") as task_a:
+            pass
+
+        with tracer.start_as_current_span(
+            "task-B",
+            links=[trace.Link(task_a.get_span_context(), attributes=test_attributes)],
+        ) as task_b:
+            pass
+
+    spans = rec.spans
+
+    task_a_span = one(spans.filter(["name"], "task-A"))
+    task_b_span = one(spans.filter(["name"], "task-B"))
+
+    task_a_span_id = task_a_span["context"]["span_id"]
+    task_a_trace_id = task_a_span["context"]["trace_id"]
+
+    task_b_link = one(task_b_span["links"])
+    assert task_b_link["context"]["trace_id"] == task_a_trace_id
+    assert task_b_link["context"]["span_id"] == task_a_span_id
+    assert task_b_link["attributes"] == test_attributes
