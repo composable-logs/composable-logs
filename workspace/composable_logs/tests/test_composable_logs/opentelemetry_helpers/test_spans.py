@@ -6,6 +6,7 @@ import pytest
 
 # -
 import opentelemetry as ot
+from opentelemetry import trace
 
 # -
 from composable_logs.opentelemetry_helpers import (
@@ -17,6 +18,14 @@ from composable_logs.opentelemetry_helpers import (
     SpanRecorder,
 )
 from composable_logs.helpers import one
+from composable_logs.wrappers import OpenTelemetryTraceParent
+
+
+def test__otel__spans__recorder():
+    with SpanRecorder() as rec:
+        pass
+
+    assert len(rec.spans) == 0
 
 
 @pytest.mark.parametrize("dummy_loop_parameter", range(3))
@@ -216,3 +225,79 @@ def test__otel__demo_context_propagation_mechanism():
         assert spans.contains_path(top_span, child_span)
 
     validate_spans(get_test_spans())
+
+
+from composable_logs.wrappers import _get_traceparent, _traceparent_to_span_context
+
+
+def test__otel__spans__add_link():
+    # test how the OpenTelemetry link API works
+    test_attributes = {"a": "b"}
+    with SpanRecorder() as rec:
+        tracer = ot.trace.get_tracer(__name__)
+
+        # Create Spans as below with OpenTelemetry links as arrows below:
+        #
+        #  :------------- Top span -------------:
+        #
+        #   task-A   -->   task-B   -->   task-C
+        #
+
+        with tracer.start_as_current_span("top"):
+            # task-A
+            with tracer.start_as_current_span("task-A") as _task_a:
+                pass
+
+            # task-B
+            with tracer.start_as_current_span(
+                "task-B",
+                links=[
+                    trace.Link(_task_a.get_span_context(), attributes=test_attributes)
+                ],
+            ):
+                _task_b_tp: OpenTelemetryTraceParent = _get_traceparent()
+                assert isinstance(_task_b_tp, str)
+
+            # task-C
+            with tracer.start_as_current_span(
+                "task-C",
+                links=[
+                    trace.Link(_traceparent_to_span_context(_task_b_tp), attributes={})
+                ],
+            ):
+                pass
+
+    del tracer, _task_a, _task_b_tp
+    # ---
+
+    spans = rec.spans
+
+    top_span = one(spans.filter(["name"], "top"))
+    task_a_span = one(spans.filter(["name"], "task-A"))
+    task_b_span = one(spans.filter(["name"], "task-B"))
+    task_c_span = one(spans.filter(["name"], "task-C"))
+
+    task_a_span_id = task_a_span["context"]["span_id"]
+    task_b_span_id = task_b_span["context"]["span_id"]
+    # task_c_span_id = task_c_span["context"]["span_id"]
+
+    task_b_link = one(task_b_span["links"])  # link: A -> B
+    assert task_b_link["context"]["span_id"] == task_a_span_id
+    assert task_b_link["attributes"] == test_attributes
+
+    task_c_link = one(task_c_span["links"])  # link: B -> C
+    assert task_c_link["context"]["span_id"] == task_b_span_id
+    assert task_c_link["attributes"] == {}
+
+    # all spans should be in the same trace
+    assert (
+        len(
+            {
+                top_span["context"]["trace_id"],
+                task_a_span["context"]["trace_id"],
+                task_b_span["context"]["trace_id"],
+                task_c_span["context"]["trace_id"],
+            }
+        )
+        == 1
+    )

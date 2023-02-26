@@ -12,6 +12,8 @@ from composable_logs.opentelemetry_helpers import (
 )
 from composable_logs.opentelemetry_task_span_parser import (
     parse_spans,
+    extract_task_dependencies,
+    new_extract_task_dependencies,
 )
 from composable_logs.tasks.task_opentelemetry_logging import (
     get_task_context,
@@ -132,6 +134,14 @@ def test__cl__can_compose(cl__can_compose_spans: Spans):
             ("input_1", "process"),
             ("input_2", "process"),
         ]
+
+
+def test__cl__can_compose__can_parse_links(cl__can_compose_spans: Spans):
+
+    old_dependencies = extract_task_dependencies(cl__can_compose_spans)
+    new_dependencies = new_extract_task_dependencies(cl__can_compose_spans)
+
+    assert old_dependencies == new_dependencies
 
 
 # ---
