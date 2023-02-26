@@ -259,6 +259,7 @@ class NonEmptyString(p.ConstrainedStr):
 
 
 OpenTelemetrySpanId = NonEmptyString
+OpenTelemetryTraceParent = NonEmptyString
 
 
 class TaskRunSummary(p.BaseModel):

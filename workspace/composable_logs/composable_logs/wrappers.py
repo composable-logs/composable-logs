@@ -9,11 +9,15 @@ from ray.dag.function_node import FunctionNode
 from ray import workflow
 
 import opentelemetry as otel
-
+from opentelemetry import trace
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 # -
 from composable_logs.opentelemetry_helpers import get_span_hexid, otel_add_baggage
-from composable_logs.opentelemetry_task_span_parser import OpenTelemetrySpanId
+from composable_logs.opentelemetry_task_span_parser import (
+    OpenTelemetrySpanId,
+    OpenTelemetryTraceParent,
+)
 from composable_logs.helpers import one, Try, Failure, Success
 from composable_logs.tasks.task_opentelemetry_logging import (
     TaskParameters,
@@ -44,8 +48,21 @@ class TaskResult(p.BaseModel):
 
     span_id: OpenTelemetrySpanId
 
+    traceparent: OpenTelemetryTraceParent
+
     def __str__(self):
-        return f"TaskResult(result={self.result}, span_id={self.span_id})"
+        return (
+            f"TaskResult("
+            f"result={self.result}, "
+            f"span_id={self.span_id}, "
+            f"traceparent={self.traceparent})"
+        )
+
+    def to_link(self) -> trace.Link:
+        return trace.Link(
+            _traceparent_to_span_context(self.traceparent),
+            attributes={"type": "task-dependency"},
+        )
 
 
 # ---
@@ -176,14 +193,10 @@ def timeout_guard_wrapper(f, timeout_s: Optional[float], num_cpus: int):
     return make_call_with_timeout_guard
 
 
-def _get_traceparent() -> str:
+def _get_traceparent() -> OpenTelemetryTraceParent:
     """
     Get implicit OpenTelemetry span context for context propagation (eg. to notebooks)
     """
-    from opentelemetry.trace.propagation.tracecontext import (
-        TraceContextTextMapPropagator,
-    )
-
     carrier: Mapping[str, str] = {}
     # carrier = {}
     TraceContextTextMapPropagator().inject(carrier=carrier)
@@ -193,7 +206,32 @@ def _get_traceparent() -> str:
     assert carrier.keys() == {"traceparent"}
     assert isinstance(carrier["traceparent"], str)
 
-    return carrier["traceparent"]
+    return carrier["traceparent"]  # type: ignore
+
+
+def _traceparent_to_span_context(traceparent: OpenTelemetryTraceParent):
+    # converse of _get_traceparent()
+    tmp = TraceContextTextMapPropagator().extract(carrier={"traceparent": traceparent})
+    # output of format:
+    #
+    # {
+    #   "current-span-<UUID>": NonRecordingSpan(
+    #     SpanContext(
+    #        trace_id=0x0123456789abcdef0123456789abcdef,
+    #        span_id=0x0123456789abcdef,
+    #        trace_flags=0x01,
+    #        trace_state=[],
+    #        is_remote=True
+    #     )
+    #   )
+    # }
+    #
+    # Unpack the SpanContext from above (TODO, is there a cleaner way to do this?)
+    assert isinstance(tmp, dict)
+    assert len(tmp.items()) == 1
+    tmp2 = one(tmp.values())
+
+    return tmp2.get_span_context()  # type: ignore
 
 
 def _task(
@@ -238,9 +276,12 @@ def _task(
             args = [arg.get() for arg in args]  # type: ignore
 
             tracer = otel.trace.get_tracer(__name__)
-            with tracer.start_as_current_span("execute-task") as span:
+            with tracer.start_as_current_span(
+                "execute-task",
+                links=[arg.to_link() for arg in args],  # type: ignore
+            ) as span:
                 this_task_span_id: str = get_span_hexid(span)
-
+                this_task_traceparent: str = _get_traceparent()
                 # ---
                 # Log all task parameters into new span.
                 #
@@ -285,6 +326,11 @@ def _task(
                             "task composition not yet supported using kwargs"
                         )
 
+                # v---
+                # Note: The task dependency data is already added above using
+                # OpenTelmetry link-data. After the cli tools have been refactored,
+                # we can delete this part.
+                #
                 # Log dependencies to upstream tasks into OpenTelemetry log
                 for arg in args:
                     if isinstance(arg, TaskResult):
@@ -292,6 +338,7 @@ def _task(
                             subspan.set_attribute("from_task_span_id", arg.span_id)
                             subspan.set_attribute("to_task_span_id", this_task_span_id)
 
+                # ^---
                 del args
 
                 # ---
@@ -333,7 +380,11 @@ def _task(
 
             # Wrap any successful result into TaskResult
             r = try_result.map_value(
-                lambda x: TaskResult(result=x, span_id=this_task_span_id)
+                lambda x: TaskResult(
+                    result=x,
+                    span_id=this_task_span_id,
+                    traceparent=this_task_traceparent,
+                )
             )
             assert otel.trace.get_tracer_provider().force_flush()  # type: ignore
 
