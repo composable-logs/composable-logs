@@ -24,6 +24,12 @@ P = {"task.variable_a": "value-used-during-interactive-development"}
 import mlflow
 
 # -
+# TODO: Currently, composable_logs package is imported in editable mode in dev-notebook,
+# but this is not accessible when running unit tests in ci.
+import sys
+
+sys.path.append("/home/host_user/workspace/composable_logs")
+
 from composable_logs.tasks.task_opentelemetry_logging import get_task_context
 # %%
 ctx = get_task_context(P, use_mlflow_for_logging=True)
