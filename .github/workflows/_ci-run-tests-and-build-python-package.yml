@@ -31,9 +31,9 @@ jobs:
 
       - name: Run unit tests
         run: |
-          @# Note: We do pip install -e for composable-logs. This seems to be necessary
-          @# so we can import the package inside (remote) Ray tasks and notebooks
-          @# tasks. These are run as remote Python processes.
+          # Note: We do pip install -e for composable-logs. This seems to be necessary
+          # so we can import the package inside (remote) Ray tasks and notebooks
+          # tasks. These are run as remote Python processes.
 
           cd docker
           make in-ci-docker/run-command \
