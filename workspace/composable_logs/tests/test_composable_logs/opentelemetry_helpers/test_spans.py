@@ -21,7 +21,7 @@ from composable_logs.helpers import one
 from composable_logs.wrappers import OpenTelemetryTraceParent
 
 
-def test__otel__spans__recorder():
+def test__otel__spans__recorder_with_no_events():
     with SpanRecorder() as rec:
         pass
 
