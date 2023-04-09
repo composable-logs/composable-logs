@@ -7,6 +7,8 @@ services:
     - ./workspace:/home/host_user/workspace
     ports:
     - "8888:8888"
+    environment:
+    - "CC_OPENTELEMETRY_OTLP_COLLECTOR_ENDPOINT=http://otel-collector:4317"
     command:
     - |
       cd /home/host_user/workspace

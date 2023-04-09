@@ -1,0 +1,37 @@
+# ------------------------------------------------------------------------------
+# Note: This file is based on example code from https://github.com/grafana/tempo
+# (AGPL-3.0 licensed). Please see the README.md in this directory for details.
+# ------------------------------------------------------------------------------
+
+version: "3"
+services:
+  otel-collector:
+    hostname: otel-collector
+    image: otel/opentelemetry-collector:0.61.0
+    command: [ "--config=/etc/otel-collector.yaml" ]
+    volumes:
+      - ./docker/dev-grafana-tempo/otel-collector.yaml:/etc/otel-collector.yaml
+
+  tempo:
+    hostname: tempo
+    image: grafana/tempo:latest
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./docker/dev-grafana-tempo/tempo.yaml:/etc/tempo.yaml
+      - ./docker/dev-grafana-tempo/tempo-data:/tmp/tempo
+    ports:
+      - "3200"
+      - "4317"
+      - "4318"
+
+  grafana:
+    image: grafana/grafana:9.3.2
+    volumes:
+      - ./docker/dev-grafana-tempo/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    ports:
+      - "3000:3000"

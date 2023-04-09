@@ -2,11 +2,12 @@
 {
   "name": "composable-logs dev",
   "dockerComposeFile": [
-    ".devcontainer-docker-compose.yml"
+    ".devcontainer-docker-compose.yml",
+    "docker/dev-grafana-tempo/docker-compose.yaml"
   ],
   "service": "dev-environment",
-  "runServices": [],
   "forwardPorts": [
+    3000,
     8888
   ],
   "remoteEnv": {},
@@ -14,4 +15,9 @@
     "ms-python.python"
   ],
   "workspaceFolder": "/home/host_user/workspace",
+  "portsAttributes": {
+    "3000": {
+      "label": "grafana"
+    }
+  }
 }

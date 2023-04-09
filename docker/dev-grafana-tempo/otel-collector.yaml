@@ -1,0 +1,21 @@
+# ------------------------------------------------------------------------------
+# Note: This file is based on example code from https://github.com/grafana/tempo
+# (AGPL-3.0 licensed). Please see the README.md in this directory for details.
+# ------------------------------------------------------------------------------
+
+# See: https://opentelemetry.io/docs/collector/configuration/
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+exporters:
+  otlp:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlp]

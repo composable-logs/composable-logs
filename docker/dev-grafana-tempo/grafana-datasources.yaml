@@ -1,0 +1,21 @@
+# ------------------------------------------------------------------------------
+# Note: This file is based on example code from https://github.com/grafana/tempo
+# (AGPL-3.0 licensed). Please see the README.md in this directory for details.
+# ------------------------------------------------------------------------------
+
+apiVersion: 1
+
+datasources:
+- name: Tempo
+  type: tempo
+  access: proxy
+  orgId: 1
+  url: http://tempo:3200
+  basicAuth: false
+  isDefault: true
+  version: 1
+  editable: false
+  apiVersion: 1
+  uid: tempo
+  jsonData:
+    httpMethod: GET
