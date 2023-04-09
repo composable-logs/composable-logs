@@ -15,8 +15,7 @@ def _ray_init():
         namespace="pydar-ray-cluster",
         num_cpus=2,
         ignore_reinit_error=True,
-        # enable tracing and write traces to /tmp/spans/<pid>.txt in JSONL format
-        _tracing_startup_hook="ray.util.tracing.setup_local_tmp_tracing:setup_tracing",
+        _tracing_startup_hook="composable_logs.opentelemetry_helpers:local_setup_tracing",
     )
 
 

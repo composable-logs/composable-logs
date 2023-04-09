@@ -13,7 +13,7 @@ from typing import (
     TypeVar,
 )
 
-import glob, time
+import glob, time, os
 from pathlib import Path
 
 # -
@@ -27,6 +27,65 @@ from opentelemetry import context, baggage  # type: ignore
 from composable_logs.helpers import pairs, flatten, read_jsonl
 
 AttributesDict = Mapping[str, Any]
+
+
+# --- OpenTelemetry setup ---
+
+import os
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import (
+    ConsoleSpanExporter,
+    SimpleSpanProcessor,
+)
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+
+def local_setup_tracing() -> None:
+    """
+    Setup Ray OpenTelemetry tracing
+
+    Note:
+    This function `local_setup_tracing` is based on code from the Ray code base
+    (as of 4/2023). And, Ray is distributed under the terms of the Apache-2 license
+    while Composable Logs is distributed under the terms of the MIT license.
+
+    See:
+    - https://github.com/ray-project/ray/tree/master/python/ray/util/tracing
+    - https://docs.ray.io/en/latest/ray-observability/ray-tracing.html
+
+    See the above repo for details.
+    """
+
+    spans_dir = "/tmp/spans/"
+
+    os.makedirs("/tmp/spans", exist_ok=True)
+
+    trace.set_tracer_provider(TracerProvider())
+    trace.get_tracer_provider().add_span_processor(  # type: ignore
+        SimpleSpanProcessor(
+            ConsoleSpanExporter(
+                out=open(f"{spans_dir}{os.getpid()}.txt", "w"),
+                formatter=lambda span: span.to_json(indent=None) + os.linesep,
+            )
+        )
+    )
+
+    # Optionally send traces to Grafana/Tempo backend for interactive analysis.
+    # This is useful for development.
+    CC_OPENTELEMETRY_OTLP_COLLECTOR_ENDPOINT = os.getenv(
+        "CC_OPENTELEMETRY_OTLP_COLLECTOR", None
+    )
+    if CC_OPENTELEMETRY_OTLP_COLLECTOR_ENDPOINT is not None:
+        trace.get_tracer_provider().add_span_processor(  # type: ignore
+            BatchSpanProcessor(
+                OTLPSpanExporter(
+                    endpoint=CC_OPENTELEMETRY_OTLP_COLLECTOR_ENDPOINT,
+                    insecure=True,
+                )
+            )
+        )
 
 
 # ---- baggage helpers ----

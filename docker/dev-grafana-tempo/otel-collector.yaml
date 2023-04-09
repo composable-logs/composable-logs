@@ -3,6 +3,8 @@
 # (AGPL-3.0 licensed). Please see the README.md in this directory for details.
 # ------------------------------------------------------------------------------
 
+# See: https://opentelemetry.io/docs/collector/configuration/
+
 receivers:
   otlp:
     protocols:
