@@ -8,7 +8,7 @@ opentelemetry-sdk==1.15.0
 opentelemetry-exporter-otlp==1.15.0
 fastcore==1.4.3
 ghapi==0.1.19
-requests==2.27.1
+requests==2.31.0
 python-dateutil==2.8.2
 pydantic==1.10.4
 jsonschema[format-nongpl]==4.17.3
